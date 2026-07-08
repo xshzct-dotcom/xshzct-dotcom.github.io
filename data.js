@@ -2622,7 +2622,7 @@ const albums = [
         'images/oldworld/青海/Z30_7292_看图王.jpg',
     ],
   },
-  { id: 'life', title: '生活', photos: [
+  { id: 'life', title: '宿舍and小五', photos: [
         'images/oldworld/生活/AAA8273_看图王.jpg',
         'images/oldworld/生活/AAA8275_看图王.jpg',
         'images/oldworld/生活/AAA8293_看图王.jpg',
