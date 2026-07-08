@@ -396,7 +396,7 @@ function updateModalView() {
     const cat = essayCategories[current.catIndex];
     const essay = cat.articles[current.index];
     title.textContent = essay.title;
-    body.innerHTML = `<div class="content-header"><div class="content-title">${essay.title}</div><div class="content-date">${essay.date || ''}</div></div><div class="content-body">${formatBody(essay.body)}</div><div class="content-nav"><button onclick="prevEssayArticle(${current.catIndex}, ${current.index})" ${current.index === 0 ? 'disabled' : ''}>← 上一篇</button><span style="color:rgba(255,255,255,0.5);font-size:0.85rem;">${current.index + 1} / ${cat.articles.length}</span><button onclick="nextEssayArticle(${current.catIndex}, ${current.index})" ${current.index === cat.articles.length - 1 ? 'disabled' : ''}>下一篇 →</button></div>`;
+    body.innerHTML = `<div class="content-header"><div class="content-title">${essay.title}</div><div class="content-date">${essay.date || ''}</div></div><div class="content-body">${formatBody(essay.body)}</div><div class="content-nav"><button onclick="nextEssayArticle(${current.catIndex}, ${current.index})" ${current.index === cat.articles.length - 1 ? 'disabled' : ''}>← 上一篇</button><span style="color:rgba(255,255,255,0.5);font-size:0.85rem;">${current.index + 1} / ${cat.articles.length}</span><button onclick="prevEssayArticle(${current.catIndex}, ${current.index})" ${current.index === 0 ? 'disabled' : ''}>下一篇 →</button></div>`;
   } else if (current.type === 'travel') {
     if (current.index === -1) {
       title.textContent = '旅行见闻';
