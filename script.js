@@ -374,6 +374,10 @@ function updateModalView() {
   const title = document.getElementById('modalTitle');
   const body = document.getElementById('modalBody');
   const backBtn = document.getElementById('modalBack');
+  // 内容过渡动画
+  body.classList.remove('content-enter');
+  void body.offsetWidth; // 强制回流触发重播
+  setTimeout(function() { body.classList.add('content-enter'); }, 10);
   const current = modalStack[modalStack.length - 1];
   backBtn.style.visibility = modalStack.length > 1 ? 'visible' : 'hidden';
 
@@ -396,7 +400,7 @@ function updateModalView() {
     const cat = essayCategories[current.catIndex];
     const essay = cat.articles[current.index];
     title.textContent = essay.title;
-    body.innerHTML = `<div class="content-header"><div class="content-title">${essay.title}</div><div class="content-date">${essay.date || ''}</div></div><div class="content-body">${formatBody(essay.body)}</div><div class="content-nav"><button onclick="prevEssayArticle(${current.catIndex}, ${current.index})" ${current.index === 0 ? 'disabled' : ''}>← 上一篇</button><span style="color:rgba(255,255,255,0.5);font-size:0.85rem;">${current.index + 1} / ${cat.articles.length}</span><button onclick="nextEssayArticle(${current.catIndex}, ${current.index})" ${current.index === cat.articles.length - 1 ? 'disabled' : ''}>下一篇 →</button></div>`;
+    body.innerHTML = `<div class="content-header"><div class="content-title">${essay.title}</div><div class="content-date">${essay.date || ''}</div><div class="font-controls"><span class="font-size-label">字号</span><button onclick="changeEssayFontSize(-0.15)" title="缩小">A−</button><button onclick="changeEssayFontSize(0.15)" title="放大">A+</button></div></div><div class="content-body" style="font-size:${window.getEssayFontSize ? window.getEssayFontSize() : 1.5}rem">${formatBody(essay.body)}</div><div class="content-nav"><button onclick="prevEssayArticle(${current.catIndex}, ${current.index})" ${current.index === 0 ? 'disabled' : ''}>← 上一篇</button><span style="color:rgba(255,255,255,0.5);font-size:0.85rem;">${current.index + 1} / ${cat.articles.length}</span><button onclick="nextEssayArticle(${current.catIndex}, ${current.index})" ${current.index === cat.articles.length - 1 ? 'disabled' : ''}>下一篇 →</button></div>`;
   } else if (current.type === 'travel') {
     if (current.index === -1) {
       title.textContent = '旅行见闻';
@@ -1153,4 +1157,177 @@ document.querySelectorAll('nav a').forEach(anchor => {
       modalBody.classList.remove('scrolling');
     }, 1000);
   }, { passive: true });
+})();
+
+// ==================== 暗黑模式 ====================
+(function() {
+  const toggle = document.getElementById('themeToggle');
+  if (!toggle) return;
+  const saved = localStorage.getItem('theme');
+  if (saved === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    toggle.textContent = '🌙';
+  }
+  toggle.addEventListener('click', function() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'light');
+      toggle.textContent = '☀️';
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('theme', 'dark');
+      toggle.textContent = '🌙';
+    }
+  });
+})();
+
+// ==================== 回到顶部 + 滚动进度 ====================
+(function() {
+  const btn = document.getElementById('backToTop');
+  const progress = document.getElementById('readProgress');
+  if (!btn) return;
+  let ticking = false;
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      requestAnimationFrame(function() {
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollPercent = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+        if (progress) {
+          progress.style.width = scrollPercent + '%';
+          progress.classList.toggle('visible', scrollPercent > 2);
+        }
+        btn.classList.toggle('visible', scrollTop > 400);
+        ticking = false;
+      });
+      ticking = true;
+    }
+  }, { passive: true });
+  btn.addEventListener('click', function() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+})();
+
+// ==================== 键盘快捷键 ====================
+(function() {
+  let hideTimer;
+  const hint = document.getElementById('kbdHint');
+  function showHint() {
+    if (hint) {
+      hint.classList.add('visible');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(function() { hint.classList.remove('visible'); }, 3000);
+    }
+  }
+  document.addEventListener('keydown', function(e) {
+    // Esc - 关闭弹窗/灯箱
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (document.querySelector('.lightbox.active')) {
+        closeLightbox();
+      } else {
+        closeModal();
+      }
+      showHint();
+      return;
+    }
+    // ← → 导航
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const lb = document.getElementById('lightbox');
+      if (lb && lb.classList.contains('active')) {
+        e.preventDefault();
+        if (e.key === 'ArrowLeft') prevPhoto();
+        else nextPhoto();
+        showHint();
+        return;
+      }
+      // 文章导航
+      const modal = document.getElementById('cardModal');
+      if (modal && modal.classList.contains('active')) {
+        const cur = modalStack[modalStack.length - 1];
+        if (cur && cur.type === 'essayArticle') {
+          e.preventDefault();
+          if (e.key === 'ArrowLeft') {
+            // 上一篇（更旧）
+            var prevBtn = document.querySelector('.content-nav button:first-child');
+            if (prevBtn && !prevBtn.disabled) prevBtn.click();
+          } else {
+            // 下一篇（更新）
+            var nextBtn = document.querySelector('.content-nav button:last-child');
+            if (nextBtn && !nextBtn.disabled) nextBtn.click();
+          }
+          showHint();
+        }
+      }
+    }
+  });
+  // 首次加载显示提示
+  setTimeout(showHint, 2000);
+})();
+
+// ==================== 文章字体大小调节 ====================
+(function() {
+  let currentFontSize = 1.5; // rem
+  const FONT_KEY = 'essayFontSize';
+  const saved = localStorage.getItem(FONT_KEY);
+  if (saved) {
+    currentFontSize = parseFloat(saved);
+  }
+  window.getEssayFontSize = function() { return currentFontSize; };
+  window.changeEssayFontSize = function(delta) {
+    currentFontSize = Math.max(1.0, Math.min(2.5, currentFontSize + delta));
+    localStorage.setItem(FONT_KEY, currentFontSize);
+    const body = document.querySelector('.modal-body .content-body');
+    if (body) body.style.fontSize = currentFontSize + 'rem';
+  };
+  // 在文章渲染后应用字体大小
+  var origUpdate = updateModalView;
+  if (origUpdate) {
+    var origRender = updateModalView;
+    updateModalView = function() {
+      origRender.apply(this, arguments);
+      var cb = document.querySelector('.modal-body .content-body');
+      if (cb) cb.style.fontSize = currentFontSize + 'rem';
+    };
+  }
+})();
+
+// ==================== 页面过渡动画 ====================
+(function() {
+  const overlay = document.getElementById('pageTransition');
+  if (!overlay) return;
+  // 淡入
+  overlay.classList.add('active');
+  setTimeout(function() {
+    overlay.classList.remove('active');
+  }, 300);
+  // 监听导航链接
+  document.querySelectorAll('nav a[href^="#"]').forEach(function(a) {
+    a.addEventListener('click', function(e) {
+      // 锚点导航 - 支持平滑滚动
+      var target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+})();
+
+// ==================== 灯箱键盘提示增强 ====================
+// 灯箱打开时显示键盘提示
+(function() {
+  var origOpen = openLightbox;
+  if (origOpen) {
+    window.openLightbox = function(index) {
+      origOpen(index);
+      var hint = document.getElementById('kbdHint');
+      if (hint) {
+        hint.innerHTML = '<kbd>←</kbd> <kbd>→</kbd> 切换照片 · <kbd>Esc</kbd> 关闭 · 滚轮缩放';
+        hint.classList.add('visible');
+        setTimeout(function() { hint.classList.remove('visible'); }, 3000);
+      }
+    };
+  }
 })();

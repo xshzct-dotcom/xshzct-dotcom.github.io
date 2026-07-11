@@ -10,6 +10,12 @@
   --gray:#888;
   --light-gray:#e8e4df;
   --accent:#8b7355;
+  --bg:#faf9f6;
+  --bg-card:#faf9f6;
+  --border:rgba(0,0,0,0.08);
+  --text:#111;
+  --text-secondary:#888;
+  --header-bg:rgba(250,249,246,0.96);
   --font-serif:'Cormorant Garamond','Noto Serif SC',serif;
   --font-sans:'Helvetica Neue',Helvetica,Arial,sans-serif;
   --transition:0.3s ease;
@@ -19,11 +25,24 @@
   --duration-std:0.5s;
   --duration-slow:0.7s
 }
-html{scroll-behavior:smooth;background:#fff}
-body{font-family:var(--font-serif);background:#faf9f6;color:var(--black);line-height:1.8;font-size:1.1rem;-webkit-font-smoothing:antialiased}
+[data-theme="dark"]{
+  --black:#faf9f6;
+  --white:#111;
+  --gray:#999;
+  --light-gray:#333;
+  --accent:#a88c6e;
+  --bg:#1a1a1a;
+  --bg-card:#222;
+  --border:rgba(255,255,255,0.08);
+  --text:#faf9f6;
+  --text-secondary:#999;
+  --header-bg:rgba(26,26,26,0.96);
+}
+html{scroll-behavior:smooth;background:var(--bg)}
+body{font-family:var(--font-serif);background:var(--bg);color:var(--text);line-height:1.8;font-size:1.1rem;-webkit-font-smoothing:antialiased;transition:background-color var(--duration-std) ease,color var(--duration-std) ease}
 
 /* --- Header --- */
-header{position:fixed;top:0;left:0;right:0;background:rgba(250,249,246,0.96);-webkit-backdrop-filter:blur(12px) saturate(180%);backdrop-filter:blur(12px) saturate(180%);z-index:1000;padding:1.2rem 3rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--light-gray)}
+header{position:fixed;top:0;left:0;right:0;background:var(--header-bg);-webkit-backdrop-filter:blur(12px) saturate(180%);backdrop-filter:blur(12px) saturate(180%);z-index:1000;padding:1.2rem 3rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
 .logo{font-size:1.3rem;font-weight:700;color:var(--black);text-decoration:none;letter-spacing:0.05em}
 nav{display:flex;gap:2rem}
 nav a{color:var(--gray);text-decoration:none;font-size:0.9rem;transition:color var(--transition);font-family:var(--font-sans)}
@@ -321,3 +340,40 @@ a:active,button:active,.card:active,.album-card:active,.post-card:active{transfo
 /* --- 淡入动画 (IntersectionObserver) --- */
 .fade-up{opacity:0;transform:translateY(20px);transition:opacity var(--duration-slow) var(--ease-out-expo),transform var(--duration-slow) var(--ease-out-expo)}
 .fade-up.visible{opacity:1;transform:translateY(0)}
+
+/* ===== 暗黑模式切换 ===== */
+.theme-toggle{background:none;border:none;color:var(--gray);font-size:1.2rem;cursor:pointer;padding:0.3rem;line-height:1;transition:color var(--transition),transform 0.3s;font-family:var(--font-sans);display:flex;align-items:center;gap:0.3rem}
+.theme-toggle:hover{color:var(--text);transform:rotate(12deg)}
+.theme-toggle span{font-size:0.75rem;letter-spacing:0.05em;text-transform:uppercase;font-weight:500}
+@media(max-width:600px){.theme-toggle span{display:none}}
+
+/* ===== 回到顶部 ===== */
+.back-to-top{position:fixed;bottom:5rem;right:0.8rem;z-index:2999;width:44px;height:44px;border-radius:50%;background:var(--accent);color:white;border:none;cursor:pointer;opacity:0;transform:translateY(20px) scale(0.8);pointer-events:none;transition:all var(--duration-std) var(--ease-out-expo);box-shadow:0 4px 16px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;font-size:1.3rem}
+.back-to-top.visible{opacity:1;transform:translateY(0) scale(1);pointer-events:all}
+.back-to-top:hover{transform:translateY(-3px) scale(1.08);box-shadow:0 6px 24px rgba(0,0,0,0.3)}
+.back-to-top:active{transform:scale(0.92)}
+.back-to-top svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:600px){.back-to-top{bottom:6rem;right:0.5rem;width:40px;height:40px;font-size:1.1rem}}
+
+/* ===== 阅读进度条 ===== */
+.read-progress{position:fixed;top:0;left:0;width:0;height:3px;background:linear-gradient(90deg,var(--accent),#c9a97c);z-index:10000;transition:width 0.1s linear;pointer-events:none;opacity:0}
+.read-progress.visible{opacity:1}
+
+/* ===== 文章阅读字体调节 ===== */
+.font-controls{display:flex;gap:0.4rem;margin-bottom:1rem;justify-content:flex-end;align-items:center}
+.font-controls button{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.7);width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:all 0.2s;font-family:var(--font-sans)}
+.font-controls button:hover{background:rgba(255,255,255,0.18);color:white}
+.font-controls .font-size-label{font-size:0.75rem;color:rgba(255,255,255,0.4);font-family:var(--font-sans);margin-right:0.3rem}
+
+/* ===== 弹窗过渡动画增强 ===== */
+.modal-body.content-enter{animation:contentSlideIn var(--duration-std) var(--ease-out-expo) both}
+@keyframes contentSlideIn{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+
+/* ===== 键盘快捷键提示 ===== */
+.kbd-hint{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:rgba(255,255,255,0.6);padding:0.4rem 1rem;border-radius:20px;font-size:0.75rem;font-family:var(--font-sans);z-index:10000;pointer-events:none;opacity:0;transition:opacity 0.5s;letter-spacing:0.04em}
+.kbd-hint.visible{opacity:1}
+.kbd-hint kbd{background:rgba(255,255,255,0.12);padding:0.1rem 0.4rem;border-radius:3px;font-size:0.7rem;margin:0 0.1rem}
+
+/* ===== 页面过渡遮罩 ===== */
+.page-transition{position:fixed;inset:0;background:var(--bg);z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.4s ease}
+.page-transition.active{opacity:1}

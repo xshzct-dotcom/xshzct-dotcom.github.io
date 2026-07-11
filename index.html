@@ -28,6 +28,7 @@
       <a href="#albums" class="nav-link">随笔</a>
       <a href="#writing" class="nav-link">我眼中的世界</a>
       <a href="#about" class="nav-link">关于</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="切换主题">☀️</button>
     </nav>
   </header>
   <section class="hero">
@@ -118,6 +119,21 @@
   </div>
   <div class="album-zoom-hint" id="zoomHint">按住 Ctrl + 滚动鼠标滚轮缩放缩略图</div>
   <audio id="bgMusic" preload="none"></audio>
+  
+  <!-- 阅读进度条 -->
+  <div class="read-progress" id="readProgress"></div>
+  
+  <!-- 回到顶部 -->
+  <button class="back-to-top" id="backToTop" aria-label="回到顶部">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
+  </button>
+  
+  <!-- 键盘快捷键提示 -->
+  <div class="kbd-hint" id="kbdHint">← <kbd>←</kbd> <kbd>→</kbd> 翻页 · <kbd>Esc</kbd> 关闭</div>
+  
+  <!-- 页面过渡遮罩 -->
+  <div class="page-transition" id="pageTransition"></div>
+  
   <script defer src="data.js?v=20260709"></script>
   <script defer src="script.js?v=20260709"></script>
 </body>
