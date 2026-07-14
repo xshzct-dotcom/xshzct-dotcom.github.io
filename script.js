@@ -349,10 +349,6 @@ function renderAlbumPhotos(photos, grid) {
 }
 function openCategory(catIndex) {
   modalStack.push({ type: 'essayCategory', catIndex, index: -1 });
-  // 童年篇切换专属背景音乐
-  if (essayCategories[catIndex] && essayCategories[catIndex].id === 'childhood') {
-    switchPlaylist(childhoodPlaylist);
-  }
   updateModalView();
 }
 function openContent(type, index) { modalStack.push({ type, index }); updateModalView(); }
@@ -1237,8 +1233,8 @@ document.querySelectorAll('nav a').forEach(anchor => {
       const lb = document.getElementById('lightbox');
       if (lb && lb.classList.contains('active')) {
         e.preventDefault();
-        if (e.key === 'ArrowLeft') prevPhoto();
-        else nextPhoto();
+        if (e.key === 'ArrowLeft') changePhoto(-1);
+        else changePhoto(1);
         showHint();
         return;
       }
