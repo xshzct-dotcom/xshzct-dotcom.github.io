@@ -82,8 +82,8 @@ const preloader = new Preloader();
 
 // ==================== 数据 ====================
 const playlist = [
-  { name: '旅行的意义', url: CDN.music + '/' + encodeURIComponent('旅行的意义.mp3') },
   { name: '太聪明', url: CDN.music + '/' + encodeURIComponent('太聪明.mp3') },
+  { name: '旅行的意义', url: CDN.music + '/' + encodeURIComponent('旅行的意义.mp3') },
   { name: '海芋恋', url: CDN.music + '/' + encodeURIComponent('海芋恋.mp3') }
 ];
 
@@ -2721,9 +2721,9 @@ const oldworldGroups = [
     title: '初恋宇宙',
     cover: 'images/covers/firstlove_cover.jpg',
     songs: [
-      { name: '陈绮贞 - 告诉我', url: CDN.music + '/' + encodeURIComponent('陈绮贞 - 告诉我.mp3') },
+      { name: 'Cookies - 最后一块', url: CDN.music + '/' + encodeURIComponent('Cookies - 最后一块.mp3') },
       { name: '杨千嬅 - 小飞侠', url: CDN.music + '/' + encodeURIComponent('杨千嬅 - 小飞侠.mp3') },
-      { name: 'Cookies - 最后一块', url: CDN.music + '/' + encodeURIComponent('Cookies - 最后一块.mp3') }
+      { name: '陈绮贞 - 告诉我', url: CDN.music + '/' + encodeURIComponent('陈绮贞 - 告诉我.mp3') }
     ],
     children: [
       { type: 'album', ref: 'chuanxi', title: '川西' },
