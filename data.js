@@ -82,9 +82,9 @@ const preloader = new Preloader();
 
 // ==================== 数据 ====================
 const playlist = [
-  { name: '太聪明', url: CDN.music + '/' + encodeURIComponent('太聪明.mp3') },
+  { name: '海芋恋', url: CDN.music + '/' + encodeURIComponent('海芋恋.mp3') },
   { name: '旅行的意义', url: CDN.music + '/' + encodeURIComponent('旅行的意义.mp3') },
-  { name: '海芋恋', url: CDN.music + '/' + encodeURIComponent('海芋恋.mp3') }
+  { name: '太聪明', url: CDN.music + '/' + encodeURIComponent('太聪明.mp3') }
 ];
 
 
