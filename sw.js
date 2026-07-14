@@ -1,7 +1,7 @@
 // ============================================
 // Service Worker - 离线缓存与加速
 // ============================================
-const CACHE = 'blog-v3';
+const CACHE = 'blog-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
