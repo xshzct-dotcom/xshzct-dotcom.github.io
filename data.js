@@ -2488,7 +2488,6 @@ const albums = [
     ],
   },
   { id: 'dali', title: '大理', cover: 'images/oldworld/大理/DSC_0640_看图王.jpg', photos: [
-        'images/oldworld/大理/DSC_0588_看图王.jpg',
         'images/oldworld/大理/DSC_0591_看图王.jpg',
         'images/oldworld/大理/DSC_0592_看图王.jpg',
         'images/oldworld/大理/DSC_0594_看图王.jpg',
