@@ -931,15 +931,16 @@ function handleLightboxDoubleTap(e) {
     lightboxPanY = 0;
     updateImageTransform(true);
   } else {
-    // 双击位置放大
+    // 双击位置放大：把点击点移到屏幕中心
     const rect = img.getBoundingClientRect();
     const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
     const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
     const offsetX = (clientX - rect.left) / rect.width;
     const offsetY = (clientY - rect.top) / rect.height;
     lightboxScale = 2.5;
-    lightboxPanX = 0;
-    lightboxPanY = 0;
+    // 让点击位置成为新的视觉中心
+    lightboxPanX = (0.5 - offsetX) * rect.width * (lightboxScale - 1);
+    lightboxPanY = (0.5 - offsetY) * rect.height * (lightboxScale - 1);
     updateImageTransform(true);
   }
 }
@@ -1071,6 +1072,29 @@ function initLightboxGestures() {
     if (window.innerWidth <= 600) return; // 手机上走 touch 事件
     handleLightboxDoubleTap(e);
   });
+
+  // 鼠标滚轮缩放（以光标位置为中心）
+  stage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const img = document.getElementById('lightboxImg');
+    if (!img) return;
+    const delta = -e.deltaY;
+    const factor = delta > 0 ? 1.18 : 1 / 1.18;
+    const newScale = Math.max(1, Math.min(6, lightboxScale * factor));
+    if (newScale === lightboxScale) return;
+    // 以光标位置为中心缩放：保持光标点视觉不动
+    const rect = img.getBoundingClientRect();
+    const offsetX = (e.clientX - rect.left) / rect.width;
+    const offsetY = (e.clientY - rect.top) / rect.height;
+    // 旧缩放下的光标相对中心偏移 → 调整后让光标仍在那里
+    const oldScale = lightboxScale;
+    lightboxScale = newScale;
+    lightboxPanX = (e.clientX - rect.left) - offsetX * rect.width * newScale;
+    lightboxPanY = (e.clientY - rect.top) - offsetY * rect.height * newScale;
+    // 缩放比例为 1 时归零
+    if (newScale === 1) { lightboxPanX = 0; lightboxPanY = 0; }
+    updateImageTransform(false);
+  }, { passive: false });
 
   // 鼠标轻扫
   let mouseDown = false;
@@ -1207,15 +1231,6 @@ document.querySelectorAll('nav a').forEach(anchor => {
 
 // ==================== 键盘快捷键 ====================
 (function() {
-  let hideTimer;
-  const hint = document.getElementById('kbdHint');
-  function showHint() {
-    if (hint) {
-      hint.classList.add('visible');
-      clearTimeout(hideTimer);
-      hideTimer = setTimeout(function() { hint.classList.remove('visible'); }, 3000);
-    }
-  }
   document.addEventListener('keydown', function(e) {
     // Esc - 关闭弹窗/灯箱
     if (e.key === 'Escape') {
@@ -1225,7 +1240,6 @@ document.querySelectorAll('nav a').forEach(anchor => {
       } else {
         closeModal();
       }
-      showHint();
       return;
     }
     // ← → 导航
@@ -1235,7 +1249,6 @@ document.querySelectorAll('nav a').forEach(anchor => {
         e.preventDefault();
         if (e.key === 'ArrowLeft') changePhoto(-1);
         else changePhoto(1);
-        showHint();
         return;
       }
       // 文章导航
@@ -1253,13 +1266,10 @@ document.querySelectorAll('nav a').forEach(anchor => {
             var nextBtn = document.querySelector('.content-nav button:last-child');
             if (nextBtn && !nextBtn.disabled) nextBtn.click();
           }
-          showHint();
         }
       }
     }
   });
-  // 首次加载显示提示
-  setTimeout(showHint, 2000);
 })();
 
 // ==================== 文章字体大小调节 ====================
@@ -1311,19 +1321,3 @@ document.querySelectorAll('nav a').forEach(anchor => {
   });
 })();
 
-// ==================== 灯箱键盘提示增强 ====================
-// 灯箱打开时显示键盘提示
-(function() {
-  var origOpen = openLightbox;
-  if (origOpen) {
-    window.openLightbox = function(index) {
-      origOpen(index);
-      var hint = document.getElementById('kbdHint');
-      if (hint) {
-        hint.innerHTML = '<kbd>←</kbd> <kbd>→</kbd> 切换照片 · <kbd>Esc</kbd> 关闭 · 滚轮缩放';
-        hint.classList.add('visible');
-        setTimeout(function() { hint.classList.remove('visible'); }, 3000);
-      }
-    };
-  }
-})();
