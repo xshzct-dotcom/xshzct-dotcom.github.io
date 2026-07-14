@@ -1097,18 +1097,42 @@ function initLightboxGestures() {
     updateImageTransform(false);
   }, { passive: false });
 
-  // 鼠标轻扫
+  // 鼠标拖动
   let mouseDown = false;
+  let dragStartX = 0, dragStartY = 0;
+  let dragPanX = 0, dragPanY = 0;
   stage.addEventListener('mousedown', (e) => {
-    if (lightboxScale > 1 || e.button !== 0) return;
+    if (e.button !== 0) return;
     mouseDown = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    dragPanX = lightboxPanX;
+    dragPanY = lightboxPanY;
     lightboxTouchStartX = e.clientX;
     lightboxTouchStartY = e.clientY;
     lightboxTouchStartTime = Date.now();
+    if (lightboxScale > 1) {
+      e.preventDefault();
+      const img = document.getElementById('lightboxImg');
+      if (img) img.classList.add('grabbing');
+    }
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!mouseDown) return;
+    if (lightboxScale > 1) {
+      // 放大状态下拖动平移
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      lightboxPanX = dragPanX + dx;
+      lightboxPanY = dragPanY + dy;
+      updateImageTransform(false);
+    }
   });
   window.addEventListener('mouseup', (e) => {
     if (!mouseDown) return;
     mouseDown = false;
+    const img = document.getElementById('lightboxImg');
+    if (img) img.classList.remove('grabbing');
     if (lightboxScale <= 1) handleSwipeEnd(e.clientX, e.clientY);
   });
 }
