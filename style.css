@@ -236,7 +236,7 @@ footer a:hover{color:var(--black)}
 .lightbox-stage{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;contain:layout style paint}
 .lightbox-thumb{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;filter:blur(24px) brightness(0.4);opacity:0;transform:scale(1.08);transition:opacity 0.4s ease,transform 6s ease;z-index:1;pointer-events:none}
 .lightbox-thumb.visible{opacity:1}
-.lightbox img{position:relative;z-index:2;max-width:92%;max-height:92vh;object-fit:contain;border-radius:4px;opacity:0;transform:scale(0.96);transition:opacity 0.45s cubic-bezier(0.22,1,0.36,1),transform 0.45s cubic-bezier(0.22,1,0.36,1);pointer-events:none;will-change:transform}
+.lightbox img{position:relative;z-index:2;max-width:92%;max-height:92vh;object-fit:contain;border-radius:4px;opacity:0;transform:scale(0.96);transition:opacity 0.45s cubic-bezier(0.22,1,0.36,1),transform 0.45s cubic-bezier(0.22,1,0.36,1);transform-origin:center center;pointer-events:none;will-change:transform}
 .lightbox img.loaded{opacity:1;transform:scale(1)}
 .lightbox img.zoomed{transition:transform 0.05s linear;cursor:grab}
 .lightbox img.zoomed.grabbing{cursor:grabbing}

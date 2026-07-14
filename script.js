@@ -931,16 +931,18 @@ function handleLightboxDoubleTap(e) {
     lightboxPanY = 0;
     updateImageTransform(true);
   } else {
-    // 双击位置放大：把点击点移到屏幕中心
+    // 双击位置放大：把点击点作为新的视觉中心
     const rect = img.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
     const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
     const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
-    const offsetX = (clientX - rect.left) / rect.width;
-    const offsetY = (clientY - rect.top) / rect.height;
+    const oldScale = lightboxScale;
     lightboxScale = 2.5;
-    // 让点击位置成为新的视觉中心
-    lightboxPanX = (0.5 - offsetX) * rect.width * (lightboxScale - 1);
-    lightboxPanY = (0.5 - offsetY) * rect.height * (lightboxScale - 1);
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+    lightboxPanX += dx * (1 - lightboxScale / oldScale);
+    lightboxPanY += dy * (1 - lightboxScale / oldScale);
     updateImageTransform(true);
   }
 }
@@ -1073,26 +1075,25 @@ function initLightboxGestures() {
     handleLightboxDoubleTap(e);
   });
 
-  // 鼠标滚轮缩放（以光标位置为中心）
+  // 鼠标滚轮缩放（以光标位置为锚点）
   stage.addEventListener('wheel', (e) => {
     e.preventDefault();
     const img = document.getElementById('lightboxImg');
     if (!img) return;
-    const delta = -e.deltaY;
-    const factor = delta > 0 ? 1.18 : 1 / 1.18;
-    const newScale = Math.max(1, Math.min(6, lightboxScale * factor));
-    if (newScale === lightboxScale) return;
-    // 以光标位置为中心缩放：保持光标点视觉不动
-    const rect = img.getBoundingClientRect();
-    const offsetX = (e.clientX - rect.left) / rect.width;
-    const offsetY = (e.clientY - rect.top) / rect.height;
-    // 旧缩放下的光标相对中心偏移 → 调整后让光标仍在那里
     const oldScale = lightboxScale;
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const newScale = Math.max(1, Math.min(6, lightboxScale * factor));
+    if (newScale === oldScale) return;
+    // 让光标下的图片点在缩放后仍位于光标下
+    const rect = img.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = e.clientX - cx;
+    const dy = e.clientY - cy;
     lightboxScale = newScale;
-    lightboxPanX = (e.clientX - rect.left) - offsetX * rect.width * newScale;
-    lightboxPanY = (e.clientY - rect.top) - offsetY * rect.height * newScale;
-    // 缩放比例为 1 时归零
-    if (newScale === 1) { lightboxPanX = 0; lightboxPanY = 0; }
+    lightboxPanX += dx * (1 - newScale / oldScale);
+    lightboxPanY += dy * (1 - newScale / oldScale);
+    if (lightboxScale === 1) { lightboxPanX = 0; lightboxPanY = 0; }
     updateImageTransform(false);
   }, { passive: false });
 
