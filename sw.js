@@ -1,16 +1,11 @@
 // ============================================
-// Service Worker - 离线缓存与加速
+// Service Worker - 照片从 Supabase Storage 加载
 // ============================================
-const CACHE = 'blog-v4';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/data.js',
-  '/script.js'
-];
+const CACHE = 'blog-v5';
+const STATIC_ASSETS = ['/','/index.html','/style.css','/data.js','/script.js','/essay-editor.js'];
 
-// 安装：缓存核心文件
+const SUPABASE_STORAGE = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos';
+
 self.addEventListener('install', function(e) {
   e.waitUntil(
     caches.open(CACHE).then(function(cache) {
@@ -20,7 +15,6 @@ self.addEventListener('install', function(e) {
   self.skipWaiting();
 });
 
-// 激活：清理旧缓存
 self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(names) {
@@ -34,15 +28,35 @@ self.addEventListener('activate', function(e) {
   self.clients.claim();
 });
 
-// 拦截请求：缓存优先，网络回退
+// 拦截请求
 self.addEventListener('fetch', function(e) {
-  // 只缓存同源请求
-  if (!e.request.url.startsWith(self.location.origin)) return;
+  const url = new URL(e.request.url);
+
+  // 图片请求 → 转到 Supabase Storage
+  if (url.pathname.startsWith('/images/') || url.pathname.startsWith('/thumbs/')) {
+    const supabaseUrl = SUPABASE_STORAGE + url.pathname;
+    e.respondWith(
+      fetch(supabaseUrl).then(function(resp) {
+        if (resp && resp.ok) {
+          var clone = resp.clone();
+          caches.open(CACHE).then(function(cache) {
+            cache.put(e.request, clone);
+          });
+        }
+        return resp;
+      }).catch(function() {
+        return caches.match(e.request);
+      })
+    );
+    return;
+  }
+
+  // 其他请求：缓存优先
+  if (!url.href.startsWith(self.location.origin)) return;
 
   e.respondWith(
     caches.match(e.request).then(function(response) {
       return response || fetch(e.request).then(function(resp) {
-        // 只缓存成功响应
         if (resp && resp.status === 200) {
           var clone = resp.clone();
           caches.open(CACHE).then(function(cache) {
@@ -51,10 +65,7 @@ self.addEventListener('fetch', function(e) {
         }
         return resp;
       }).catch(function() {
-        // 离线时返回缓存的页面
-        if (e.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
+        if (e.request.mode === 'navigate') return caches.match('/index.html');
       });
     })
   );
