@@ -1,6 +1,6 @@
 /* =========================================
-   随笔 · 嵌入编辑功能
-   直接在现有网站内管理文章，不需跳转管理页
+   随笔 · 内嵌编辑（无需登录版）
+   点 ⚙️ 开启编辑模式 → 直接增删改
    ========================================= */
 (function() {
   'use strict';
@@ -9,19 +9,17 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
 
   let sb = null;
-  let isAdmin = false;
-  let supabaseEssays = [];
+  let editMode = false;
   let initialized = false;
 
-  // ===== 初始化 Supabase =====
   try {
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   } catch(e) {
-    console.warn('[essay-editor] Supabase init failed:', e);
+    console.warn('[editor] Supabase init failed:', e);
     return;
   }
 
-  // ===== 从 Supabase 加载文章 =====
+  // ===== 从 Supabase 加载 =====
   async function loadFromSupabase() {
     try {
       const { data, error } = await sb
@@ -31,257 +29,207 @@
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.warn('[essay-editor] 加载失败:', error.message);
+        console.warn('[editor] 加载失败:', error.message);
         return false;
       }
       if (data && data.length > 0) {
-        supabaseEssays = data;
         mergeIntoCategories(data);
         return true;
       }
       return false;
     } catch(e) {
-      console.warn('[essay-editor] Error:', e);
+      console.warn('[editor] Error:', e);
       return false;
     }
   }
 
-  // ===== 把 Supabase 数据合并进 essayCategories =====
   function mergeIntoCategories(rows) {
     const groups = {};
     rows.forEach(r => {
       const key = r.category || 'thoughts';
       if (!groups[key]) {
-        groups[key] = {
-          id: key,
-          title: r.category_title || getDefaultTitle(key),
-          articles: []
-        };
+        groups[key] = { id: key, title: r.category_title || getDefaultTitle(key), articles: [] };
       }
       groups[key].articles.push({
         title: r.title,
         date: r.date || '',
         body: r.body,
-        _supabase_id: r.id  // 隐藏ID，用于编辑/删除
+        _sid: r.id
       });
     });
-
-    // 合并到全局 essayCategories
     if (typeof essayCategories !== 'undefined') {
-      // 用 Supabase 数据替换原有的分类内容
       const order = ['childhood', 'firstlove', 'thoughts', 'travel'];
-      const newCats = [];
       order.forEach(key => {
-        if (groups[key]) newCats.push(groups[key]);
-      });
-      // 加上 Supabase 里的额外分类
-      Object.keys(groups).forEach(key => {
-        if (!order.includes(key)) newCats.push(groups[key]);
-      });
-      // 只替换文章数据，保留分类结构
-      newCats.forEach(newCat => {
-        const oldIdx = essayCategories.findIndex(c => c.id === newCat.id);
-        if (oldIdx >= 0) {
-          essayCategories[oldIdx].articles = newCat.articles;
-        } else {
-          essayCategories.push(newCat);
+        if (groups[key]) {
+          const idx = essayCategories.findIndex(c => c.id === key);
+          if (idx >= 0) essayCategories[idx].articles = groups[key].articles;
+          else essayCategories.push(groups[key]);
         }
       });
     }
   }
 
   function getDefaultTitle(key) {
-    const map = { childhood: '童年篇', firstlove: '初恋篇', thoughts: '所思所想', travel: '旅行见闻' };
-    return map[key] || key;
+    return ({ childhood: '童年篇', firstlove: '初恋篇', thoughts: '所思所想', travel: '旅行见闻' })[key] || key;
   }
 
-  // ===== 检查登录状态 =====
-  async function checkSession() {
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      isAdmin = !!session?.user;
-    } catch(e) {
-      isAdmin = false;
-    }
-  }
+  // ===== 注入编辑按钮 =====
+  function injectEditUI() {
+    const modalBody = document.querySelector('.modal-body');
+    if (!modalBody) return;
+    const hasList = modalBody.querySelector('.article-list');
+    const hasBody = modalBody.querySelector('.content-body');
+    if (!hasList && !hasBody) return;
+    if (modalBody.querySelector('.ee-bar')) return;
 
-  // ===== 添加管理 UI =====
-  function injectAdminUI() {
-    // 只在随笔视图注入
-    const observer = new MutationObserver(() => {
-      const modalBody = document.querySelector('.modal-body');
-      if (!modalBody) return;
-      
-      // 检查是否在随笔视图
-      const isEssayView = modalBody.querySelector('.article-list') || 
-                           modalBody.querySelector('.content-body');
-      if (!isEssayView) return;
+    if (editMode) {
+      // 底部工具栏
+      const bar = document.createElement('div');
+      bar.className = 'ee-bar';
+      bar.style.cssText = 'display:flex;gap:8px;justify-content:center;padding:16px 0 8px;border-top:1px solid rgba(255,255,255,0.1);margin-top:12px;flex-wrap:wrap';
+      bar.innerHTML = `
+        <button onclick="ee.add()" style="padding:8px 20px;border:1px solid rgba(255,255,255,0.3);border-radius:20px;background:transparent;color:#fff;font-size:13px;cursor:pointer">✏️ 写新文章</button>
+        <button onclick="ee.toggle()" style="padding:8px 12px;border:1px solid rgba(255,255,255,0.15);border-radius:20px;background:transparent;color:rgba(255,255,255,0.4);font-size:12px;cursor:pointer">退出编辑</button>
+      `;
+      modalBody.appendChild(bar);
 
-      // 检查是否已经注入了管理按钮
-      if (modalBody.querySelector('.essay-admin-bar')) return;
-
-      // 注入管理栏
-      if (isAdmin) {
-        const adminBar = document.createElement('div');
-        adminBar.className = 'essay-admin-bar';
-        adminBar.style.cssText = 'display:flex;gap:8px;justify-content:center;padding:16px 0 8px;border-top:1px solid rgba(255,255,255,0.1);margin-top:12px';
-        adminBar.innerHTML = `
-          <button class="essay-admin-btn" onclick="essayEditor.addArticle()" 
-                  style="padding:8px 20px;border:1px solid rgba(255,255,255,0.3);border-radius:20px;background:transparent;color:#fff;font-size:13px;cursor:pointer">✏️ 写新文章</button>
-          <button class="essay-admin-btn" onclick="essayEditor.logout()"
-                  style="padding:8px 12px;border:1px solid rgba(255,255,255,0.15);border-radius:20px;background:transparent;color:rgba(255,255,255,0.5);font-size:12px;cursor:pointer">退出</button>
+      // 在每篇文章加编辑/删除按钮
+      modalBody.querySelectorAll('.article-item').forEach(item => {
+        if (item.querySelector('.ee-actions')) return;
+        const act = document.createElement('div');
+        act.className = 'ee-actions';
+        act.style.cssText = 'display:flex;gap:4px;margin-top:4px';
+        act.innerHTML = `
+          <button onclick="event.stopPropagation();ee.edit(this)" style="padding:2px 10px;border:1px solid rgba(255,255,255,0.2);border-radius:4px;background:transparent;color:rgba(255,255,255,0.6);font-size:11px;cursor:pointer">✎ 编辑</button>
+          <button onclick="event.stopPropagation();ee.del(this)" style="padding:2px 10px;border:1px solid rgba(255,255,200,0.15);border-radius:4px;background:transparent;color:rgba(255,150,150,0.6);font-size:11px;cursor:pointer">🗑 删除</button>
         `;
-        modalBody.appendChild(adminBar);
+        item.appendChild(act);
+      });
+    }
+  }
 
-        // 在每个文章项加编辑按钮（文章列表）
-        modalBody.querySelectorAll('.article-item').forEach(item => {
-          if (item.querySelector('.essay-edit-btn')) return;
-          const editBtn = document.createElement('button');
-          editBtn.className = 'essay-edit-btn';
-          editBtn.innerHTML = '✎';
-          editBtn.style.cssText = 'position:absolute;right:8px;top:8px;width:28px;height:28px;border:none;border-radius:6px;background:rgba(255,255,255,0.15);color:#fff;font-size:14px;cursor:pointer;opacity:0;transition:opacity .2s;display:flex;align-items:center;justify-content:center';
-          editBtn.title = '编辑';
-          item.style.position = 'relative';
-          item.appendChild(editBtn);
-          item.addEventListener('mouseenter', () => editBtn.style.opacity = '1');
-          item.addEventListener('mouseleave', () => editBtn.style.opacity = '0');
-        });
-      }
+  // 观察模态框变化
+  function watchModal() {
+    const obs = new MutationObserver(() => {
+      setTimeout(injectEditUI, 50);
     });
-
-    observer.observe(document.body, { childList: true, subtree: true });
+    obs.observe(document.body, { childList: true, subtree: true });
   }
 
-  // ===== 登录入口（小齿轮） =====
-  function injectLoginTrigger() {
-    // 在页面底部加一个小齿轮
-    const trigger = document.createElement('div');
-    trigger.id = 'essay-admin-trigger';
-    trigger.textContent = '⚙️';
-    trigger.title = '管理员';
-    trigger.style.cssText = 'position:fixed;bottom:20px;right:20px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.3);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px);transition:all .3s';
-    trigger.onmouseenter = () => { trigger.style.background = 'rgba(255,255,255,0.18)'; trigger.style.color = '#fff'; };
-    trigger.onmouseleave = () => { trigger.style.background = 'rgba(255,255,255,0.08)'; trigger.style.color = 'rgba(255,255,255,0.3)'; };
-    trigger.onclick = handleLoginClick;
-    document.body.appendChild(trigger);
+  // ===== 切换编辑模式 =====
+  function toggleEditMode() {
+    editMode = !editMode;
+    // 清除旧的编辑UI
+    document.querySelectorAll('.ee-bar, .ee-actions').forEach(el => el.remove());
+    if (typeof updateModalView === 'function') updateModalView();
+    setTimeout(injectEditUI, 100);
   }
 
-  let loginAttempts = 0;
-
-  async function handleLoginClick() {
-    if (isAdmin) {
-      // 已登录：直接弹出新增或编辑界面
-      showAddForm();
-      return;
-    }
-
-    // 登录：先注册还是登录？
-    const action = confirm('点"确定"=登录  点"取消"=注册账号');
-    
-    if (action) {
-      // 登录
-      const email = prompt('邮箱:');
-      if (!email) return;
-      const password = prompt('密码:');
-      if (!password) return;
-      const { error } = await sb.auth.signInWithPassword({ email, password });
-      if (error) {
-        alert('❌ 登录失败: ' + error.message);
-      } else {
-        isAdmin = true;
-        alert('✅ 已登录，现在可以编辑文章了');
-        refreshUI();
-      }
-    } else {
-      // 注册
-      const email = prompt('邮箱（你的邮箱）:');
-      if (!email) return;
-      const password = prompt('密码（至少6位）:');
-      if (!password || password.length < 6) { alert('密码至少6位'); return; }
-      const { error } = await sb.auth.signUp({ email, password });
-      if (error) {
-        alert('❌ 注册失败: ' + error.message);
-      } else {
-        alert('✅ 注册成功！请去邮箱确认，然后刷新页面登录。');
-      }
-    }
-  }
-
-  // ===== 显示新增/编辑表单 =====
-  function showAddForm(articleData) {
-    const isEdit = !!articleData;
-    const title = prompt(isEdit ? '标题:' : '新文章 - 标题:', isEdit ? articleData.title : '');
+  // ===== CRUD =====
+  async function addArticle() {
+    const title = prompt('标题:');
     if (!title) return;
-    const date = prompt(isEdit ? '日期（可选）:' : '日期（可选，如 2026.7.20）:', isEdit ? (articleData.date || '') : '');
-    const category = prompt(isEdit ? '分类 (childhood/firstlove/thoughts/travel):' : '分类 (childhood=童年篇 firstlove=初恋篇 thoughts=所思所想 travel=旅行见闻):', isEdit ? articleData._category : 'thoughts');
+    const date = prompt('日期（可选，如 2026.7.20）:', '');
+    const category = prompt('分类:\nchildhood=童年篇  firstlove=初恋篇  thoughts=所思所想  travel=旅行见闻', 'thoughts');
     if (!category) return;
-    const body = prompt('正文:', isEdit ? articleData.body : '');
+    const body = prompt('正文:');
     if (!body) return;
-    saveArticle({ title, date, category, body }, isEdit ? articleData._supabase_id : null);
-  }
 
-  async function saveArticle(data, editId) {
-    const record = {
-      category: data.category,
-      category_title: getDefaultTitle(data.category),
-      title: data.title,
-      date: data.date || '',
-      body: data.body,
-      sort_order: -Date.now(),
-    };
-
-    let error;
-    if (editId) {
-      ({ error } = await sb.from('essays').update(record).eq('id', editId));
-    } else {
-      ({ error } = await sb.from('essays').insert(record));
-    }
-
-    if (error) {
-      alert('❌ 保存失败: ' + error.message);
-      return;
-    }
-    alert('✅ 已保存，刷新页面可见');
+    const { error } = await sb.from('essays').insert({
+      category, category_title: getDefaultTitle(category),
+      title, date: date || '', body, sort_order: -Date.now()
+    });
+    if (error) { alert('❌ 失败: ' + error.message); return; }
+    alert('✅ 已发布');
     await loadFromSupabase();
     if (typeof updateModalView === 'function') updateModalView();
+    setTimeout(injectEditUI, 100);
   }
 
-  // ===== 删除文章 =====
-  async function deleteArticle(id) {
-    if (!confirm('确定删除这篇文章？')) return;
-    const { error } = await sb.from('essays').delete().eq('id', id);
-    if (error) {
-      alert('❌ 删除失败: ' + error.message);
-      return;
+  async function editArticle(btn) {
+    const item = btn.closest('.article-item');
+    if (!item) return;
+    // 从文章列表中找到对应的文章数据
+    const titleEl = item.querySelector('.title');
+    if (!titleEl) return;
+    const titleText = titleEl.textContent;
+    
+    // 从 essayCategories 找对应的文章
+    let articleData = null;
+    for (const cat of (window.essayCategories || [])) {
+      for (const art of cat.articles) {
+        if (art.title === titleText) {
+          articleData = art;
+          break;
+        }
+      }
+      if (articleData) break;
     }
+    if (!articleData) { alert('找不到文章数据'); return; }
+
+    const title = prompt('标题:', articleData.title);
+    if (!title) return;
+    const date = prompt('日期:', articleData.date || '');
+    const body = prompt('正文:', articleData.body);
+    if (!body) return;
+
+    const { error } = await sb.from('essays').update({
+      title, date: date || '', body
+    }).eq('id', articleData._sid);
+
+    if (error) { alert('❌ 失败: ' + error.message); return; }
+    alert('✅ 已更新');
     await loadFromSupabase();
     if (typeof updateModalView === 'function') updateModalView();
+    setTimeout(injectEditUI, 100);
   }
 
-  // ===== 退出 =====
-  async function logout() {
-    await sb.auth.signOut();
-    isAdmin = false;
-    alert('已退出管理');
-    refreshUI();
-  }
+  async function deleteArticle(btn) {
+    if (!confirm('确定删除？')) return;
+    const item = btn.closest('.article-item');
+    if (!item) return;
+    const titleEl = item.querySelector('.title');
+    if (!titleEl) return;
+    const titleText = titleEl.textContent;
 
-  // ===== 刷新界面 =====
-  function refreshUI() {
-    const bars = document.querySelectorAll('.essay-admin-bar');
-    bars.forEach(b => b.remove());
-    const btns = document.querySelectorAll('.essay-edit-btn');
-    btns.forEach(b => b.remove());
+    let articleData = null;
+    for (const cat of (window.essayCategories || [])) {
+      for (const art of cat.articles) {
+        if (art.title === titleText) { articleData = art; break; }
+      }
+      if (articleData) break;
+    }
+    if (!articleData || !articleData._sid) { alert('找不到文章'); return; }
+
+    const { error } = await sb.from('essays').delete().eq('id', articleData._sid);
+    if (error) { alert('❌ 失败: ' + error.message); return; }
+    alert('已删除');
+    await loadFromSupabase();
     if (typeof updateModalView === 'function') updateModalView();
-    injectAdminUI();
+    setTimeout(injectEditUI, 100);
   }
 
-  // ===== 暴露全局方法 =====
-  window.essayEditor = {
-    addArticle: () => showAddForm(),
-    editArticle: (data) => showAddForm(data),
-    deleteArticle: (id) => deleteArticle(id),
-    logout: () => logout(),
+  // ===== 齿轮触发按钮 =====
+  function addTrigger() {
+    const existing = document.getElementById('ee-trigger');
+    if (existing) return;
+    const el = document.createElement('div');
+    el.id = 'ee-trigger';
+    el.textContent = '⚙️';
+    el.title = editMode ? '关闭编辑' : '开启编辑';
+    el.style.cssText = 'position:fixed;bottom:20px;right:20px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);color:' + (editMode ? '#fff' : 'rgba(255,255,255,0.3)') + ';font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px);transition:all .3s';
+    el.onmouseenter = () => { el.style.background = 'rgba(255,255,255,0.18)'; el.style.color = '#fff'; };
+    el.onmouseleave = () => { el.style.background = 'rgba(255,255,255,0.08)'; el.style.color = editMode ? '#fff' : 'rgba(255,255,255,0.3)'; };
+    el.onclick = () => { toggleEditMode(); addTrigger(); };
+    document.body.appendChild(el);
+  }
+
+  // ===== 暴露全局 =====
+  window.ee = {
+    toggle: toggleEditMode,
+    add: addArticle,
+    edit: editArticle,
+    del: deleteArticle,
   };
 
   // ===== 初始化 =====
@@ -289,28 +237,17 @@
     if (initialized) return;
     initialized = true;
 
-    await checkSession();
-    const hasSupabaseData = await loadFromSupabase();
+    const has = await loadFromSupabase();
+    console.log('[editor]', has ? '✅ Supabase 文章已加载' : '📭 无数据，使用 data.js');
 
-    if (hasSupabaseData) {
-      console.log('[essay-editor] ✅ 已从 Supabase 加载文章');
-    } else {
-      console.log('[essay-editor] 📭 Supabase 暂无数据，使用 data.js 数据');
-    }
+    addTrigger();
+    watchModal();
 
-    injectLoginTrigger();
-    injectAdminUI();
-
-    // 监听模态框变化，重新注入管理UI
     document.addEventListener('click', () => {
-      setTimeout(() => injectAdminUI(), 100);
+      setTimeout(injectEditUI, 100);
     });
   }
 
-  // 等页面完全加载后启动
-  if (document.readyState === 'complete') {
-    init();
-  } else {
-    window.addEventListener('load', init);
-  }
+  if (document.readyState === 'complete') init();
+  else window.addEventListener('load', init);
 })();
