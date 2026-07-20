@@ -268,6 +268,45 @@ input[type=file].music-upload{display:none}
     if (loaded) return;
     loaded = true;
     await loadTracks();
+    // 检查是否需要导入现有音乐
+    const { count } = await sb.from('music').select('id', { count: 'exact', head: true });
+    if (count === 0) {
+      // 导入 data.js 里的现有音乐
+      if (typeof playlist !== 'undefined' && playlist.length > 0) {
+        for (const s of playlist) {
+          const filename = decodeURIComponent(s.url.split('/').pop());
+          const mp3Path = 'music/' + filename;
+          const { error } = await sb.from('music').insert({
+            title: s.name, artist: '',
+            album_id: null, storage_path: mp3Path,
+            sort_order: -Date.now(),
+          });
+        }
+        console.log('[music] 导入主页音乐');
+      }
+      // 导入相册音乐（data.js 里的 firstlove.songs / friends.songs）
+      if (typeof albums !== 'undefined') {
+        for (const album of albums) {
+          if (album.albums) {
+            for (const sub of album.albums) {
+              if (sub.songs && sub.songs.length > 0) {
+                for (const s of sub.songs) {
+                  const { error } = await sb.from('music').insert({
+                    title: s.artist + ' - ' + s.name,
+                    artist: s.artist,
+                    album_id: null,
+                    storage_path: 'music/' + encodeURIComponent(s.name) + '.mp3',
+                    sort_order: -(Date.now()),
+                  });
+                }
+                console.log('[music] 导入相册音乐:', sub.name);
+              }
+            }
+          }
+        }
+      }
+      await loadTracks();
+    }
     addTrigger();
   }
 
