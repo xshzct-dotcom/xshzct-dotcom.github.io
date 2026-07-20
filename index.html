@@ -134,7 +134,7 @@
   
   <script defer src="data.js?v=20260715-1"></script>
   <script>
-  // 照片路径重写到 Supabase Storage
+  // 照片路径重写到 Supabase Storage（封面图除外，走GitHub）
   (function() {
     var STORAGE_URL = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos';
     var iv = setInterval(function() {
@@ -143,17 +143,14 @@
         albums.forEach(function(a) {
           if (a.photos) {
             a.photos = a.photos.map(function(p) {
+              // 封面图继续走 GitHub
+              if (p.indexOf('images/covers/') === 0) return p;
               return p.replace(/^images\//, STORAGE_URL + '/');
             });
           }
         });
-        // 封面图
-        albums.forEach(function(a) {
-          if (a.cover && a.cover.startsWith('images/')) {
-            a.cover = a.cover.replace(/^images\//, STORAGE_URL + '/');
-          }
-        });
-        console.log('[cdn] 照片路径已重写为 Supabase Storage');
+        // 封面图保持走 GitHub（不重写）
+        console.log('[cdn] 照片路径已重写（封面除外）');
       }
     }, 50);
   })();
