@@ -273,10 +273,16 @@
     if (!item) return null;
     const t = item.querySelector('.title');
     if (!t) return null;
-    const titleText = t.textContent;
-    for (const cat of (window.essayCategories || [])) {
-      for (const art of cat.articles) {
-        if (art.title === titleText) return art;
+    const titleText = (t.textContent || '').trim().replace(/\s+/g, ' ');
+    // essayCategories 是 const，不在 window 上
+    const cats = (typeof essayCategories !== 'undefined') ? essayCategories : [];
+    for (const cat of cats) {
+      for (const art of (cat.articles || [])) {
+        const artTitle = (art.title || '').trim().replace(/\s+/g, ' ');
+        if (artTitle === titleText) {
+          if (!art._cat) art._cat = cat.id;
+          return art;
+        }
       }
     }
     return null;
