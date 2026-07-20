@@ -133,8 +133,33 @@
   <div class="page-transition" id="pageTransition"></div>
   
   <script defer src="data.js?v=20260715-1"></script>
+  <script>
+  // 照片路径重写到 Supabase Storage
+  (function() {
+    var STORAGE_URL = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos';
+    var iv = setInterval(function() {
+      if (typeof albums !== 'undefined') {
+        clearInterval(iv);
+        albums.forEach(function(a) {
+          if (a.photos) {
+            a.photos = a.photos.map(function(p) {
+              return p.replace(/^images\//, STORAGE_URL + '/');
+            });
+          }
+        });
+        // 封面图
+        albums.forEach(function(a) {
+          if (a.cover && a.cover.startsWith('images/')) {
+            a.cover = a.cover.replace(/^images\//, STORAGE_URL + '/');
+          }
+        });
+        console.log('[cdn] 照片路径已重写为 Supabase Storage');
+      }
+    }, 50);
+  })();
+  </script>
   <script defer src="script.js?v=20260715-1"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script defer src="essay-editor.js?v=20260721-6"></script>
+  <script defer src="essay-editor.js?v=20260721-7"></script>
 </body>
 </html>
