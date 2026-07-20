@@ -192,7 +192,16 @@ input[type=file].music-upload{display:none}
   };
 
   function playTrack(storagePath) {
-    const url = `${STORAGE_URL}/photos/${storagePath}`;
+    // 优先用 Supabase，没有就用 GitHub 原路径
+    let url;
+    if (storagePath && storagePath.startsWith('http')) {
+      url = storagePath;
+    } else if (storagePath) {
+      url = `${STORAGE_URL}/photos/${storagePath}`;
+    } else {
+      url = '';
+    }
+    if (!url) return;
     const audio = new Audio(url);
     audio.play();
   }
@@ -271,37 +280,41 @@ input[type=file].music-upload{display:none}
     // 检查是否需要导入现有音乐
     const { count } = await sb.from('music').select('id', { count: 'exact', head: true });
     if (count === 0) {
-      // 导入 data.js 里的现有音乐
+      const ORDER = { '海芋恋': 1, '旅行的意义': 2, '太聪明': 3 };
+      // 导入主页音乐 (playlist)
       if (typeof playlist !== 'undefined' && playlist.length > 0) {
         for (const s of playlist) {
-          const filename = decodeURIComponent(s.url.split('/').pop());
-          const mp3Path = 'music/' + filename;
-          const { error } = await sb.from('music').insert({
+          await sb.from('music').insert({
             title: s.name, artist: '',
-            album_id: null, storage_path: mp3Path,
-            sort_order: -Date.now(),
+            album_id: null,
+            storage_path: s.url || 'music/' + s.name + '.mp3',
+            sort_order: ORDER[s.name] || -(Date.now()),
           });
         }
-        console.log('[music] 导入主页音乐');
+        console.log('[music] 导入主页音乐', playlist.length, '首');
       }
-      // 导入相册音乐（data.js 里的 firstlove.songs / friends.songs）
+      // 导入相册专用音乐
+      const ORDER_ALBUM = { '陈绮贞 - 告诉我': 1, '杨千嬅 - 小飞侠': 2, 'Cookies - 最后一块': 3 };
       if (typeof albums !== 'undefined') {
         for (const album of albums) {
-          if (album.albums) {
-            for (const sub of album.albums) {
-              if (sub.songs && sub.songs.length > 0) {
-                for (const s of sub.songs) {
-                  const { error } = await sb.from('music').insert({
-                    title: s.artist + ' - ' + s.name,
-                    artist: s.artist,
-                    album_id: null,
-                    storage_path: 'music/' + encodeURIComponent(s.name) + '.mp3',
-                    sort_order: -(Date.now()),
-                  });
-                }
-                console.log('[music] 导入相册音乐:', sub.name);
-              }
+          if (album.songs && album.songs.length > 0) {
+            // 在 Supabase 创建同名相册
+            const { data: newAlbum, error: aErr } = await sb.from('albums').insert({
+              title: album.title || album.id,
+              sort_order: -(Date.now()),
+            }).select('id').single();
+            if (aErr || !newAlbum) continue;
+
+            for (const s of album.songs) {
+              const sortIdx = ORDER_ALBUM[s.name] ? ORDER_ALBUM[s.name] : -(Date.now());
+              await sb.from('music').insert({
+                title: s.name, artist: '',
+                album_id: newAlbum.id,
+                storage_path: s.url || 'music/' + s.name + '.mp3',
+                sort_order: sortIdx,
+              });
             }
+            console.log('[music] 导入相册音乐:', album.title, album.songs.length, '首');
           }
         }
       }
