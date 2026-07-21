@@ -192,14 +192,14 @@ function buildGallery(){
   const filtersEl = $('#galleryFilters');
   if(!masonry) return;
 
-  if(!Array.isArray(window.albums)||window.albums.length===0){
+  if(!Array.isArray(albums)||albums.length===0){
     masonry.innerHTML = '<div class="timeline-empty"># 暂无相册 #</div>';
     return;
   }
 
   // 收集所有照片
   const allPhotos = [];
-  window.albums.forEach(album => {
+  albums.forEach(album => {
     (album.photos||[]).forEach(photo => {
       allPhotos.push({
         ...photo,
@@ -211,7 +211,7 @@ function buildGallery(){
   });
 
   // 构建筛选器
-  const worlds = window.worlds||[];
+  const worlds = worlds||[];
   const groups = {};
   allPhotos.forEach(p => {
     const k = p._worldId||p._albumId||'';
@@ -448,7 +448,7 @@ $('#pwdInput').onkeydown = e => { if(e.key==='Enter') checkPwd(); };
 // 旧世界的 albums 可能需要密码
 // data.js 中 worlds 定义了哪些相册属于旧世界
 function handleAlbumClick(albumId){
-  const album = (window.albums||[]).find(a=>a.id===albumId);
+  const album = (albums||[]).find(a=>a.id===albumId);
   if(!album) return;
 
   // 检查是否需要密码
@@ -467,7 +467,7 @@ function handleAlbumClick(albumId){
 }
 
 function openAlbumLightbox(albumId){
-  const album = (window.albums||[]).find(a=>a.id===albumId);
+  const album = (albums||[]).find(a=>a.id===albumId);
   if(!album||!album.photos||album.photos.length===0) return;
   lightboxPhotos = album.photos.map(p=>({...p,_albumTitle:album.title}));
   openLightbox(0);
