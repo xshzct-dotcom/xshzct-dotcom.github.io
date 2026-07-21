@@ -13,37 +13,38 @@ function rand(min,max){return min+Math.random()*(max-min)}
 function randi(min,max){return Math.floor(rand(min,max+1))}
 
 // ===== 路径处理（兼容字符串与对象） =====
-const IMG_BASE='../images/';
-const THUMB_BASE='../thumbs/';
+// 用 jsdelivr CDN 加速 — GitHub Pages 限流会 429
+const REPO = 'xshzct-dotcom/xshzct-dotcom.github.io@main';
+const IMG_BASE = 'https://cdn.jsdelivr.net/gh/'+REPO+'/images/';
+const THUMB_BASE = 'https://cdn.jsdelivr.net/gh/'+REPO+'/thumbs/';
+const MUSIC_BASE = 'https://cdn.jsdelivr.net/gh/'+REPO+'/music/';
 function getPath(p){
   if(!p) return '';
   if(typeof p==='string') return p;
   return p.path||p.src||p.storage_path||p.url||p.filename||'';
 }
-// 缩略图：把 images/x.jpg 映射到 ../thumbs/x.webp（保留 _看图王 等后缀，只改扩展名）
-// onerror 兜底：webp 加载失败时回退原图 .jpg
+// 缩略图：images/x.jpg → thumbs CDN 路径/x.webp（CDN 加速，免 429）
 function thumb(p){
   const s=getPath(p); if(!s) return '';
   if(s.startsWith('http')) return s;
   let t = s;
   if(t.startsWith('images/')) t = t.slice(7);
-  if(t.startsWith('thumbs/')) return '../'+t;
+  if(t.startsWith('thumbs/')) return THUMB_BASE+t.slice(7);
   t = t.replace(/\.jpg$/i, '.webp')
        .replace(/\.jpeg$/i, '.webp')
        .replace(/\.png$/i, '.webp');
-  // 返回带 onerror 的对象（用 srcset/onerror 方式不可行，用包装函数生成 img 标签）
-  return '../thumbs/'+t;
+  return THUMB_BASE+t;
 }
 // 全图：灯箱用原图
 function full(p){
   const s=getPath(p); if(!s) return '';
   if(s.startsWith('http')) return s;
-  if(s.startsWith('images/')) return '../'+s;
+  if(s.startsWith('images/')) return IMG_BASE+s.slice(7);
   if(s.startsWith('thumbs/')){
     // thumbs/xxx.webp → images/xxx.jpg
     let t = s.replace(/^\.\.\/thumbs\//, 'images/').replace(/^thumbs\//, 'images/');
     t = t.replace(/\.webp$/i, '.jpg');
-    return '../'+t;
+    return IMG_BASE+t.slice(7);
   }
   return IMG_BASE+s;
 }
