@@ -21,19 +21,18 @@ function getPath(p){
   return p.path||p.src||p.storage_path||p.url||p.filename||'';
 }
 // 缩略图：把 images/x.jpg 映射到 ../thumbs/x.webp（保留 _看图王 等后缀，只改扩展名）
-// 加 ?v= 时间戳：每次脚本加载时间不同 → URL 不同 → 浏览器不会用旧 404 缓存
-const _thumbV = '?v=' + Date.now().toString(36);
+// onerror 兜底：webp 加载失败时回退原图 .jpg
 function thumb(p){
   const s=getPath(p); if(!s) return '';
   if(s.startsWith('http')) return s;
-  // 把 images/xxx.jpg → thumbs/xxx.webp（只改扩展名，不动文件名其他部分）
   let t = s;
   if(t.startsWith('images/')) t = t.slice(7);
-  if(t.startsWith('thumbs/')) return '../'+t+_thumbV;
+  if(t.startsWith('thumbs/')) return '../'+t;
   t = t.replace(/\.jpg$/i, '.webp')
        .replace(/\.jpeg$/i, '.webp')
        .replace(/\.png$/i, '.webp');
-  return '../thumbs/'+t+_thumbV;
+  // 返回带 onerror 的对象（用 srcset/onerror 方式不可行，用包装函数生成 img 标签）
+  return '../thumbs/'+t;
 }
 // 全图：灯箱用原图
 function full(p){
@@ -354,9 +353,11 @@ function renderGrid(){
   }
   masonry.innerHTML = photos.map((p,i) => {
     const src = thumb(p);
+    // fallback: 从 ../thumbs/.../x.webp 反推 ../images/.../x.jpg
+    const fb = src.replace(/^\.\.\/thumbs\//, '../images/').replace(/\.webp$/i, '.jpg');
     return `<div class="masonry-item fade-up" data-idx="${i}">
       <div class="masonry-frame">
-        <img src="${src}" alt="" loading="lazy" decoding="async" onclick="openLightbox(${i})">
+        <img src="${src}" alt="" loading="lazy" decoding="async" onerror="if(this.dataset.fb!=='1'){this.dataset.fb='1';this.src='${fb}'}" onclick="openLightbox(${i})">
       </div>
       <div class="masonry-overlay"><div class="mo-title">${esc(p._albumTitle||'')}</div></div>
     </div>`;
