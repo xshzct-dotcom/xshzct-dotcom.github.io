@@ -443,6 +443,16 @@ function applyBgZoom(lb){
   } else {
     lb.style.background = '#000 url('+src+') '+lbZoom.bgX+'% '+lbZoom.bgY+'% / '+(lbZoom.scale*100)+'% no-repeat';
   }
+  // 缩放指示器
+  var zInd = document.getElementById('lightboxZoomIndicator');
+  if(zInd){
+    if(lbZoom.scale > 1.01){
+      zInd.textContent = Math.round(lbZoom.scale*100)+'%';
+      zInd.classList.add('show');
+    } else {
+      zInd.classList.remove('show');
+    }
+  }
 }
 
 function applyZoom(){
