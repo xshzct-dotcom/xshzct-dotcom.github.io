@@ -384,40 +384,66 @@
     if (data && data.length > 0) mergeToCategories(data);
   }
 
-  async function importOld() {
-    const data = await loadData();
-    if (data && data.length > 0) return;
-    let count = 0;
-    // essayCategories
-    if (typeof essayCategories !== 'undefined') {
-      for (const cat of essayCategories) {
-        for (const art of (cat.articles || [])) {
+  // ===== 强制同步：确保所有文章都有 _sid =====
+  async function ensureSync() {
+    // 1. 尝试从 Supabase 加载
+    let data = await loadData();
+    // 2. 如果 Supabase 还没有数据，从 data.js 导入
+    if (!data || data.length === 0) {
+      let count = 0;
+      if (typeof essayCategories !== 'undefined') {
+        for (const cat of essayCategories) {
+          for (const art of (cat.articles || [])) {
+            if (art._sid) continue;
+            const { error } = await sb.from('essays').insert({
+              category: cat.id, category_title: cat.title,
+              title: art.title, date: art.date || '', body: art.body,
+              sort_order: -Date.now() + count,
+            });
+            if (!error) count++;
+          }
+        }
+      }
+      if (typeof travels !== 'undefined') {
+        for (const art of travels) {
           if (art._sid) continue;
           const { error } = await sb.from('essays').insert({
-            category: cat.id, category_title: cat.title,
+            category: 'travel', category_title: '旅行见闻',
             title: art.title, date: art.date || '', body: art.body,
             sort_order: -Date.now() + count,
           });
           if (!error) count++;
         }
       }
+      if (count > 0) console.log('[blog] 导入', count, '篇文章到 Supabase');
+      // 重新加载
+      data = await loadData();
     }
-    // travels
-    if (typeof travels !== 'undefined') {
-      for (const art of travels) {
-        if (art._sid) continue;
-        const { error } = await sb.from('essays').insert({
-          category: 'travel', category_title: '旅行见闻',
-          title: art.title, date: art.date || '', body: art.body,
-          sort_order: -Date.now() + count,
-        });
-        if (!error) count++;
-      }
+    // 3. 合并到本地数组（设置 _sid）
+    if (data && data.length > 0) {
+      mergeToCategories(data);
+      return true;
     }
-    if (count > 0) {
-      console.log('[blog] 导入', count, '篇文章');
-      await refreshData();
+    return false;
+  }
+
+  // ===== 根据本地文章数据查找 Supabase ID =====
+  async function findSid(article) {
+    if (article._sid) return article._sid;
+    // 按标题 + 分类查
+    const cat = article._cat || 'thoughts';
+    const { data: matches } = await sb.from('essays').select('id').eq('title', article.title).eq('category', cat).limit(1);
+    if (matches && matches.length > 0) {
+      article._sid = matches[0].id;
+      return article._sid;
     }
+    // 只按标题查（兜底）
+    const { data: matches2 } = await sb.from('essays').select('id').eq('title', article.title).limit(1);
+    if (matches2 && matches2.length > 0) {
+      article._sid = matches2[0].id;
+      return article._sid;
+    }
+    return null;
   }
 
   // ===== 编辑按钮 =====
@@ -626,28 +652,33 @@
     edit: async (btn) => {
       const d = findArticle(btn);
       if (!d) { alert('找不到文章，请刷新后重试'); return; }
-      if (!d._sid) {
-        const { data: matches } = await sb.from('essays').select('id').eq('title', d.title).limit(1);
-        if (matches && matches.length > 0) d._sid = matches[0].id;
-      }
-      if (d) openEditor(d);
+      if (!d._sid) await findSid(d);
+      openEditor(d);
     },
     del: async (btn) => {
       const d = findArticle(btn);
       if (!d) { alert('找不到文章'); return; }
+      // 确保有 Supabase ID
+      if (!d._sid) await findSid(d);
       if (!d._sid) {
-        // 没有 _sid（data.js 数据），尝试从 Supabase 按标题查找
-        const { data: matches } = await sb.from('essays').select('id').eq('title', d.title).limit(1);
-        if (matches && matches.length > 0) {
-          d._sid = matches[0].id;
-        } else {
-          alert('找不到数据，该文章可能未同步到服务器');
-          return;
-        }
+        alert('该文章尚未同步到服务器，请在页面刷新后重试');
+        return;
       }
       if (!confirm('确定删除「' + d.title + '」？')) return;
       const { error } = await sb.from('essays').delete().eq('id', d._sid);
-      if (error) { alert('❌ ' + error.message); return; }
+      if (error) {
+        if (error.code === 'PGRST116') { alert('文章已被删除，刷新即可'); } else { alert('❌ ' + error.message); }
+        return;
+      }
+      // 从本地数组移除
+      for (const cat of essayCategories) {
+        cat.articles = cat.articles.filter(a => a._sid !== d._sid);
+      }
+      if (typeof travels !== 'undefined') {
+        for (let i = travels.length - 1; i >= 0; i--) {
+          if (travels[i]._sid === d._sid) travels.splice(i, 1);
+        }
+      }
       await refreshData();
       if (typeof updateModalView === 'function') updateModalView();
       setTimeout(injectEditButtons, 100);
@@ -680,14 +711,8 @@
     loaded = true;
     loadCustomCats();
     await loadCategoryNames();
-
-    const data = await loadData();
-    if (!data || data.length === 0) {
-      await importOld();
-    } else {
-      mergeToCategories(data);
-    }
-
+    // 确保所有文章同步到 Supabase 并有 _sid
+    await ensureSync();
     addPen();
     watchDOM();
   }
