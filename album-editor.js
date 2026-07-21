@@ -4,6 +4,9 @@
 (function() {
   'use strict';
 
+  // 保存网站全局相册引用（data.js 的 const albums），后面会被 local let albums 遮蔽
+  const SITE_ALBUMS = (typeof albums !== 'undefined' && Array.isArray(albums)) ? albums : [];
+
   const SB_URL = 'https://mvzbkuhwapdqcdkekczh.supabase.co';
   const SB_KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
   const STORAGE_URL = SB_URL + '/storage/v1/object/public/photos';
@@ -502,6 +505,22 @@
   function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   // ===== 启动 =====
+  async function importFromSite() {
+    if (!SITE_ALBUMS || SITE_ALBUMS.length === 0) {
+      console.log('[album] 没有可导入的网站相册');
+      return;
+    }
+    console.log('[album] 从网站导入', SITE_ALBUMS.length, '个相册...');
+    for (const sa of SITE_ALBUMS) {
+      const { error: aErr } = await sb.from('albums').insert({
+        title: sa.title,
+        sort_order: -(Date.now()),
+      });
+      if (aErr) { console.warn('[album] 导入失败:', sa.title, aErr); continue; }
+    }
+    console.log('[album] 网站相册导入完成');
+  }
+
   async function init() {
     if (loaded) return;
     loaded = true;
@@ -509,9 +528,19 @@
     // 检查是否有数据库
     const test = await loadAlbums();
     if (test.length === 0) {
-      console.log('[album] 尚无相册，请先在管理页面创建');
+      // 从网站导入现有相册
+      try { await importFromSite(); } catch(e) { console.warn('[album] 导入失败', e); }
+      const test2 = await loadAlbums();
+      if (test2.length === 0) {
+        console.log('[album] 尚无相册，请先在管理页面创建');
+      } else {
+        albums = test2;
+        for (const a of albums) {
+          const { count } = await sb.from('album_photos').select('id', { count: 'exact', head: true }).eq('album_id', a.id);
+          a._count = count;
+        }
+      }
     } else {
-      // 统计照片数
       for (const a of test) {
         const { count } = await sb.from('album_photos').select('id', { count: 'exact', head: true }).eq('album_id', a.id);
         a._count = count;

@@ -95,6 +95,27 @@ input[type=file].music-upload{display:none}
       // 排序
       pl.items.sort((a, b) => a.sort_order - b.sort_order);
     }
+    // 同步到网站播放器
+    syncToPlayer();
+  }
+
+  // 同步到网站播放器
+  function syncToPlayer() {
+    try {
+      // 从 Supabase tracks 重建播放列表
+      const mainTracks = tracks.filter(t => !t.album_id);
+      if (mainTracks.length === 0) return;
+      const newList = mainTracks.map(t => ({
+        name: t.title,
+        url: t.url || (STORAGE_URL.replace('/photos', '') + '/photos/' + t.storage_path),
+      }));
+      // 修改全局 playlist（data.js 的 const 数组，可以原地修改）
+      if (typeof playlist !== 'undefined' && Array.isArray(playlist)) {
+        playlist.length = 0;
+        newList.forEach(s => playlist.push(s));
+      }
+      console.log('[music] 已同步', newList.length, '首到播放器');
+    } catch(e) { console.warn('[music] 同步播放器失败', e); }
   }
 
   // ===== 渲染 =====

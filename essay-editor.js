@@ -229,6 +229,41 @@
     injectEditButtons();
   };
 
+  // ===== 所有文章列表 =====
+  function renderAllArticles() {
+    const modalBody = document.querySelector('.modal-body');
+    if (!modalBody) return;
+    const all = [];
+    if (typeof essayCategories !== 'undefined') {
+      for (const cat of essayCategories) {
+        for (const art of (cat.articles || [])) {
+          all.push({ ...art, _cat: art._cat || cat.id, _catTitle: cat.title });
+        }
+      }
+    }
+    if (typeof travels !== 'undefined') {
+      for (const art of travels) {
+        all.push({ ...art, _cat: 'travel', _catTitle: '旅行见闻' });
+      }
+    }
+    // 按日期排序
+    all.sort((a, b) => {
+      const da = a.date || ''; const db = b.date || '';
+      return db.localeCompare(da) || (b.sort_order || 0) - (a.sort_order || 0);
+    });
+
+    const body = document.getElementById('modalBody');
+    const title = document.getElementById('modalTitle');
+    title.textContent = '所有文章';
+    body.innerHTML = '<div class="article-list">' + all.map(a => `
+      <div class="article-item" data-sid="${a._sid || ''}" data-cat="${a._cat || ''}">
+        <div><div class="title">${esc(a.title)}</div>
+        <div class="meta">${a._catTitle}${a.date ? ' · ' + a.date : ''}</div></div>
+        <div class="arrow">→</div>
+      </div>`).join('') + '</div>';
+    setTimeout(injectEditButtons, 50);
+  }
+
   // ===== 分类管理 =====
   function openCatManager() {
     renderCatList();
@@ -377,14 +412,50 @@
 
     const bar = document.createElement('div');
     bar.className = 'ee-toolbar';
-    bar.innerHTML = '<button onclick="BLOG.add()">✏️ 写新文章</button><button onclick="BLOG.openCats()">📂 管理分类</button><button onclick="BLOG.toggle()">✕ 退出编辑</button>';
+    bar.innerHTML = '<button onclick="BLOG.add()">✏️ 写新文章</button><button onclick="BLOG.openCats()">📂 管理分类</button> <button onclick="BLOG.showAll()">📋 所有文章</button> <button onclick="BLOG.toggle()">✕ 退出编辑</button>';
     body.appendChild(bar);
+
+    // 辅助：从标题找文章数据
+    function findArticleData(titleText) {
+      // essayCategories
+      if (typeof essayCategories !== 'undefined') {
+        for (const cat of essayCategories) {
+          for (const art of (cat.articles || [])) {
+            if ((art.title || '').trim().replace(/\s+/g, ' ') === titleText) {
+              if (!art._cat) art._cat = cat.id;
+              return art;
+            }
+          }
+        }
+      }
+      // travels
+      if (typeof travels !== 'undefined') {
+        for (const art of travels) {
+          if ((art.title || '').trim().replace(/\s+/g, ' ') === titleText) {
+            if (!art._cat) art._cat = 'travel';
+            return art;
+          }
+        }
+      }
+      return null;
+    }
 
     body.querySelectorAll('.article-item').forEach((item, i) => {
       if (item.querySelector('.ee-act')) return;
       // 分类列表（显示"X 篇"）不显示编辑/删除按钮
       const meta = item.querySelector('.meta');
       if (meta && meta.textContent.includes('篇')) return;
+
+      // 提前找到文章数据并注入 data-sid，避免后续标题匹配
+      const titleEl = item.querySelector('.title');
+      if (titleEl) {
+        const t = titleEl.textContent.trim().replace(/\s+/g, ' ');
+        const art = findArticleData(t);
+        if (art && art._sid) item.dataset.sid = art._sid;
+        // 也存分类索引用于拖拽
+        if (art && art._cat) item.dataset.cat = art._cat;
+      }
+
       const act = document.createElement('div');
       act.className = 'ee-act';
       act.innerHTML = '<span style="color:rgba(255,255,255,.3);margin-right:6px;cursor:grab;user-select:none">⠿</span><button onclick="event.stopPropagation();BLOG.edit(this)">✎</button><button class="ee-del" onclick="event.stopPropagation();BLOG.del(this)">🗑</button>';
@@ -415,62 +486,73 @@
         const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
         const toIdx = parseInt(item.dataset.idx);
         if (fromIdx === toIdx || isNaN(fromIdx) || isNaN(toIdx)) return;
-        // 找到当前分类
-        const titleEl = item.querySelector('.title');
-        if (!titleEl) return;
-        const titleText = titleEl.textContent.trim().replace(/\s+/g, ' ');
+
+        // 从 data-cat 找分类
+        const toCat = item.dataset.cat;
+        if (!toCat) return;
+        // 找源分类
+        const fromItems = body.querySelectorAll('.article-item');
+        const fromCat = fromItems[fromIdx] ? fromItems[fromIdx].dataset.cat : null;
+        if (fromCat !== toCat) return; // 不同分类不能拖拽交换
+
         for (const cat of essayCategories) {
-          for (const art of (cat.articles || [])) {
-            const artTitle = (art.title || '').trim().replace(/\s+/g, ' ');
-            if (artTitle === titleText) {
-              // 找到当前分类
-              const from = cat.articles[fromIdx];
-              const to = cat.articles[toIdx];
-              if (from && to && from._sid && to._sid) {
-                const fromOrder = from.sort_order;
-                const toOrder = to.sort_order;
-                await sb.from('essays').update({ sort_order: toOrder }).eq('id', from._sid);
-                await sb.from('essays').update({ sort_order: fromOrder }).eq('id', to._sid);
-                await refreshData();
-                if (typeof updateModalView === 'function') updateModalView();
-                setTimeout(injectEditButtons, 100);
-              }
-              return;
+          if (cat.id === toCat || cat.id === fromCat) {
+            const from = cat.articles[fromIdx];
+            const to = cat.articles[toIdx];
+            if (from && to && from._sid && to._sid) {
+              const fromOrder = from.sort_order;
+              const toOrder = to.sort_order;
+              await sb.from('essays').update({ sort_order: toOrder }).eq('id', from._sid);
+              await sb.from('essays').update({ sort_order: fromOrder }).eq('id', to._sid);
+              await refreshData();
+              if (typeof updateModalView === 'function') updateModalView();
+              setTimeout(injectEditButtons, 100);
             }
+            return;
           }
         }
       });
     });
   }
 
-  // 关键修复：essayCategories 是 const 声明，不在 window 上
+  // 关键修复：先查 data-sid，找不到再按标题匹配
   function findArticle(btn) {
     const item = btn.closest('.article-item');
     if (!item) return null;
+    // 优先用 data-sid
+    if (item.dataset.sid) {
+      const sid = parseInt(item.dataset.sid);
+      // 搜索 essayCategories
+      if (typeof essayCategories !== 'undefined') {
+        for (const cat of essayCategories) {
+          for (const art of (cat.articles || [])) {
+            if (art._sid === sid) { if (!art._cat) art._cat = cat.id; return art; }
+          }
+        }
+      }
+      // 搜索 travels
+      if (typeof travels !== 'undefined') {
+        for (const art of travels) {
+          if (art._sid === sid) { if (!art._cat) art._cat = 'travel'; return art; }
+        }
+      }
+    }
+    // 后备：按标题匹配
     const t = item.querySelector('.title');
     if (!t) return null;
     const titleText = (t.textContent || '').trim().replace(/\s+/g, ' ');
-
-    // 搜索 essayCategories
     if (typeof essayCategories !== 'undefined') {
       for (const cat of essayCategories) {
         for (const art of (cat.articles || [])) {
           const artTitle = (art.title || '').trim().replace(/\s+/g, ' ');
-          if (artTitle === titleText) {
-            if (!art._cat) art._cat = cat.id;
-            return art;
-          }
+          if (artTitle === titleText) { if (!art._cat) art._cat = cat.id; return art; }
         }
       }
     }
-    // 搜索 travels
     if (typeof travels !== 'undefined') {
       for (const art of travels) {
         const artTitle = (art.title || '').trim().replace(/\s+/g, ' ');
-        if (artTitle === titleText) {
-          if (!art._cat) art._cat = 'travel';
-          return art;
-        }
+        if (artTitle === titleText) { if (!art._cat) art._cat = 'travel'; return art; }
       }
     }
     return null;
@@ -502,6 +584,7 @@
     exit: () => { if (editMode) toggleMode(); },
     add: () => openEditor(null),
     show: () => { if (!editMode) toggleMode(); },
+    showAll: renderAllArticles,
     ensureButtons: () => setTimeout(injectEditButtons, 50),
     edit: (btn) => { const d = findArticle(btn); if (d) openEditor(d); else alert('找不到文章，请刷新后重试'); },
     del: async (btn) => {
@@ -533,6 +616,9 @@
 
   // 由 settings-menu 统一管理入口，这里不添加浮动按钮
   function addPen() { /* 已迁移到 settings-menu */ }
+
+  // ===== 工具 =====
+  function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   async function init() {
     if (loaded) return;
