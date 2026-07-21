@@ -1,4 +1,4 @@
-// ===== 声音效果 =====
+// ===== 声音效果 — 柔和相册翻页声 =====
 (function(){
   var ctx = null;
   var enabled = true;
@@ -17,89 +17,90 @@
     gain.gain.exponentialRampToValueAtTime(0.001, t + attack + decay);
   }
 
-  // 翻页声 — 高频纸声 + 短促低频
+  // 翻页声 — 柔和纸张摩擦（低频+轻微白噪）
   function playFlip(){
     if(!enabled) return;
     var c = ensureCtx(); if(!c) return;
-    // 高频白噪声
-    var buffer = c.createBuffer(1, c.sampleRate * 0.15, c.sampleRate);
+    // 纸张摩擦 — 低频闷声
+    var osc = c.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(120, c.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(40, c.currentTime + 0.12);
+    var g = c.createGain();
+    envelope(g, 0.01, 0.15, 0.08);
+    osc.connect(g).connect(c.destination);
+    osc.start();
+    osc.stop(c.currentTime + 0.18);
+    // 极轻的高频"沙沙"声
+    var buffer = c.createBuffer(1, c.sampleRate * 0.1, c.sampleRate);
     var data = buffer.getChannelData(0);
-    for(var i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
-    var src = c.createBufferSource();
-    src.buffer = buffer;
-    var filter = c.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.value = 2000;
-    var gain = c.createGain();
-    envelope(gain, 0.005, 0.12, 0.3);
-    src.connect(filter).connect(gain).connect(c.destination);
-    src.start();
-    // 低频"砰"（纸接触桌面）
-    setTimeout(function(){
-      var osc = c.createOscillator();
-      var g = c.createGain();
-      osc.frequency.setValueAtTime(80, c.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(50, c.currentTime + 0.05);
-      envelope(g, 0.003, 0.05, 0.15);
-      osc.connect(g).connect(c.destination);
-      osc.start();
-      osc.stop(c.currentTime + 0.06);
-    }, 60);
-  }
-
-  // 相机快门 — 短促"咔嚓"
-  function playShutter(){
-    if(!enabled) return;
-    var c = ensureCtx(); if(!c) return;
-    var buffer = c.createBuffer(1, c.sampleRate * 0.06, c.sampleRate);
-    var data = buffer.getChannelData(0);
-    for(var i=0;i<data.length;i++){
-      data[i] = (Math.random()*2-1) * Math.exp(-i / (c.sampleRate * 0.015));
-    }
+    for(var i=0;i<data.length;i++) data[i] = Math.random() * 0.3 * (1 - i/data.length);
     var src = c.createBufferSource();
     src.buffer = buffer;
     var filter = c.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.value = 4000;
-    filter.Q.value = 5;
-    var gain = c.createGain();
-    gain.gain.value = 0.4;
-    src.connect(filter).connect(gain).connect(c.destination);
+    filter.frequency.value = 600;
+    filter.Q.value = 2;
+    var g2 = c.createGain();
+    envelope(g2, 0.008, 0.08, 0.04);
+    src.connect(filter).connect(g2).connect(c.destination);
     src.start();
   }
 
-  // 轻敲 — 中频短促
+  // 快门 — 柔和"咔"
+  function playShutter(){
+    if(!enabled) return;
+    var c = ensureCtx(); if(!c) return;
+    var osc = c.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(300, c.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, c.currentTime + 0.04);
+    var g = c.createGain();
+    envelope(g, 0.002, 0.05, 0.06);
+    osc.connect(g).connect(c.destination);
+    osc.start();
+    osc.stop(c.currentTime + 0.06);
+    // 微弱的第二声（反光镜回弹）
+    setTimeout(function(){
+      var osc2 = c.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(200, c.currentTime);
+      osc2.frequency.exponentialRampToValueAtTime(80, c.currentTime + 0.03);
+      var g3 = c.createGain();
+      envelope(g3, 0.002, 0.03, 0.03);
+      osc2.connect(g3).connect(c.destination);
+      osc2.start();
+      osc2.stop(c.currentTime + 0.04);
+    }, 40);
+  }
+
+  // 轻敲 — 极柔点击
   function playClick(){
     if(!enabled) return;
     var c = ensureCtx(); if(!c) return;
     var osc = c.createOscillator();
-    var g = c.createGain();
-    osc.frequency.value = 800;
     osc.type = 'sine';
-    envelope(g, 0.002, 0.04, 0.12);
+    osc.frequency.setValueAtTime(400, c.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(150, c.currentTime + 0.03);
+    var g = c.createGain();
+    envelope(g, 0.002, 0.03, 0.03);
     osc.connect(g).connect(c.destination);
     osc.start();
-    osc.stop(c.currentTime + 0.05);
+    osc.stop(c.currentTime + 0.04);
   }
 
-  // 灯泡——柔和点击
+  // 柔和叮
   function playTick(){
     if(!enabled) return;
     var c = ensureCtx(); if(!c) return;
     var osc = c.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 1200;
     var g = c.createGain();
-    osc.frequency.value = 1800;
-    osc.type = 'triangle';
-    envelope(g, 0.001, 0.03, 0.06);
+    envelope(g, 0.002, 0.05, 0.04);
     osc.connect(g).connect(c.destination);
     osc.start();
-    osc.stop(c.currentTime + 0.035);
-  }
-
-  // 拍立得拍摄——多次快门
-  function playCapture(){
-    playShutter();
-    setTimeout(playShutter, 80);
+    osc.stop(c.currentTime + 0.06);
   }
 
   window.SFX = {
@@ -107,7 +108,6 @@
     shutter: playShutter,
     click: playClick,
     tick: playTick,
-    capture: playCapture,
     toggle: function(){ enabled = !enabled; },
     enabled: function(){ return enabled; },
   };

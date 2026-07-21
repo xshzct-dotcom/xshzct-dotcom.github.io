@@ -36,8 +36,12 @@ async function bindDragSort(listEl, data, table, sortField, onReorder){
       data.splice(to,0,item);
       // 批量更新 sort_order
       try{
+        if(!sb){ console.warn('[drag] Supabase 未连接，拖拽仅视觉生效'); }
         for(let j=0;j<data.length;j++){
-          await db().from(table).update({[sortField]:j}).eq('id', data[j].id);
+          if(sb){
+            const {error} = await sb.from(table).update({[sortField]:j}).eq('id', data[j].id);
+            if(error) console.warn('[drag] update row '+j+' failed:', error);
+          }
         }
       }catch(e){ console.warn('[drag] sort update failed:', e); }
       if(onReorder) onReorder();
@@ -379,18 +383,24 @@ async function renderMusicTab(){
   }
   renderList();
 
-  $('#meUpload').onchange=async (e)=>{
-    const files=e.target.files;
-    for(const f of files){
-      const fname='music_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-      const {error:upErr}=await db().storage.from('photos').upload(fname,f);
-      if(!upErr){
-        await db().from('music').insert({title:f.name.replace(/\.[^.]+$/,''),artist:'',storage_path:fname,sort_order:-Date.now(),album_id:null});
+  // 上传（延迟绑定，等 DOM 就绪）
+  setTimeout(()=>{
+    const uploadEl = $('#meUpload');
+    if(uploadEl) uploadEl.onchange = async (e)=>{
+      const files = e.target.files;
+      for(const f of files){
+        const fname = 'music_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+        try{
+          const {error:upErr} = await sb.storage.from('photos').upload(fname, f);
+          if(!upErr){
+            await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order:-Date.now(), album_id:null});
+          }
+        }catch(err){ console.warn('[music upload]', err); }
       }
-    }
-    e.target.value='';
-    renderMusicTab();
-  };
+      e.target.value = '';
+      renderMusicTab();
+    };
+  }, 200);
 }
 window.renderMusicTab=renderMusicTab;
 
