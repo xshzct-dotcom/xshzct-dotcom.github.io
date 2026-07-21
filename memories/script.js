@@ -70,8 +70,10 @@ function initHeroStars(){
   let W, H, stars, mouseX=0, mouseY=0;
   const N=80;
   function resize(){
-    W=c.width = c.offsetWidth = c.parentElement.offsetWidth;
-    H=c.height = c.parentElement.offsetHeight;
+    W = c.parentElement.offsetWidth;
+    H = c.parentElement.offsetHeight;
+    c.width = W;
+    c.height = H;
     stars = Array.from({length:N}, () => ({
       x: Math.random()*W,
       y: Math.random()*H,
