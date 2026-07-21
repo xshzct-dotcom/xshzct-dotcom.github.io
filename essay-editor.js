@@ -187,12 +187,25 @@
     const body = document.getElementById('blogBody').value.trim();
     if (!title || !body) { alert('标题和正文不能为空'); return; }
     const cat = document.getElementById('blogCategory').value;
+    const dateStr = document.getElementById('blogDate').value.trim();
+
+    // 根据日期自动算排序（最新在前）
+    let sortOrder = -Date.now();
+    if (dateStr) {
+      const m = dateStr.match(/^(\d{2,4})[.\-/年](\d{1,2})[.\-/月](\d{1,2})/);
+      if (m) {
+        let y = parseInt(m[1]);
+        if (y < 100) y += 2000;
+        const ts = new Date(y, parseInt(m[2]) - 1, parseInt(m[3])).getTime();
+        if (!isNaN(ts)) sortOrder = -ts;
+      }
+    }
 
     const data = {
       category: cat,
       category_title: getCatTitle(cat),
-      title, date: document.getElementById('blogDate').value.trim(), body,
-      sort_order: -Date.now(),
+      title, date: dateStr, body,
+      sort_order: sortOrder,
     };
 
     let err;
@@ -431,7 +444,9 @@
   // ===== 暴露全局 =====
   window.BLOG = {
     toggle: toggleMode,
+    isEditing: () => editMode,
     add: () => openEditor(null),
+    show: () => { if (!editMode) toggleMode(); },
     edit: (btn) => { const d = findArticle(btn); if (d) openEditor(d); else alert('找不到文章，请刷新后重试'); },
     del: async (btn) => {
       const d = findArticle(btn);
@@ -460,14 +475,8 @@
     },
   };
 
-  function addPen() {
-    if (document.getElementById('blog-pen')) return;
-    const pen = document.createElement('div');
-    pen.id = 'blog-pen';
-    pen.textContent = '✏️';
-    pen.onclick = toggleMode;
-    document.body.appendChild(pen);
-  }
+  // 由 settings-menu 统一管理入口，这里不添加浮动按钮
+  function addPen() { /* 已迁移到 settings-menu */ }
 
   async function init() {
     if (loaded) return;

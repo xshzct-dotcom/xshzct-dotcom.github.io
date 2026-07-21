@@ -247,18 +247,8 @@ input[type=file].music-upload{display:none}
   }
 
   // ===== 触发按钮 =====
-  function addTrigger() {
-    if (document.getElementById('music-pen')) return;
-    const pen = document.createElement('div');
-    pen.id = 'music-pen';
-    pen.textContent = '🎵';
-    pen.title = '音乐管理';
-    pen.style.cssText = 'position:fixed;bottom:124px;right:24px;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:rgba(255,255,255,.4);font-size:20px;cursor:pointer;z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:all .3s;user-select:none;-webkit-user-select:none;box-shadow:0 2px 12px rgba(0,0,0,.2);touch-action:manipulation';
-    pen.onmouseenter = () => { pen.style.background = 'rgba(255,255,255,.18)'; pen.style.color = '#fff'; };
-    pen.onmouseleave = () => { pen.style.background = 'rgba(255,255,255,.07)'; pen.style.color = 'rgba(255,255,255,.4)'; };
-    pen.onclick = () => MUSIC.show();
-    document.body.appendChild(pen);
-  }
+  // 由 settings-menu 统一管理入口
+  function addTrigger() { /* 已迁移到 settings-menu */ }
 
   // ===== 工具 =====
   function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
