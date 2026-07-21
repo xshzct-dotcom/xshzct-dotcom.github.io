@@ -327,4 +327,8 @@ function renderTab(){
 
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
+// ===== 齿轮绑定（在 EDITOR 定义后执行） =====
+const gearBtn = $('#navGear');
+if(gearBtn) gearBtn.onclick = () => open();
+
 })();

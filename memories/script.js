@@ -500,13 +500,8 @@ function init(){
   buildGallery();
   observeFadeUps();
 
-  // 点击齿轮打开编辑器
-  const gear = $('#navGear');
-  if(gear) gear.onclick = () => {
-    if(window.EDITOR && window.EDITOR.open) window.EDITOR.open();
-  };
-
-  // 给 masonry/photos 添加 lazyload 后重新观察
+  // 齿轮由 editor.js 接管
+  // observe masonry items as they lazy-load
   const mediaObserver = new MutationObserver(()=>{
     observeFadeUps();
   });
