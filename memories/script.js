@@ -1166,14 +1166,18 @@ async function ensureSync(){
     // === 2. 相册 ===
     if(Array.isArray(albums)){
       const {count:albumsCount} = await SB.from('albums').select('*', {count:'exact', head:true});
+      console.log('[memories] albums count before sync:', albumsCount);
       // albums 表当前 schema: id, title, cover, sort_order, created_at（无 photo_count）
       const allAlbums = albums.map((a, i) => ({
         title: a.title, sort_order: i,
         cover: a.cover || '',
       }));
       if(!albumsCount || albumsCount === 0){
-        for(let i=0; i<allAlbums.length; i+=50){
-          await SB.from('albums').insert(allAlbums.slice(i, i+50));
+        try{
+          const r = await SB.from('albums').insert(allAlbums);
+          console.log('[memories] albums insert result:', JSON.stringify(r));
+        } catch(e){
+          console.warn('[memories] albums insert error:', e.message, e.details);
         }
       } else {
         for(let i=0; i<allAlbums.length; i++){
