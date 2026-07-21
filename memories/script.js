@@ -293,6 +293,15 @@ function getFilteredRiver(){
   });
 }
 
+// ===== 全局加载进度 =====
+let _galleryLoadTotal = 0;
+let _galleryLoadDone = 0;
+function updateGalleryLoadProgress(){
+  _galleryLoadDone++;
+  const el = document.getElementById('galleryLoadProgress');
+  if(el) el.textContent = _galleryLoadDone + ' / ' + _galleryLoadTotal + ' 张已加载';
+}
+
 // ===== 记忆河流（队列模式 — 每次都不一样直到看完所有） =====
 let _riverQueue = [];
 let _riverCycle = 0;
@@ -337,6 +346,7 @@ function renderRiver(){
     rotations.push(((seed % 12) - 6));
   }
 
+  _galleryLoadTotal += indices.length;
   stream.innerHTML = indices.map(function(pi, i){
     var p = pool[pi];
     var rot = rotations[i];
@@ -350,7 +360,10 @@ function renderRiver(){
   // 绑定 onload/onerror（分离绑定避免转义问题）
   stream.querySelectorAll('.polaroid img').forEach(function(img){
     var polaroid = img.parentElement.parentElement;
-    img.onload = function(){ polaroid.classList.remove('polaroid-loading'); };
+    img.onload = function(){
+      polaroid.classList.remove('polaroid-loading');
+      updateGalleryLoadProgress();
+    };
     img.onerror = function(){
       if(img.dataset.fb !== '1'){
         img.dataset.fb = '1';
@@ -517,7 +530,6 @@ function openLightbox(idx, kenBurns){
   const img = $('#lightboxImg');
   const stage = $('#lightboxStage');
 
-  // 恢复 stage/img 显示（closeLightbox 设了 display:none）
   if(stage) stage.style.display = 'flex';
   if(img) img.style.display = 'block';
 
@@ -527,25 +539,84 @@ function openLightbox(idx, kenBurns){
   lb.style.opacity = '1';
   lb.style.pointerEvents = 'auto';
 
+  // 显示加载状态
+  showLbLoader(true, 0, '加载中…');
+
   const photo = lightboxPhotos[idx];
   const src = full(photo);
-  img.src = src;
-  img.style.transition = 'none';
-  img.style.transform = 'translate(0,0) scale(1)';
-  img.style.opacity = '0';
-  img.onload = function(){
-    img.style.transition = 'opacity .35s ease';
-    img.style.opacity = '1';
-  };
-  img.onerror = function(){
-    img.style.opacity = '1';
-  };
-
   counter.textContent = (idx+1) + ' / ' + lightboxPhotos.length;
   if(window.SFX) window.SFX.shutter();
+
+  // 用 fetch 拿真实下载进度
+  loadImageWithProgress(src).then(url => {
+    img.style.transition = 'none';
+    img.style.transform = 'translate(0,0) scale(1)';
+    img.style.opacity = '0';
+    img.onload = function(){
+      img.style.transition = 'opacity .35s ease';
+      img.style.opacity = '1';
+      showLbLoader(false, 100, '');
+    };
+    img.onerror = function(){
+      img.style.opacity = '1';
+      showLbLoader(false, 0, '✕ 加载失败');
+      setTimeout(() => showLbLoader(false, 0, ''), 1500);
+    };
+    img.src = url;
+  });
 }
 
 window.openLightbox = openLightbox;
+
+// 用 fetch 流式下载图片 + 实时进度
+async function loadImageWithProgress(url){
+  showLbLoader(true, 0, '准备…');
+  try {
+    const resp = await fetch(url);
+    if(!resp.ok) throw new Error('HTTP ' + resp.status);
+    const total = parseInt(resp.headers.get('content-length') || '0');
+    const reader = resp.body.getReader();
+    const chunks = [];
+    let received = 0;
+    while(true){
+      const {done, value} = await reader.read();
+      if(done) break;
+      chunks.push(value);
+      received += value.length;
+      if(total > 0){
+        const pct = Math.round(received * 100 / total);
+        const mb = (received/1024/1024).toFixed(1);
+        showLbLoader(true, pct, mb + ' MB');
+      } else {
+        showLbLoader(true, 0, (received/1024/1024).toFixed(1) + ' MB');
+      }
+    }
+    const blob = new Blob(chunks);
+    return URL.createObjectURL(blob);
+  } catch(e){
+    showLbLoader(true, 0, '直接加载…');
+    return url;  // 失败时回退到直接 src
+  }
+}
+
+function showLbLoader(show, pct, text){
+  let loader = document.getElementById('lbLoader');
+  if(!loader){
+    loader = document.createElement('div');
+    loader.id = 'lbLoader';
+    loader.innerHTML = '<div class="lb-spinner"></div><div class="lb-progress"></div><div class="lb-text"></div>';
+    document.getElementById('lightbox').appendChild(loader);
+  }
+  if(!show){
+    loader.classList.add('hidden');
+    return;
+  }
+  loader.classList.remove('hidden');
+  const prog = loader.querySelector('.lb-progress');
+  const tx = loader.querySelector('.lb-text');
+  if(prog) prog.style.setProperty('--p', Math.min(pct, 100) + '%');
+  if(tx) tx.textContent = text + (pct > 0 ? ' ' + pct + '%' : '');
+}
 
 function renderFilmstrip(kenBurns){
   const strip = $('#lightboxFilmstrip');
