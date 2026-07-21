@@ -43,7 +43,7 @@
   --page-title-color:#faf9f6;
 }
 html{scroll-behavior:smooth;background:var(--bg)}
-body{font-family:var(--font-serif);background:var(--bg);color:var(--text);line-height:1.8;font-size:1.1rem;-webkit-font-smoothing:antialiased;transition:background-color var(--duration-std) ease,color var(--duration-std) ease}
+body{font-family:var(--font-serif);background:var(--bg);color:var(--text);line-height:1.8;font-size:1.1rem;-webkit-font-smoothing:antialiased;transition:background-color var(--duration-std) ease,color var(--duration-std) ease;padding-bottom:80px}
 
 /* --- Header --- */
 header{position:fixed;top:0;left:0;right:0;background:var(--header-bg);-webkit-backdrop-filter:blur(12px) saturate(180%);backdrop-filter:blur(12px) saturate(180%);z-index:1000;padding:1.2rem 3rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
@@ -279,8 +279,8 @@ footer a:hover{color:var(--black)}
 @media(hover:none){.lightbox-nav:hover{background:rgba(255,255,255,0.06)}}
 
 /* --- 音乐播放器 --- */
-.music-player{position:fixed;bottom:2rem;right:2rem;z-index:3000;touch-action:none}
-.music-panel{background:rgba(17,17,17,0.93);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:white;border-radius:14px;padding:0.55rem 0.8rem 0.4rem;width:215px;box-shadow:0 4px 16px rgba(0,0,0,0.3);cursor:grab;user-select:none}
+.music-player{position:fixed;bottom:0;left:0;right:0;z-index:2000;padding:0.5rem 1rem;display:flex;justify-content:center;pointer-events:none;touch-action:none}
+.music-panel{background:rgba(17,17,17,0.93);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);color:white;border-radius:14px;padding:0.55rem 0.8rem 0.4rem;width:min(420px,calc(100% - 2rem));box-shadow:0 4px 16px rgba(0,0,0,0.3);cursor:grab;user-select:none;pointer-events:auto}
 .music-panel:active{cursor:grabbing}
 .music-panel .music-row{display:flex;align-items:center;gap:0.35rem;width:100%;justify-content:center}
 .music-panel .music-info{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:0.82rem;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:0.15rem}
@@ -300,17 +300,17 @@ footer a:hover{color:var(--black)}
 
 /* ===== 移动端触控细化改善 ===== */
 @media(max-width:768px){
-  header{padding:0.8rem 1rem;-webkit-backdrop-filter:none;backdrop-filter:none}
-  nav{gap:0.8rem}
-  nav a{font-size:0.8rem}
-  .logo{font-size:1.1rem}
-  .theme-toggle{font-size:1rem;padding:0.2rem}
+  header{padding:0.6rem 0.8rem;-webkit-backdrop-filter:none;backdrop-filter:none}
+  nav{gap:0.5rem;align-items:center}
+  nav a{font-size:0.72rem}
+  .logo{font-size:1rem}
+  .theme-toggle{font-size:0.9rem;padding:0.15rem}
   .hero h1{font-size:2.6rem;letter-spacing:0.12em}
   .hero p{font-size:1rem}
   .section{padding:3rem 1.5rem}
   .page-title h1{font-size:1.8rem}
-  .music-player{bottom:4rem;right:1rem}
-  .music-panel{padding:0.45rem 0.6rem 0.35rem;width:190px}
+  .music-player{bottom:0;left:0;right:0;padding:0.4rem 0.6rem}
+  .music-panel{padding:0.45rem 0.6rem 0.35rem;width:100%;max-width:100%}
   .music-panel .music-info{font-size:0.72rem}
   .music-panel .music-act{font-size:0.9rem;padding:0.05rem 0.2rem}
   .music-track{height:4px}
@@ -327,7 +327,7 @@ footer a:hover{color:var(--black)}
   .album-card .album-title{font-size:1.4rem;padding:0.4rem 0.9rem}
   .post-card .card-title{font-size:1.4rem}
   .about-section{padding:3rem 1.5rem}
-  .music-player{bottom:4rem;right:0.8rem}
+  .music-player{bottom:0;left:0;right:0;padding:0.3rem 0.5rem}
   .album-photo-item{border-radius:3px;content-visibility:auto}
   .post-card:hover,.album-card:hover{transform:none!important;box-shadow:none!important}
   .album-photo-item:hover img{transform:none}
