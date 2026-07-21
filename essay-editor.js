@@ -371,6 +371,16 @@
     try {
       const { data, error } = await sb.from('essays').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false });
       if (error) return null;
+      // 兼容旧数据：正数（新样式）排在负数（旧样式时间戳）前面
+      if (data) {
+        data.sort((a, b) => {
+          const aIsNew = a.sort_order >= 0;
+          const bIsNew = b.sort_order >= 0;
+          if (aIsNew && !bIsNew) return -1;
+          if (!aIsNew && bIsNew) return 1;
+          return a.sort_order - b.sort_order;
+        });
+      }
       return data || [];
     } catch(e) { return null; }
   }
