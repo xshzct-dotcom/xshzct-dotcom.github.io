@@ -1242,11 +1242,85 @@ async function loadFromSupabase(){
   }
 }
 
-// ===== 初始化 =====
+// ===== 从 Supabase 加载数据覆盖 data.js（编辑器改了这里能看到） =====
+async function loadFromSupabase(){
+  if(!SB) return;
+  try {
+    // 1. 文章 — 从 essays 表加载
+    const {data:essays} = await SB.from('essays').select('*').order('sort_order', {ascending:true});
+    if(essays && essays.length > 0){
+      // 按 category 分组，重建 essayCategories 结构
+      const groups = {};
+      essays.forEach(e => {
+        const cid = e.category || 'thoughts';
+        if(!groups[cid]) groups[cid] = {id: cid, title: e.category_title||cid, articles:[]};
+        groups[cid].articles.push({title:e.title, date:e.date, body:e.body, sort_order:e.sort_order});
+      });
+      const cats = Object.values(groups);
+      // 覆盖全局变量（用 splice 原地替换，因为 data.js 声明是 const）
+      if(typeof essayCategories !== 'undefined'){
+        essayCategories.splice(0, essayCategories.length, ...cats);
+      }
+      // 重建时间线
+      fillTimelineIndex();
+    }
+
+    // 2. 相册 — 从 albums 表加载
+    const {data:sbAlbums} = await SB.from('albums').select('*').order('sort_order', {ascending:true});
+    if(sbAlbums && sbAlbums.length > 0){
+      // 覆盖全局 albums（保留 photos 从 data.js）
+      const oldMap = {};
+      if(typeof albums !== 'undefined') albums.forEach(a => { oldMap[a.title] = a; });
+      const merged = sbAlbums.map(sa => ({
+        ...(oldMap[sa.title]||{}),
+        id: sa.title === (oldMap[sa.title]||{}).title ? oldMap[sa.title].id : sa.title,
+        title: sa.title,
+        cover: sa.cover||'',
+        sort_order: sa.sort_order,
+      }));
+      // 按 sort_order 重新排序
+      merged.sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
+      if(typeof albums !== 'undefined'){
+        const mergedLen = albums.length;
+        albums.splice(0, mergedLen, ...merged);
+      }
+      // 重建 allGalleryPhotos
+      allGalleryPhotos = [];
+      merged.forEach(album => {
+        (album.photos||[]).forEach(photo => {
+          allGalleryPhotos.push({path:photo, src:photo, _albumTitle:album.title, _albumId:album.id, _worldId:album.world||''});
+        });
+      });
+    }
+
+    // 3. 音乐 — 从 music 表加载排序
+    const {data:tracks} = await SB.from('music').select('*').order('sort_order', {ascending:true});
+    if(tracks && tracks.length > 0){
+      const newPlaylist = tracks.map(t => ({
+        name: t.title, title: t.title, artist: t.artist||'',
+        url: t.storage_path||'', storage_path: t.storage_path||'',
+      }));
+      if(typeof playlist !== 'undefined'){
+        playlist.splice(0, playlist.length, ...newPlaylist);
+      }
+      // 更新播放器
+      switchPlaylist(newPlaylist);
+    }
+
+    console.log('[memories] loadFromSupabase done');
+  } catch(e){
+    console.warn('[memories] loadFromSupabase failed:', e);
+  }
+}
 function init(){
   console.log('[memories] init() start');
   initHeroStars();
   initMusic();
+  ensureSync().then(() => loadFromSupabase()).then(() => {
+    buildTimeline();
+    buildRiver();
+    buildYearHeatmap();
+  });
   fillTimelineIndex();
   buildTimeline();
   buildRiver();
