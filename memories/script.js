@@ -450,12 +450,10 @@ window.riverShuffle = riverShuffle;
 // ===== 灯箱 v2 =====// ===== 灯箱 v2 =====
 let zoom = {scale: 1, x: 0, y: 0};
 let lbHideTimer = null;
+// 按钮一直显示，不自动隐藏
 function lbAutoHideControls(){
   clearTimeout(lbHideTimer);
   $$('#lightbox button, #lightbox .lightbox-counter, #lightbox .lightbox-filmstrip').forEach(el => el.classList.remove('lb-hidden'));
-  lbHideTimer = setTimeout(()=>{
-    $$('#lightbox button, #lightbox .lightbox-counter, #lightbox .lightbox-filmstrip').forEach(el => el.classList.add('lb-hidden'));
-  }, 3000);
 }
 
 // ===== 灯箱（用 <img> + transform 实现 Windows Photo Viewer 风格平滑缩放） =====
