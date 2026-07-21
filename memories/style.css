@@ -125,8 +125,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .polaroid{flex:0 0 auto;width:260px;height:340px;scroll-snap-align:center;background:linear-gradient(180deg,#fdfaf3 0%,#f5efe2 100%);padding:12px 12px 30px 12px;border-radius:2px;box-shadow:0 4px 16px rgba(0,0,0,.3),0 1px 4px rgba(0,0,0,.15);transition:transform .3s cubic-bezier(.25,.1,.25,1),box-shadow .3s ease;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:stretch}
 .polaroid::after{content:attr(data-label);position:absolute;bottom:8px;left:12px;right:12px;text-align:center;font-family:var(--font-display);font-style:italic;font-size:.8rem;color:#6a6358;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.5px}
 .polaroid:hover{transform:translateY(-16px) scale(1.06)!important;box-shadow:0 20px 48px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.2);z-index:10}
-.polaroid-frame{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:linear-gradient(135deg,#2a2a2a 0%,#1a1a1a 100%);border-radius:1px;position:relative}
-.polaroid-frame::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.4) 100%);pointer-events:none}
+.polaroid-frame{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:transparent;position:relative}
 .polaroid img{display:block;max-width:100%;max-height:100%;object-fit:contain;pointer-events:none}
 .polaroid-broken{background:rgba(201,123,92,.12);display:flex;align-items:center;justify-content:center}
 .polaroid-broken::before{content:'📷';font-size:2rem;opacity:.4}
@@ -200,7 +199,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .lightbox-prev:hover,.lightbox-next:hover{background:rgba(255,255,255,.15)}
 /* 自动隐藏 */
 .lb-hidden{opacity:0!important;pointer-events:none}
-.lightbox-counter{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);color:var(--text-dim);font-size:.85rem;z-index:201;background:rgba(0,0,0,.4);padding:4px 12px;border-radius:12px;backdrop-filter:blur(8px)}
+.lightbox-counter{position:fixed;top:24px;left:50%;transform:translateX(-50%);color:var(--text-dim);font-size:.85rem;z-index:201;background:rgba(0,0,0,.4);padding:4px 12px;border-radius:12px;backdrop-filter:blur(8px);align-self:flex-start;width:fit-content;height:fit-content}
 .lightbox-zoom-indicator,.lightbox-zoom-indicator.show{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;width:0!important;height:0!important}
 .lightbox-loader,.lightbox-loader.show{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;width:0!important;height:0!important}
 /* Ken Burns 慢推动画 */
