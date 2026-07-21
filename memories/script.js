@@ -292,26 +292,46 @@ function getFilteredRiver(){
   });
 }
 
+// ===== 记忆河流（队列模式 — 每次都不一样直到看完所有） =====
+let _riverQueue = [];
+let _riverCycle = 0;
+let _riverTotal = 0;
+let _riverPoolKey = null;
+
+function ensureRiverQueue(pool){
+  if(_riverQueue.length === 0){
+    for(var i = 0; i < pool.length; i++) _riverQueue.push(i);
+    for(var i = _riverQueue.length - 1; i > 0; i--){
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = _riverQueue[i]; _riverQueue[i] = _riverQueue[j]; _riverQueue[j] = t;
+    }
+    _riverCycle++;
+  }
+}
+
 function renderRiver(){
   var stream = document.getElementById('riverStream');
   if(!stream) return;
   var filtered = getFilteredRiver();
   var pool = filtered.length > 0 ? filtered : allGalleryPhotos;
-  var n = Math.min(POLAROID_COUNT, pool.length);
+  _riverTotal = pool.length;
 
-  // 随机选取 n 张（不重复）用 Fisher-Yates
-  var indices = [];
-  for(var i = 0; i < pool.length; i++) indices.push(i);
-  for(var i = indices.length - 1; i > 0; i--){
-    var j = Math.floor(Math.random() * (i + 1));
-    var t = indices[i]; indices[i] = indices[j]; indices[j] = t;
+  if(_riverPoolKey !== currentFilter){
+    _riverQueue = [];
+    _riverCycle = 0;
+    _riverPoolKey = currentFilter;
   }
-  indices = indices.slice(0, n).sort(function(a,b){return a-b;});
 
-  // 预计算旋转角度
+  ensureRiverQueue(pool);
+  var n = Math.min(POLAROID_COUNT, pool.length);
+  var indices = [];
+  for(var i = 0; i < n && _riverQueue.length > 0; i++){
+    indices.push(_riverQueue.shift());
+  }
+
   var rotations = [];
   var seed = Date.now() % 10000;
-  for(var i = 0; i < n; i++){
+  for(var i = 0; i < indices.length; i++){
     seed = (seed * 16807) % 2147483647;
     rotations.push(((seed % 12) - 6));
   }
@@ -324,7 +344,6 @@ function renderRiver(){
     '</div>';
   }).join('');
 
-  // 每个拍立得初始状态是 loading
   stream.querySelectorAll('.polaroid').forEach(function(el){
     el.classList.add('polaroid-loading');
     el.onclick = function(){
@@ -336,7 +355,12 @@ function renderRiver(){
     };
   });
 
-  // 滚到第一个
+  var hint = document.getElementById('riverHint');
+  if(hint){
+    var ce = Math.ceil(_riverTotal / POLAROID_COUNT);
+    hint.textContent = '轮回 ' + _riverCycle + ' / 约 ' + ce + ' 次（剩余 ' + _riverQueue.length + ' / ' + _riverTotal + ' 张）';
+  }
+
   stream.scrollLeft = 0;
 }
 
@@ -347,6 +371,8 @@ function riverScroll(dir){
 }
 
 function riverShuffle(){
+  // 跳过当前剩余队列，下一批从剩余重新洗
+  _riverQueue = [];
   renderRiver();
 }
 
