@@ -24,6 +24,15 @@
 `;
   document.head.appendChild(CSS);
 
+  // 清理任何残留的旧浮动笔按钮
+  function cleanupOldPens() {
+    ['blog-pen', 'album-pen', 'music-pen'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+  }
+  cleanupOldPens();
+
   function addBtn() {
     if (document.getElementById('settings-menu-btn')) return;
 
