@@ -122,11 +122,11 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .river-stream::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
 .river-stream::-webkit-scrollbar-track{background:transparent}
 
-.polaroid{flex:0 0 auto;width:260px;height:340px;scroll-snap-align:center;background:linear-gradient(180deg,#fdfaf3 0%,#f5efe2 100%);padding:12px 12px 30px 12px;border-radius:2px;box-shadow:0 4px 16px rgba(0,0,0,.3),0 1px 4px rgba(0,0,0,.15);transition:transform .3s cubic-bezier(.25,.1,.25,1),box-shadow .3s ease;cursor:pointer;position:relative;display:flex;flex-direction:column;align-items:stretch}
-.polaroid::after{content:attr(data-label);position:absolute;bottom:8px;left:12px;right:12px;text-align:center;font-family:var(--font-display);font-style:italic;font-size:.8rem;color:#6a6358;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.5px}
+.polaroid{flex:0 0 auto;width:260px;height:340px;scroll-snap-align:center;background:linear-gradient(180deg,#fdfaf3 0%,#f5efe2 100%);border-radius:2px;box-shadow:0 4px 16px rgba(0,0,0,.3),0 1px 4px rgba(0,0,0,.15);transition:transform .3s cubic-bezier(.25,.1,.25,1),box-shadow .3s ease;cursor:pointer;position:relative;display:flex;flex-direction:column;overflow:hidden}
+.polaroid::after{content:attr(data-label);flex:0 0 24px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-style:italic;font-size:.8rem;color:#6a6358;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.5px;padding:0 12px;position:relative;z-index:1}
 .polaroid:hover{transform:translateY(-16px) scale(1.06)!important;box-shadow:0 20px 48px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.2);z-index:10}
-.polaroid-frame{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:transparent;position:relative}
-.polaroid img{display:block;max-width:100%;max-height:100%;object-fit:contain;pointer-events:none}
+.polaroid-frame{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background:transparent;padding:12px;min-height:0}
+.polaroid img{display:block;max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;margin:auto}
 .polaroid-broken{background:rgba(201,123,92,.12);display:flex;align-items:center;justify-content:center}
 .polaroid-broken::before{content:'📷';font-size:2rem;opacity:.4}
 .polaroid-loading .polaroid-frame{background:linear-gradient(135deg,#3a3a3a 25%,#2a2a2a 50%,#3a3a3a 75%);background-size:200% 200%;animation:shimmer2 1.5s infinite}
