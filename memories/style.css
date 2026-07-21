@@ -199,10 +199,8 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 /* 自动隐藏 */
 .lb-hidden{opacity:0!important;pointer-events:none}
 .lightbox-counter{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);color:var(--text-dim);font-size:.85rem;z-index:201;background:rgba(0,0,0,.4);padding:4px 12px;border-radius:12px;backdrop-filter:blur(8px)}
-.lightbox-zoom-indicator{position:fixed;top:20px;left:24px;color:var(--text-dim);font-size:.78rem;z-index:201;background:rgba(0,0,0,.4);padding:4px 10px;border-radius:10px;backdrop-filter:blur(8px);display:none}
-.lightbox-zoom-indicator.show{display:block}
-.lightbox-loader{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text-dim);z-index:202;display:none}
-.lightbox-loader.show{display:block}
+.lightbox-zoom-indicator,.lightbox-zoom-indicator.show{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;width:0!important;height:0!important}
+.lightbox-loader,.lightbox-loader.show{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;width:0!important;height:0!important}
 /* Ken Burns 慢推动画 */
 .lightbox-kenburns .lightbox-img{animation:kenburns 14s ease-in-out forwards}
 @keyframes kenburns{0%{transform:scale(1) translate(0,0)}100%{transform:scale(1.15) translate(-3%,-2%)}}
