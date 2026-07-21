@@ -1313,6 +1313,7 @@ async function loadFromSupabase(){
     console.warn('[memories] loadFromSupabase failed:', e);
   }
 }
+window.reloadFromSupabase = loadFromSupabase;
 function init(){
   console.log('[memories] init() start');
   initHeroStars();

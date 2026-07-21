@@ -53,6 +53,7 @@ async function bindDragSort(listEl, data, table, sortField, onReorder){
         }
       }catch(e){ console.warn('[drag] sort update failed:', e); }
       if(onReorder) onReorder();
+      if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 1000);
     });
   });
 }
@@ -275,7 +276,10 @@ async function renderAlbumTab(){
     el.querySelectorAll('[data-ae-del]').forEach(b=>b.onclick=()=>{
       const a=list[parseInt(b.dataset.aeDel)];
       if(!confirm('删除相册「'+a.title+'」？'))return;
-      db().from('albums').delete().eq('id',a.id).then(()=>renderAlbumTab());
+      db().from('albums').delete().eq('id',a.id).then(()=>{
+        renderAlbumTab();
+        if(window.reloadFromSupabase) window.reloadFromSupabase();
+      });
     });
     // 拖拽排序
     bindDragSort(el, list, 'albums', 'sort_order', ()=>renderList());
@@ -408,7 +412,10 @@ async function renderMusicTab(){
       const t = list[idx];
       if(!t){ console.warn('[del] song not found'); return; }
       if(!confirm('删除「'+t.title+'」？'))return;
-      if(sb) sb.from('music').delete().eq('id',t.id).then(()=>renderMusicTab());
+      if(sb) sb.from('music').delete().eq('id',t.id).then(()=>{
+        renderMusicTab();
+        if(window.reloadFromSupabase) window.reloadFromSupabase();
+      });
       if(t.storage_path && sb) sb.storage.from('photos').remove([t.storage_path]).catch(()=>{});
     });
     // 拖拽排序
@@ -439,6 +446,7 @@ async function renderMusicTab(){
       }
       e.target.value = '';
       renderMusicTab();
+      if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 2000);
       if(total > 0) alert('上传完成：' + okCount + ' 首成功' + (failCount > 0 ? '，' + failCount + ' 首失败' : ''));
     };
   }, 200);
