@@ -357,7 +357,7 @@ function renderGrid(){
     // 不带 loading="lazy" — 让所有图立即请求（即使在视窗外）。2652 个并发请求浏览器会自己排队。
     return `<div class="masonry-item fade-up" data-idx="${i}">
       <div class="masonry-frame">
-        <img src="${src}" alt="" decoding="async" onload="this.classList.add('loaded')" onerror="if(this.dataset.fb!=='1'){this.dataset.fb='1';this.src='${fb}';this.onerror=()=>{this.classList.add('loaded')}}" onclick="(function(t){var lb=document.getElementById('lightbox');lb.classList.add('active');var src=t.src.replace('/thumbs/','/images/').replace('.webp','.jpg');lb.style.cssText='display:flex!important;opacity:1!important;pointer-events:auto!important;z-index:99999!important;background:#000 url('+src+') center/contain no-repeat';document.body.style.overflow='hidden';})(this)">
+        <img src="${src}" alt="" decoding="async" onload="this.classList.add('loaded')" onerror="if(this.dataset.fb!=='1'){this.dataset.fb='1';this.src='${fb}';this.onerror=()=>{this.classList.add('loaded')}}" onclick="(function(t){var lb=document.getElementById('lightbox');lb.classList.add('active');var src=t.src.replace('/thumbs/','/images/').replace('.webp','.jpg');lb.style.cssText='display:flex!important;opacity:1!important;pointer-events:auto!important;z-index:99999!important;background:#000 url('+src+') center/contain no-repeat';document.body.style.overflow='hidden';var stage=document.getElementById('lightboxStage');if(stage)stage.style.display='none';var img=document.getElementById('lightboxImg');if(img){img.removeAttribute('src');img.removeAttribute('style')}})(this)">
       </div>
       <div class="masonry-overlay"><div class="mo-title">${esc(p._albumTitle||'')}</div></div>
     </div>`;
@@ -575,10 +575,19 @@ function openLightbox(idx, kenBurns=false){
   lb.style.pointerEvents = 'auto';
   document.body.style.overflow = 'hidden';
 
-  // 用背景图显示原图，避开 img 元素在 mobile Safari 的渲染 bug
+  // 用背景图显示原图
   const photo = lightboxPhotos[idx];
   const src = full(photo);
   lb.style.background = '#000 url(' + src + ') center/contain no-repeat';
+
+  // 彻底清空 stage 里的 img（避免残留 src 在中央显示挡住背景图）
+  const stage = $('#lightboxStage');
+  if(stage) stage.style.display = 'none';
+  const img = $('#lightboxImg');
+  if(img){
+    img.removeAttribute('src');
+    img.removeAttribute('style');
+  }
 
   counter.textContent = (idx+1) + ' / ' + lightboxPhotos.length;
   lbAutoHideControls();
@@ -624,6 +633,14 @@ function closeLightbox(){
   lb.style.pointerEvents = 'none';
   lb.style.background = '#000';
   document.body.style.overflow = '';
+  // 恢复 stage 显示（万一后续用）
+  const stage = $('#lightboxStage');
+  if(stage) stage.style.display = '';
+  const img = $('#lightboxImg');
+  if(img){
+    img.removeAttribute('src');
+    img.removeAttribute('style');
+  }
   clearTimeout(lbHideTimer);
 }
 window.closeLightbox = closeLightbox;
