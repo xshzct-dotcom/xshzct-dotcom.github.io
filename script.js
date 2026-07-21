@@ -485,6 +485,8 @@ function closeModal() {
   document.getElementById('cardModal').classList.remove('active'); 
   document.body.style.overflow = ''; 
   modalStack = []; 
+  // 关闭时退出文章编辑模式
+  if (window.BLOG && typeof window.BLOG.exit === 'function') window.BLOG.exit();
 }
 
 // ===== 手机端：边缘右滑返回上一级（兼容全屏手势导航） =====

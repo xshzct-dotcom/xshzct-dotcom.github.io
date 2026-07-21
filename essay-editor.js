@@ -382,6 +382,9 @@
 
     body.querySelectorAll('.article-item').forEach((item, i) => {
       if (item.querySelector('.ee-act')) return;
+      // 分类列表（显示"X 篇"）不显示编辑/删除按钮
+      const meta = item.querySelector('.meta');
+      if (meta && meta.textContent.includes('篇')) return;
       const act = document.createElement('div');
       act.className = 'ee-act';
       act.innerHTML = '<span style="color:rgba(255,255,255,.3);margin-right:6px;cursor:grab;user-select:none">⠿</span><button onclick="event.stopPropagation();BLOG.edit(this)">✎</button><button class="ee-del" onclick="event.stopPropagation();BLOG.del(this)">🗑</button>';
@@ -496,8 +499,10 @@
   window.BLOG = {
     toggle: toggleMode,
     isEditing: () => editMode,
+    exit: () => { if (editMode) toggleMode(); },
     add: () => openEditor(null),
     show: () => { if (!editMode) toggleMode(); },
+    ensureButtons: () => setTimeout(injectEditButtons, 50),
     edit: (btn) => { const d = findArticle(btn); if (d) openEditor(d); else alert('找不到文章，请刷新后重试'); },
     del: async (btn) => {
       const d = findArticle(btn);
