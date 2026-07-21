@@ -341,10 +341,25 @@ function renderRiver(){
     var rot = rotations[i];
     var name = (typeof p === 'string' ? p : (p.path||p.src||'')).split('/').pop().replace(/看图王\.jpg$|\.jpg$|\.jpeg$/i, '').replace(/^_+/, '');
     return '<div class="polaroid" data-idx="' + pi + '" style="transform:rotate(' + rot + 'deg);z-index:' + (POLAROID_COUNT - i) + '" data-label="' + esc(p._albumTitle||'') + '" data-missing="暂未上传 · ' + esc(name) + '">' +
-      '<div class="polaroid-frame"><img src="' + thumb(p) + '" alt="" decoding="async" data-full="' + full(p) + '" data-name="' + esc(name) + '" onload="this.parentElement.parentElement.classList.remove(\'polaroid-loading\')" onerror="if(this.dataset.fb!==\'1\'){this.dataset.fb=\'1\';this.src=this.dataset.full;this.onerror=function(){this.style.display=\'none\';this.parentElement.parentElement.classList.add(\'img-fail-frame\')}"></div>' +
+      '<div class="polaroid-frame"><img src="' + thumb(p) + '" alt="" decoding="async" data-full="' + full(p) + '" data-name="' + esc(name) + '"></div>' +
       '<div class="polaroid-caption">' + esc(name) + '</div>' +
     '</div>';
   }).join('');
+
+  // 绑定 onload/onerror（分离绑定避免转义问题）
+  stream.querySelectorAll('.polaroid img').forEach(function(img){
+    var polaroid = img.parentElement.parentElement;
+    img.onload = function(){ polaroid.classList.remove('polaroid-loading'); };
+    img.onerror = function(){
+      if(img.dataset.fb !== '1'){
+        img.dataset.fb = '1';
+        img.src = img.dataset.full;
+      } else {
+        img.style.display = 'none';
+        polaroid.classList.add('img-fail-frame');
+      }
+    };
+  });
 
   stream.querySelectorAll('.polaroid').forEach(function(el){
     el.classList.add('polaroid-loading');
