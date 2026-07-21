@@ -237,7 +237,7 @@ async function renderAlbumTab(){
       renderPhotos();
 
       // Upload
-      $('#aeUpload').onchange=async(e=>{
+      $('#aeUpload').onchange=async (e)=>{
         const files=e.target.files;
         for(const f of files){
           const fname=Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
@@ -248,7 +248,7 @@ async function renderAlbumTab(){
         }
         e.target.value='';
         renderAlbumPhotos(album);
-      });
+      };
     });
   }
 
@@ -303,7 +303,7 @@ async function renderMusicTab(){
   }
   renderList();
 
-  $('#meUpload').onchange=async(e=>{
+  $('#meUpload').onchange=async (e)=>{
     const files=e.target.files;
     for(const f of files){
       const fname='music_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
@@ -314,7 +314,7 @@ async function renderMusicTab(){
     }
     e.target.value='';
     renderMusicTab();
-  });
+  };
 }
 window.renderMusicTab=renderMusicTab;
 
