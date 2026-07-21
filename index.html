@@ -134,26 +134,8 @@
   
   <script defer src="data.js?v=20260715-1"></script>
   <script>
-  // 照片路径重写到 Supabase Storage（封面图除外，走GitHub）
-  (function() {
-    var STORAGE_URL = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos';
-    var iv = setInterval(function() {
-      if (typeof albums !== 'undefined') {
-        clearInterval(iv);
-        albums.forEach(function(a) {
-          if (a.photos) {
-            a.photos = a.photos.map(function(p) {
-              // 封面图继续走 GitHub
-              if (p.indexOf('images/covers/') === 0) return p;
-              return p.replace(/^images\//, STORAGE_URL + '/');
-            });
-          }
-        });
-        // 封面图保持走 GitHub（不重写）
-        console.log('[cdn] 照片路径已重写（封面除外）');
-      }
-    }, 50);
-  })();
+  // 照片路径：新上传的走 Supabase（相册管理器），旧照片保持 GitHub
+  // 新照片由 album-editor.js 上传到 Supabase，data.js 里的旧照片维持 GitHub
   </script>
   <script defer src="script.js?v=20260715-1"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
