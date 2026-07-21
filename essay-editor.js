@@ -286,9 +286,11 @@
   function renderCatList() {
     const wrap = document.getElementById('catList');
     const all = getAllCats();
-    // 统计文章数
+    // 统计文章数（修复：const 不在 window 上，直接用全局变量）
     const counts = {};
-    for (const a of (window.essayCategories || [])) {
+    let cats = [];
+    try { cats = typeof essayCategories !== 'undefined' ? essayCategories : []; } catch(e) {}
+    for (const a of cats) {
       for (const x of (a.articles || [])) counts[x._cat || a.id] = (counts[x._cat || a.id] || 0) + 1;
     }
     if (typeof travels !== 'undefined') {
@@ -298,39 +300,55 @@
     wrap.innerHTML = '<div class="cat-list">' + all.map(c => {
       const isDefault = DEFAULT_CATS.find(d => d.id === c.id);
       return `<div class="cat-item" data-id="${c.id}">
-        <span class="name">${isDefault ? '🔒 ' : ''}<span class="editable">${c.title}</span></span>
+        <span class="name"><span class="editable" data-default="${isDefault ? '1' : '0'}">${esc(c.title)}</span></span>
         <span class="count">${counts[c.id] || 0} 篇</span>
         ${!isDefault ? `<button class="ee-act-btn ee-del" onclick="BLOG.delCat('${c.id}')" style="padding:3px 10px;border:1px solid rgba(255,80,80,.25);border-radius:5px;background:transparent;color:rgba(255,130,130,.7);font-size:11px;cursor:pointer">🗑</button>` : ''}
       </div>`;
     }).join('') + '</div>';
 
-    // 默认分类可以改名字，自定义分类可以改名字
+    // 所有分类都可改名（点击名字）
     wrap.querySelectorAll('.cat-item .editable').forEach(span => {
       span.style.cursor = 'pointer';
-      span.title = '点击修改';
+      span.title = '点击修改名称';
       span.onclick = () => {
         const item = span.closest('.cat-item');
         const id = item.dataset.id;
         const newName = prompt('新分类名:', span.textContent);
         if (!newName) return;
         const c = all.find(x => x.id === id);
-        if (c) c.title = newName.trim();
+        if (c) {
+          c.title = newName.trim();
+          // 保存到 Supabase
+          sb.from('categories').upsert({ id: id, title: c.title }, { onConflict: 'id' }).catch(() => {});
+        }
         renderCatList();
       };
     });
   }
 
   async function saveCustomCats() {
-    // 保存到 localStorage（也可以存到 Supabase 的 categories 表）
-    try {
-      localStorage.setItem('blogCustomCats', JSON.stringify(customCats));
-    } catch(e) {}
+    try { localStorage.setItem('blogCustomCats', JSON.stringify(customCats)); } catch(e) {}
   }
 
   function loadCustomCats() {
     try {
       const c = localStorage.getItem('blogCustomCats');
       if (c) customCats = JSON.parse(c);
+    } catch(e) {}
+  }
+
+  // 从 Supabase 加载分类名称（覆盖默认）
+  async function loadCategoryNames() {
+    try {
+      const { data } = await sb.from('categories').select('id,title');
+      if (data && data.length > 0) {
+        for (const d of data) {
+          const cat = DEFAULT_CATS.find(c => c.id === d.id);
+          if (cat) cat.title = d.title;
+          const cc = customCats.find(c => c.id === d.id);
+          if (cc) cc.title = d.title;
+        }
+      }
     } catch(e) {}
   }
 
@@ -624,6 +642,7 @@
     if (loaded) return;
     loaded = true;
     loadCustomCats();
+    await loadCategoryNames();
 
     const data = await loadData();
     if (!data || data.length === 0) {

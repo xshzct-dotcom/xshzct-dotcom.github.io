@@ -98,6 +98,17 @@
     return data || [];
   }
 
+  // ===== 获取照片URL（支持 Supabase 存储路径和完整 URL）=====
+  function photoUrl(p) {
+    if (!p || !p.storage_path) return '';
+    // 完整 URL → 直接用
+    if (p.storage_path.startsWith('http://') || p.storage_path.startsWith('https://')) return p.storage_path;
+    // 相对路径（如 images/chuanxi/xxx.jpg）→ 用 GitHub Pages 同源路径
+    if (p.storage_path.startsWith('images/') || p.storage_path.startsWith('music/')) return p.storage_path;
+    // Supabase 存储路径 → 拼 STORAGE_URL
+    return STORAGE_URL + '/' + p.storage_path;
+  }
+
   // ===== 渲染 =====
   async function renderAlbumList() {
     const body = document.getElementById('albumBody');
@@ -145,7 +156,7 @@
              ontouchstart="${editMode ? 'ALBUM.touchDragStart(event,' + i + ')' : ''}"
              ontouchmove="${editMode ? 'ALBUM.touchDragMove(event)' : ''}"
              ontouchend="${editMode ? 'ALBUM.touchDragEnd(event)' : ''}">
-          <img src="${STORAGE_URL}/${p.storage_path}" loading="lazy" onclick="${editMode ? '' : 'ALBUM.preview(' + i + ')'}">
+          <img src="${photoUrl(p)}" loading="lazy" onclick="${editMode ? '' : 'ALBUM.preview(' + i + ')'}">
           ${editMode ? `<button class="del-btn" onclick="event.stopPropagation();ALBUM.delPhoto(${p.id})">✕</button>
           <span class="drag-handle" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.3);font-size:16px;cursor:grab">⠿</span>` : ''}
         </div>`).join('') + '</div>';
@@ -299,7 +310,7 @@
   function previewPhoto(idx) {
     const photo = currentPhotos[idx];
     if (!photo) return;
-    const url = STORAGE_URL + '/' + photo.storage_path;
+    const url = photoUrl(photo);
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:10003;display:flex;align-items:center;justify-content:center;cursor:pointer';
     ov.innerHTML = `<img src="${url}" style="max-width:95%;max-height:95%;object-fit:contain;border-radius:8px">`;
@@ -512,11 +523,23 @@
     }
     console.log('[album] 从网站导入', SITE_ALBUMS.length, '个相册...');
     for (const sa of SITE_ALBUMS) {
-      const { error: aErr } = await sb.from('albums').insert({
+      // 创建相册并获取 ID
+      const { data: newAlbum, error: aErr } = await sb.from('albums').insert({
         title: sa.title,
         sort_order: -(Date.now()),
-      });
-      if (aErr) { console.warn('[album] 导入失败:', sa.title, aErr); continue; }
+      }).select('id').single();
+      if (aErr || !newAlbum) { console.warn('[album] 导入失败:', sa.title, aErr); continue; }
+      // 导入照片
+      if (sa.photos && sa.photos.length > 0) {
+        const batch = sa.photos.map((url, i) => ({
+          album_id: newAlbum.id,
+          filename: url.split('/').pop() || 'photo_' + i + '.jpg',
+          storage_path: url,  // 存原始 URL（GitHub 路径）
+          sort_order: i,
+        }));
+        const { error: pErr } = await sb.from('album_photos').insert(batch);
+        if (pErr) console.warn('[album] 照片导入失败:', sa.title, pErr);
+      }
     }
     console.log('[album] 网站相册导入完成');
   }

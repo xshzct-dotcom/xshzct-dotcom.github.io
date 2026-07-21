@@ -105,10 +105,15 @@ input[type=file].music-upload{display:none}
       // 从 Supabase tracks 重建播放列表
       const mainTracks = tracks.filter(t => !t.album_id);
       if (mainTracks.length === 0) return;
-      const newList = mainTracks.map(t => ({
-        name: t.title,
-        url: t.url || (STORAGE_URL.replace('/photos', '') + '/photos/' + t.storage_path),
-      }));
+      const newList = mainTracks.map(t => {
+        let trackUrl = t.url || '';
+        if (!trackUrl) {
+          if (t.storage_path.startsWith('http')) trackUrl = t.storage_path;
+          else if (t.storage_path.startsWith('music/')) trackUrl = t.storage_path;
+          else trackUrl = `${STORAGE_URL}/photos/${t.storage_path}`;
+        }
+        return { name: t.title, url: trackUrl };
+      });
       // 修改全局 playlist（data.js 的 const 数组，可以原地修改）
       if (typeof playlist !== 'undefined' && Array.isArray(playlist)) {
         playlist.length = 0;
@@ -213,9 +218,11 @@ input[type=file].music-upload{display:none}
   };
 
   function playTrack(storagePath) {
-    // 优先用 Supabase，没有就用 GitHub 原路径
     let url;
     if (storagePath && storagePath.startsWith('http')) {
+      url = storagePath;
+    } else if (storagePath && storagePath.startsWith('music/')) {
+      // GitHub 相对路径
       url = storagePath;
     } else if (storagePath) {
       url = `${STORAGE_URL}/photos/${storagePath}`;
