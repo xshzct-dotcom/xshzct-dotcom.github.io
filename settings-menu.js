@@ -124,17 +124,24 @@
         if (window.ALBUM && typeof window.ALBUM.show === 'function') {
           window.ALBUM.show();
         } else {
-          // 等 album-editor.js 加载
+          alert('相册管理器加载中，请稍后重试...');
           const check = setInterval(() => {
             if (window.ALBUM && typeof window.ALBUM.show === 'function') {
               clearInterval(check);
               window.ALBUM.show();
             }
-          }, 100);
-          setTimeout(() => clearInterval(check), 3000);
+          }, 200);
+          setTimeout(() => { clearInterval(check); }, 5000);
         }
-      } catch(e) { console.warn('[MENU] 打开相册失败', e); }
+      } catch(e) { console.warn('[MENU] 打开相册失败', e); alert('打开相册失败: ' + e.message); }
     },
+    openMusic: () => {
+      document.getElementById('settings-dropdown')?.classList.remove('show');
+      try {
+        if (window.MUSIC && typeof window.MUSIC.show === 'function') {
+          window.MUSIC.show();
+        } else {
+          const check = setInterval(() => {
     openMusic: () => {
       document.getElementById('settings-dropdown')?.classList.remove('show');
       try {

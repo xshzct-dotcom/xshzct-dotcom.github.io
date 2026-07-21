@@ -173,10 +173,22 @@
 
   // ===== 相册操作 =====
   function show() {
+    // 如果 Supabase 还没初始化，等一会儿再试
+    if (!sb) {
+      setTimeout(show, 500);
+      return;
+    }
     const ov = document.getElementById('albumOverlay');
-    if (!ov) { console.warn('[album] 找不到弹窗DOM，Supabase SDK可能未加载'); return; }
+    if (!ov) {
+      alert('相册管理器加载失败（请检查网络，刷新页面重试）');
+      console.warn('[album] 找不到弹窗DOM，Supabase SDK可能未加载');
+      return;
+    }
     ov.classList.add('show');
-    renderAlbumList().catch(e => console.warn('[album] 渲染失败', e));
+    renderAlbumList().catch(e => {
+      console.warn('[album] 渲染失败', e);
+      ov.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(255,255,255,.6)"><p>加载失败: ' + e.message + '</p><button onclick="ALBUM.show()" style="padding:8px 20px;border:1px solid rgba(255,255,255,.2);border-radius:8px;background:transparent;color:#fff;cursor:pointer">重试</button></div>';
+    });
   }
   function hide() {
     const ov = document.getElementById('albumOverlay');
