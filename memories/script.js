@@ -320,7 +320,7 @@ function renderRiver(){
     var p = pool[pi];
     var rot = rotations[i];
     return '<div class="polaroid" data-idx="' + pi + '" style="transform:rotate(' + rot + 'deg)" data-label="' + esc(p._albumTitle||'') + '">' +
-      '<img src="' + thumb(p) + '" alt="" decoding="async" data-full="' + full(p) + '" onload="var p=this.parentElement;if(p)p.classList.remove(\'polaroid-loading\')" onerror="if(this.dataset.fb!==\'1\'){this.dataset.fb=\'1\';this.src=this.dataset.full}">' +
+      '<div class="polaroid-frame"><img src="' + thumb(p) + '" alt="" decoding="async" data-full="' + full(p) + '" onload="this.parentElement.parentElement.classList.remove(\'polaroid-loading\')" onerror="if(this.dataset.fb!==\'1\'){this.dataset.fb=\'1\';this.src=this.dataset.full}"></div>' +
     '</div>';
   }).join('');
 
