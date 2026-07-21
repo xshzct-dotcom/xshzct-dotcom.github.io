@@ -14,9 +14,41 @@ function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 // 图片路径（父级 images/thumbs 目录）
 const IMG_BASE = '../images/';
 const THUMB_BASE = '../thumbs/';
-function thumb(p){ if(!p)return'';if(p.startsWith('http'))return p;if(p.startsWith('images/'))return '../'+p;if(p.startsWith('thumbs/'))return '../'+p;return THUMB_BASE + p; }
-function full(p){ if(!p)return'';if(p.startsWith('http'))return p;if(p.startsWith('images/'))return '../'+p;return IMG_BASE + p; }
-function musicPath(m){ if(!m)return'';if(m.startsWith('http'))return m;if(m.startsWith('music/'))return '../'+m;return '../music/'+m; }
+// 统一取路径：接收字符串或 {path,src}
+function getPath(p){
+  if(!p) return '';
+  if(typeof p === 'string') return p;
+  return p.path || p.src || p.storage_path || p.url || p.filename || '';
+}
+function thumb(p){
+  const s = getPath(p);
+  if(!s) return '';
+  if(s.startsWith('http')) return s;
+  if(s.startsWith('images/')) return '../' + s;
+  if(s.startsWith('thumbs/')) return '../' + s;
+  return THUMB_BASE + s;
+}
+function full(p){
+  const s = getPath(p);
+  if(!s) return '';
+  if(s.startsWith('http')) return s;
+  if(s.startsWith('images/')) return '../' + s;
+  return IMG_BASE + s;
+}
+function musicPath(m){
+  if(!m) return '';
+  if(typeof m === 'string'){
+    if(m.startsWith('http')) return m;
+    if(m.startsWith('music/')) return '../' + m;
+    return '../music/' + m;
+  }
+  // 对象形式
+  const s = m.url || m.path || m.src || m.storage_path || '';
+  if(!s) return '';
+  if(s.startsWith('http')) return s;
+  if(s.startsWith('music/')) return '../' + s;
+  return '../music/' + s;
+}
 
 // ===== 导航 =====
 const nav = $('#nav');
@@ -201,8 +233,10 @@ function buildGallery(){
   const allPhotos = [];
   albums.forEach(album => {
     (album.photos||[]).forEach(photo => {
+      // photo 是字符串路径（注意：不能用展开运算符，会把字符串拆成字符对象）
       allPhotos.push({
-        ...photo,
+        path: photo,
+        src: photo,
         _albumTitle: album.title,
         _albumId: album.id,
         _worldId: album.world||'',
@@ -468,7 +502,7 @@ function handleAlbumClick(albumId){
 function openAlbumLightbox(albumId){
   const album = (albums||[]).find(a=>a.id===albumId);
   if(!album||!album.photos||album.photos.length===0) return;
-  lightboxPhotos = album.photos.map(p=>({...p,_albumTitle:album.title}));
+  lightboxPhotos = album.photos.map(p=>({path:p, src:p, _albumTitle:album.title}));
   openLightbox(0);
 }
 
