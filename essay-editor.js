@@ -28,8 +28,7 @@
   // ===== 样式 =====
   const CSS = document.createElement('style');
   CSS.textContent = `
-#blog-pen{position:fixed;bottom:24px;right:24px;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.07);color:rgba(255,255,255,.4);font-size:20px;cursor:pointer;z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:all .3s;user-select:none;-webkit-user-select:none;box-shadow:0 2px 12px rgba(0,0,0,.2);touch-action:manipulation}
-#blog-pen:hover,#blog-pen.active{background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.3);transform:scale(1.05)}
+#blog-pen,.blog-pen{display:none!important}
 
 .blog-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:10001;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
 .blog-overlay.show{display:flex}
@@ -79,7 +78,7 @@
   .blog-editor-header{padding:14px 16px}
   .blog-editor-body{padding:14px 16px}
   .blog-editor-footer{padding:12px 16px 14px}
-  #blog-pen{width:40px;height:40px;font-size:18px;bottom:16px;right:16px}
+  /* pen按钮已废弃 */
   .blog-field textarea{min-height:200px}
 }`;
   document.head.appendChild(CSS);
