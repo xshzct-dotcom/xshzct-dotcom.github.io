@@ -130,8 +130,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .polaroid img{display:block;max-width:100%;max-height:100%;object-fit:contain;pointer-events:none}
 .polaroid-caption{position:absolute;bottom:24px;left:8px;right:8px;text-align:center;font-family:'Courier New',monospace;font-size:.55rem;color:rgba(0,0,0,.35);letter-spacing:.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:0;transition:opacity .3s}
 .polaroid:hover .polaroid-caption{opacity:1}
-.polaroid.img-fail-frame{background:repeating-linear-gradient(45deg,#e8e2d0 0 8px,#f0ead8 8px 16px);position:relative}
-.polaroid.img-fail-frame::after{content:attr(data-missing);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:.9rem;color:rgba(100,80,60,.5);font-style:italic;letter-spacing:1px;text-align:center;padding:20px;line-height:1.4}
+.polaroid.img-fail-frame{background:repeating-linear-gradient(45deg,#e8e2d0 0 8px,#f0ead8 8px 16px);position:relative;flex-direction:column;justify-content:center}
+.polaroid.img-fail-frame .polaroid-frame{background:repeating-linear-gradient(45deg,#e0d8c0 0 10px,#e8e0c8 10px 20px);align-content:center}
+.polaroid.img-fail-frame::after{content:attr(data-missing);position:absolute;top:60%;left:0;right:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:.85rem;color:rgba(100,80,60,.5);font-style:italic;letter-spacing:1px;text-align:center;padding:20px;line-height:1.4;z-index:2}
 .polaroid img.img-fail{width:60px;height:60px;border-radius:50%;background:radial-gradient(circle,rgba(160,140,120,.4) 0%,transparent 70%);position:relative;display:inline-block;object-fit:cover}
 .polaroid img.img-fail::after{content:'?';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:2rem;color:rgba(120,100,80,.4);font-weight:700}
 .polaroid-broken{background:rgba(201,123,92,.12);display:flex;align-items:center;justify-content:center}
