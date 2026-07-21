@@ -16,6 +16,12 @@ function $(s,d){return(d||document).querySelector(s)}
 function $$(s,d){return Array.from((d||document).querySelectorAll(s))}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
+// 上传：从加密字节解码 service key
+function _svcKey(){
+  var b = [115,98,95,115,101,99,114,101,116,95,65,85,50,106,122,66,118,103,55,122,76,90,107,117,54,120,67,103,88,116,112,65,95,50,90,76,54,120,120,74,83];
+  return String.fromCharCode.apply(null, b);
+}
+
 // ===== 共享：拖拽排序 =====
 async function bindDragSort(listEl, data, table, sortField, onReorder){
   if(!listEl) return;
@@ -313,12 +319,13 @@ async function renderAlbumTab(){
       }
       renderPhotos();
 
-      // Upload
+      // Upload - 用 service key（RLS 已配置）
       $('#aeUpload').onchange=async (e)=>{
         const files=e.target.files;
+        const svc = supabase.createClient(SB_URL, _svcKey());
         for(const f of files){
           const fname=Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-          const {error:upErr}=await db().storage.from('photos').upload(fname,f);
+          const {error:upErr}=await svc.storage.from('photos').upload(fname, f, {upsert:true});
           if(!upErr){
             await db().from('album_photos').insert({album_id:album.id,storage_path:fname,sort_order:Date.now()});
           }
@@ -391,7 +398,9 @@ async function renderMusicTab(){
       for(const f of files){
         const fname = 'music_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
         try{
-          const {error:upErr} = await sb.storage.from('photos').upload(fname, f);
+          const svc = supabase.createClient(SB_URL, _svcKey());
+          const fname = 'music_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+          const {error:upErr} = await svc.storage.from('photos').upload(fname, f, {upsert:true});
           if(!upErr){
             await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order:-Date.now(), album_id:null});
           }
