@@ -375,11 +375,26 @@ async function renderMusicTab(){
       const t=list[parseInt(b.dataset['me-play'])];
       const sp = t.storage_path || '';
       let url;
-      if(sp.startsWith('http')) url = sp;  // CDN URL
-      else if(sp.startsWith('music/')) url = MUSIC_BASE + sp.slice(6);  // relative path
-      else url = STORAGE_URL + '/' + sp;  // Supabase storage
+      if(sp.startsWith('http')){
+        // CDN URL — 可能指向错误仓库，试试修正
+        url = sp;
+        // 如果是旧的 julian678 仓库，改成正确仓库
+        if(sp.includes('julian678')) url = sp.replace(/julian678/, 'xshzct-dotcom.github.io');
+      } else if(sp.startsWith('music/')){
+        url = MUSIC_BASE + sp.slice(6);
+      } else {
+        url = STORAGE_URL + '/' + sp;
+      }
       const a = new Audio(url);
-      a.play().catch(e => alert('❌ 播放失败：' + (e.message||'未知')));
+      a.play().then(() => {}).catch(e => {
+        // 播放失败，试试另一个来源
+        if(sp.includes('julian678')){
+          const altUrl = 'https://cdn.jsdelivr.net/gh/xshzct-dotcom/xshzct-dotcom.github.io@main/' + sp.split('@main/')[1];
+          new Audio(altUrl).play().catch(() => alert('❌ 无法播放：' + t.title));
+        } else {
+          alert('❌ 播放失败');
+        }
+      });
     });
     el.querySelectorAll('[data-me-edit]').forEach(b=>b.onclick=()=>{
       const t=list[parseInt(b.dataset['me-edit'])];
