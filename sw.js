@@ -3,7 +3,7 @@
 // 策略：network-first（每次都拿最新），离线时回退缓存
 // 2026-07-21 升级：从 cache-first 改为 network-first，解决"改了却看不到"的缓存锁死
 // ============================================
-const CACHE = 'blog-v11';
+const CACHE = 'blog-v12';
 const STATIC_ASSETS = [
   '/', '/index.html',
   '/style.css', '/data.js', '/script.js',

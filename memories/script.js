@@ -1005,7 +1005,22 @@ function visTick(){
   requestAnimationFrame(visTick);
 }
 
-function switchPlaylist(songs){ window._currentSongs=songs; currentSongIdx=0; playSong(0); }
+function switchPlaylist(songs){
+  window._currentSongs=songs;
+  currentSongIdx=0;
+  if(songs&&songs.length){
+    // 只设 src 不自动播放（避免浏览器拦截），等用户点 ▶
+    const s=songs[0];
+    const sp=(s.storage_path||s.url||'').trim();
+    let url;
+    if(sp.startsWith('http')) url=sp;
+    else if(sp.startsWith('music/')) url=MUSIC_BASE+sp.slice(6);
+    else if(sp) url='https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/'+sp;
+    else url=MUSIC_BASE+(s.name||s.title||'')+'.mp3';
+    if(bgMusic){ bgMusic.src=url; bgMusic.load(); }
+    $('#playerTitle').textContent=s.name||s.title||'未知';
+  }
+}
 function playSong(idx){
   const songs=window._currentSongs;
   if(!songs||idx>=songs.length||idx<0) return;
@@ -1016,7 +1031,6 @@ function playSong(idx){
   let url;
   if(sp.startsWith('http')){
     url = sp;
-    if(url.includes('julian678')) url = url.replace(/julian678/g, 'xshzct-dotcom.github.io');
   } else if(sp.startsWith('music/')){
     url = MUSIC_BASE + sp.slice(6);
   } else if(sp){
@@ -1037,8 +1051,13 @@ function playSong(idx){
 }
 function togglePlay(){
   if(!bgMusic) return;
-  if(isPlaying) bgMusic.pause();
-  else bgMusic.play().catch(()=>{});
+  if(isPlaying){ bgMusic.pause(); return; }
+  // 如果 src 为空或还没加载过，先加载当前歌
+  if(!bgMusic.src || bgMusic.src===window.location.href || bgMusic.readyState===0){
+    const songs=window._currentSongs;
+    if(songs&&songs.length>0) playSong(currentSongIdx);
+  }
+  bgMusic.play().catch(()=>{});
 }
 window.togglePlay=togglePlay;
 function prevSong(){
