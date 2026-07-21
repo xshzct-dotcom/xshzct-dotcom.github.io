@@ -244,9 +244,9 @@ function openEssayModal(essay){
     <div class="modal-essay-date">${essay.date||''} · ${essay.cat||''}</div>
     <div class="modal-essay-body">${fmtBody(essay.body)}</div>
     <div class="modal-nav">
-      <button class="editor-btn editor-btn-secondary" ${hasPrev?'':'disabled'} onclick="(${hasPrev?'openEssayModal(_timelineItems['+ (curIdx-1) +'])':'void 0'})()">← 上一篇</button>
+      <button class="editor-btn editor-btn-secondary" ${hasPrev?'':'disabled'} onclick="${hasPrev?'openEssayModal(_timelineItems['+ (curIdx-1) +'])':'void 0'}">← 上一篇</button>
       <span style="color:var(--text-muted);font-size:.85rem">${curIdx+1}/${_timelineItems.length}</span>
-      <button class="editor-btn editor-btn-secondary" ${hasNext?'':'disabled'} onclick="(${hasNext?'openEssayModal(_timelineItems['+ (curIdx+1) +'])':'void 0'})()">下一篇 →</button>
+      <button class="editor-btn editor-btn-secondary" ${hasNext?'':'disabled'} onclick="${hasNext?'openEssayModal(_timelineItems['+ (curIdx+1) +'])':'void 0'}">下一篇 →</button>
     </div>
   `;
   overlay.classList.add('active');
@@ -903,11 +903,44 @@ function fillTimelineIndex(){
   if(typeof travels !== 'undefined'){
     travels.forEach(art => _timelineItems.push({...art, cat:'旅行见闻', catId:'travel'}));
   }
+  // 排序：先按 sort_order（编辑器自定义），再按日期（新的在上）
   _timelineItems.sort((a,b)=>{
-    const da=a.date||'', db=b.date||'';
+    var ao=a.sort_order!=null?a.sort_order:0, bo=b.sort_order!=null?b.sort_order:0;
+    if(ao!==bo) return ao-bo;
+    var da=a.date||'', db=b.date||'';
     if(da>db) return -1; if(da<db) return 1;
-    return (b.sort_order||0)-(a.sort_order||0);
+    return 0;
   });
+  // 从 Supabase 同步 sort_order（如果已编辑过）
+  loadSortOrderFromDB();
+}
+async function loadSortOrderFromDB(){
+  var sb = window._supabaseClient;
+  if(!sb && typeof supabase !== 'undefined'){
+    try{
+      sb = supabase.createClient('https://mvzbkuhwapdqcdkekczh.supabase.co','sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb');
+    }catch(e){}
+    window._supabaseClient = sb;
+  }
+  if(!sb) return;
+  try{
+    var {data:items} = await sb.from('essays').select('title,date,sort_order');
+    if(items && items.length > 0){
+      items.forEach(function(dbItem){
+        var found = _timelineItems.find(function(t){ return t.title === dbItem.title && t.date === dbItem.date; });
+        if(found) found.sort_order = dbItem.sort_order;
+      });
+      // 重新排序
+      _timelineItems.sort((a,b)=>{
+        var ao=a.sort_order!=null?a.sort_order:0, bo=b.sort_order!=null?b.sort_order:0;
+        if(ao!==bo) return ao-bo;
+        var da=a.date||'', db=b.date||'';
+        if(da>db) return -1; if(da<db) return 1;
+        return 0;
+      });
+      buildTimeline();
+    }
+  }catch(e){}
 }
 
 // ===== Supabase 同步（把 data.js 现有内容同步到云端，让编辑器有真实数据可改） =====
