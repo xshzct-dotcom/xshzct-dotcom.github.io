@@ -3,7 +3,7 @@
 // 策略：network-first（每次都拿最新），离线时回退缓存
 // 2026-07-21 升级：从 cache-first 改为 network-first，解决"改了却看不到"的缓存锁死
 // ============================================
-const CACHE = 'blog-v7';
+const CACHE = 'blog-v8';
 const STATIC_ASSETS = [
   '/', '/index.html',
   '/style.css', '/data.js', '/script.js',
@@ -38,28 +38,25 @@ self.addEventListener('activate', function(e) {
 self.addEventListener('fetch', function(e) {
   const url = new URL(e.request.url);
 
-  // 图片请求 → 转到 Supabase Storage（缓存作为兜底）
+  // 仅处理同源 GET
+  if (!url.href.startsWith(self.location.origin)) return;
+  if (e.request.method !== 'GET') return;
+
+  // 图片（/thumbs/, /images/）：**只走网络，不缓存**
+  // 之前错误地重定向到 Supabase Storage，但照片都在 GitHub 仓库里，导致 404
   if (url.pathname.startsWith('/images/') || url.pathname.startsWith('/thumbs/')) {
-    const supabaseUrl = SUPABASE_STORAGE + url.pathname;
     e.respondWith(
-      fetch(supabaseUrl).then(function(resp) {
-        if (resp && resp.ok) {
-          var clone = resp.clone();
-          caches.open(CACHE).then(function(cache) { cache.put(e.request, clone); });
-        }
+      fetch(e.request, { cache: 'no-store' }).then(function(resp) {
         return resp;
       }).catch(function() {
+        // 离线时回退缓存（如果之前缓存过）
         return caches.match(e.request);
       })
     );
     return;
   }
 
-  // 仅处理同源 GET
-  if (!url.href.startsWith(self.location.origin)) return;
-  if (e.request.method !== 'GET') return;
-
-  // network-first：先取网络最新，失败再回退缓存（离线可用）
+  // 其他资源：network-first（先网络后缓存）
   e.respondWith(
     fetch(e.request).then(function(resp) {
       if (resp && resp.status === 200) {
