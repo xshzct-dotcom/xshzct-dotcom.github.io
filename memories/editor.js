@@ -63,15 +63,15 @@ async function ensureDataSync(){
       }
       for(let i=0;i<all.length;i+=50) await sb.from('essays').insert(all.slice(i, i+50));
     }
-    // 相册
+    // 相册（schema: id, title, cover, sort_order, created_at — 无 photo_count）
     const {count:ac} = await sb.from('albums').select('*', {count:'exact', head:true});
     if((!ac || ac === 0) && typeof albums !== 'undefined'){
-      const allA = albums.map((a, i) => ({title:a.title, sort_order:i, cover:a.cover||'', photo_count:(a.photos||[]).length}));
+      const allA = albums.map((a, i) => ({title:a.title, sort_order:i, cover:a.cover||''}));
       for(let i=0;i<allA.length;i+=50) await sb.from('albums').insert(allA.slice(i, i+50));
     } else if(typeof albums !== 'undefined'){
       for(const a of albums){
         const {data:exist} = await sb.from('albums').select('id').eq('title', a.title).limit(1);
-        if(exist && exist.length) await sb.from('albums').update({photo_count:(a.photos||[]).length}).eq('id', exist[0].id);
+        if(exist && exist.length) await sb.from('albums').update({cover:a.cover||'', sort_order:0}).eq('id', exist[0].id);
       }
     }
     // 音乐
