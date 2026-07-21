@@ -189,22 +189,27 @@
     const cat = document.getElementById('blogCategory').value;
     const dateStr = document.getElementById('blogDate').value.trim();
 
-    // 根据日期自动算排序（最新在前）
-    let sortOrder = -Date.now();
-    if (dateStr) {
-      const m = dateStr.match(/^(\d{2,4})[.\-/年](\d{1,2})[.\-/月](\d{1,2})/);
-      if (m) {
-        let y = parseInt(m[1]);
-        if (y < 100) y += 2000;
-        const ts = new Date(y, parseInt(m[2]) - 1, parseInt(m[3])).getTime();
-        if (!isNaN(ts)) sortOrder = -ts;
+    // 默认日期：今天
+    const finalDate = dateStr || new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric' }).replace(/\//g, '.');
+
+    // 排序：新文章放在最前面（sort_order = 0），已有文章保持
+    let sortOrder = 0;
+    if (!editingId) {
+      // 新文章 → 查当前分类最大 sort_order，新文章放最前
+      const { data: siblings } = await sb.from('essays').select('sort_order').eq('category', cat).order('sort_order', { ascending: true });
+      if (siblings && siblings.length > 0) {
+        // 新文章排第一（sort_order = 0），其他全部 +1
+        for (let j = 0; j < siblings.length; j++) {
+          await sb.from('essays').update({ sort_order: j + 1 }).eq('id', siblings[j].id);
+        }
+        sortOrder = 0;
       }
     }
 
     const data = {
       category: cat,
       category_title: getCatTitle(cat),
-      title, date: dateStr, body,
+      title, date: finalDate, body,
       sort_order: sortOrder,
     };
 
@@ -364,7 +369,7 @@
   // ===== 数据 =====
   async function loadData() {
     try {
-      const { data, error } = await sb.from('essays').select('*').order('sort_order', { ascending: false }).order('created_at', { ascending: false });
+      const { data, error } = await sb.from('essays').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false });
       if (error) return null;
       return data || [];
     } catch(e) { return null; }
@@ -407,7 +412,7 @@
             const { error } = await sb.from('essays').insert({
               category: cat.id, category_title: cat.title,
               title: art.title, date: art.date || '', body: art.body,
-              sort_order: -Date.now() + count,
+              sort_order: count,
             });
             if (!error) count++;
           }
@@ -540,30 +545,38 @@
         const toIdx = parseInt(item.dataset.idx);
         if (fromIdx === toIdx || isNaN(fromIdx) || isNaN(toIdx)) return;
 
-        // 从 data-cat 找分类
-        const toCat = item.dataset.cat;
-        if (!toCat) return;
-        // 找源分类
+        // 确定操作的是哪个分类
+        const catId = item.dataset.cat;
+        if (!catId) return;
         const fromItems = body.querySelectorAll('.article-item');
         const fromCat = fromItems[fromIdx] ? fromItems[fromIdx].dataset.cat : null;
-        if (fromCat !== toCat) return; // 不同分类不能拖拽交换
+        if (fromCat !== catId) return;
 
-        for (const cat of essayCategories) {
-          if (cat.id === toCat || cat.id === fromCat) {
-            const from = cat.articles[fromIdx];
-            const to = cat.articles[toIdx];
-            if (from && to && from._sid && to._sid) {
-              const fromOrder = from.sort_order;
-              const toOrder = to.sort_order;
-              await sb.from('essays').update({ sort_order: toOrder }).eq('id', from._sid);
-              await sb.from('essays').update({ sort_order: fromOrder }).eq('id', to._sid);
-              await refreshData();
-              if (typeof updateModalView === 'function') updateModalView();
-              setTimeout(injectEditButtons, 100);
-            }
-            return;
+        // 找到该分类的所有文章
+        let catArticles = null;
+        let catObj = null;
+        if (typeof essayCategories !== 'undefined') {
+          for (const c of essayCategories) {
+            if (c.id === catId) { catArticles = c.articles; catObj = c; break; }
           }
         }
+        if (!catArticles) return;
+
+        // 重新排序：把 from 移到 to 位置，其余顺移
+        const item_data = catArticles.splice(fromIdx, 1)[0];
+        catArticles.splice(toIdx, 0, item_data);
+
+        // 重新分配 sort_order（从0开始递增）
+        for (let j = 0; j < catArticles.length; j++) {
+          const a = catArticles[j];
+          if (a._sid) {
+            await sb.from('essays').update({ sort_order: j }).eq('id', a._sid);
+          }
+        }
+
+        await refreshData();
+        if (typeof updateModalView === 'function') updateModalView();
+        setTimeout(injectEditButtons, 100);
       });
     });
   }
