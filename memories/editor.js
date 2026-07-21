@@ -412,10 +412,13 @@ async function renderMusicTab(){
       const t = list[idx];
       if(!t){ console.warn('[del] song not found'); return; }
       if(!confirm('删除「'+t.title+'」？'))return;
-      if(sb) sb.from('music').delete().eq('id',t.id).then(()=>{
-        renderMusicTab();
-        if(window.reloadFromSupabase) window.reloadFromSupabase();
-      });
+      if(sb){
+        const svcDel = supabase.createClient(SB_URL, _svcKey());
+        svcDel.from('music').delete().eq('id',t.id).then(()=>{
+          renderMusicTab();
+          if(window.reloadFromSupabase) window.reloadFromSupabase();
+        });
+      }
       if(t.storage_path && sb) sb.storage.from('photos').remove([t.storage_path]).catch(()=>{});
     });
     // 拖拽排序
