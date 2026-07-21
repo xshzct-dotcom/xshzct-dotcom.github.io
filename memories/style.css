@@ -111,7 +111,8 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 
 /* --- 记忆河流 · 散落拍立得 --- */
 .river-filters{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:20px}
-.river-hint{text-align:center;font-size:.78rem;color:var(--text-muted);margin-bottom:12px;font-family:var(--font-display);font-style:italic;letter-spacing:.5px}
+.river-hint{text-align:center;font-size:.78rem;color:var(--text-muted);margin-bottom:6px;font-family:var(--font-display);font-style:italic;letter-spacing:.5px}
+.gallery-load-progress{text-align:center;font-size:.72rem;color:var(--accent);margin-bottom:12px;font-family:var(--font-display);letter-spacing:1px}
 .river-filter{padding:7px 18px;border:1px solid var(--border);border-radius:20px;font-size:.85rem;color:var(--text-dim);transition:all .25s;cursor:pointer;background:transparent}
 .river-filter:hover{border-color:var(--border-hover);color:var(--text)}
 .river-filter.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
@@ -212,6 +213,14 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .lightbox-counter{position:fixed;top:24px;left:50%;transform:translateX(-50%);color:var(--text-dim);font-size:.85rem;z-index:201;background:rgba(0,0,0,.4);padding:4px 12px;border-radius:12px;backdrop-filter:blur(8px);align-self:flex-start;width:fit-content;height:fit-content}
 .lightbox-zoom-indicator{position:fixed;top:20px;left:24px;color:var(--text-dim);font-size:.78rem;z-index:201;background:rgba(0,0,0,.4);padding:4px 10px;border-radius:10px;backdrop-filter:blur(8px);display:none}
 .lightbox-zoom-indicator.show{display:block}
+/* 灯箱加载状态：转圈 + 进度条 + MB 显示 */
+#lbLoader{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:202;display:flex;flex-direction:column;align-items:center;gap:14px;pointer-events:none}
+#lbLoader.hidden{display:none}
+.lb-spinner{width:52px;height:52px;border-radius:50%;border:3px solid rgba(255,255,255,.1);border-top-color:#7C9B7E;animation:lb-spin .8s linear infinite}
+@keyframes lb-spin{to{transform:rotate(360deg)}}
+.lb-progress{width:200px;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;position:relative}
+.lb-progress::after{content:'';position:absolute;left:0;top:0;height:100%;background:#7C9B7E;transition:width .2s ease;width:var(--p, 0%)}
+.lb-text{color:var(--text);font-size:.8rem;font-family:var(--font-display);font-style:italic;letter-spacing:.5px;text-align:center;min-width:200px}
 .lightbox-loader,.lightbox-loader.show{display:none!important;visibility:hidden!important;opacity:0!important;pointer-events:none!important;width:0!important;height:0!important}
 /* Ken Burns 慢推动画 */
 .lightbox-kenburns .lightbox-img{animation:kenburns 14s ease-in-out forwards}
