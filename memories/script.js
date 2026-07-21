@@ -1308,6 +1308,7 @@ async function loadFromSupabase(){
     }
 
     console.log('[memories] loadFromSupabase done');
+    window._testReady = true;
   } catch(e){
     console.warn('[memories] loadFromSupabase failed:', e);
   }
@@ -1320,6 +1321,7 @@ function init(){
     buildTimeline();
     buildRiver();
     buildYearHeatmap();
+    window._testReady = true;
   });
   fillTimelineIndex();
   buildTimeline();

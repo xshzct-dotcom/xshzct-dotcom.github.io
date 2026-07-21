@@ -372,8 +372,10 @@ async function renderMusicTab(){
     `).join('')||'<div class="editor-empty">暂无音乐</div>';
 
     el.querySelectorAll('[data-me-play]').forEach(b=>b.onclick=()=>{
-      const t=list[parseInt(b.dataset['me-play'])];
-      const sp = t.storage_path || '';
+      const idx = parseInt(b.dataset['me-play']);
+      const t = list[idx];
+      if(!t){ console.warn('[play] song not found at idx', idx, 'list len', list.length); return; }
+      const sp = (t.storage_path || '').trim();
       let url;
       if(sp.startsWith('http')){
         // CDN URL — 可能指向错误仓库，试试修正
@@ -402,10 +404,12 @@ async function renderMusicTab(){
       db().from('music').update({title:nt.trim()}).eq('id',t.id).then(()=>renderMusicTab());
     });
     el.querySelectorAll('[data-me-del]').forEach(b=>b.onclick=()=>{
-      const t=list[parseInt(b.dataset['me-del'])];
+      const idx = parseInt(b.dataset['me-del']);
+      const t = list[idx];
+      if(!t){ console.warn('[del] song not found'); return; }
       if(!confirm('删除「'+t.title+'」？'))return;
-      db().from('music').delete().eq('id',t.id).then(()=>renderMusicTab());
-      if(t.storage_path) db().storage.from('photos').remove([t.storage_path]).catch(()=>{});
+      if(sb) sb.from('music').delete().eq('id',t.id).then(()=>renderMusicTab());
+      if(t.storage_path && sb) sb.storage.from('photos').remove([t.storage_path]).catch(()=>{});
     });
     // 拖拽排序
     bindDragSort(el, list, 'music', 'sort_order', ()=>renderList());
