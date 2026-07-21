@@ -304,13 +304,15 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   .timeline-item:nth-child(even) .timeline-card{margin-left:50px;margin-right:0}
 }
 @media(max-width:768px){
-  .nav{padding:0 16px}
-  .nav-links{display:none}
-  .nav-links.open{display:flex;position:fixed;top:var(--nav-h);left:0;right:0;flex-direction:column;background:rgba(14,17,22,.95);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);padding:20px;gap:16px;border-bottom:1px solid var(--border)}
-  .nav-hamburger{display:flex}
+  .nav{padding:0 12px;gap:8px}
+  .nav-links{display:flex;gap:14px;flex:1;justify-content:center}
+  .nav-links a{font-size:.8rem}
+  .nav-right{gap:4px}
+  .nav-right .nav-icon-btn{width:32px;height:32px;font-size:1rem}
+  .nav-shuffle{font-size:.85rem!important}
+  .nav-hamburger{display:none}
   .hero{min-height:80vh}
   .section{padding:60px 16px}
-  .masonry-item{width:calc((100% - 18px) / 2)}
   .timeline-card{width:calc(100% - 48px);margin-left:36px}
   .player{gap:10px;padding:10px 16px}
   .player-info{max-width:120px;font-size:.8rem}
