@@ -12,7 +12,45 @@
   const STORAGE_URL = SB_URL + '/storage/v1/object/public/photos';
   let sb;
   try { sb = supabase.createClient(SB_URL, SB_KEY); }
-  catch(e) { console.warn('[album]', e); return; }
+  catch(e) { console.warn('[album]', e); sb = null; }
+
+  // 延迟初始化 sb（如果首次创建失败则重试）
+  function getSb() {
+    if (sb) return sb;
+    try {
+      if (typeof supabase !== 'undefined' && supabase.createClient) {
+        sb = supabase.createClient(SB_URL, SB_KEY);
+      }
+    } catch(e) { console.warn('[album] sb retry fail', e); }
+    return sb;
+  }
+  // 安全的 db 访问，sb 不可用时返回空数据的 mock
+  function db() {
+    const client = getSb();
+    if (client) return client;
+    // 链式 mock：所有过滤方法返回自身，最终 await 时返回空数据
+    const chain = (result) => new Proxy({}, {
+      get: (_, prop) => {
+        if (prop === 'then') return (resolve) => resolve(result);
+        if (prop === 'catch') return (reject) => Promise.reject(result);
+        return () => chain(result);
+      }
+    });
+    const qb = (defaultResult) => new Proxy({}, {
+      get: (_, prop) => {
+        if (['select','insert','update','delete','maybeSingle','single','limit','order','eq','filter','match'].includes(prop)) {
+          return () => qb(defaultResult);
+        }
+        if (prop === 'then') return (resolve) => resolve(defaultResult);
+        if (prop === 'catch') return () => {};
+        return () => qb(defaultResult);
+      }
+    });
+    return {
+      from: () => qb({ data: [], error: null }),
+      storage: { from: () => ({ upload: async () => ({ error: null }), remove: async () => ({ error: null }) }) },
+    };
+  }
 
   // ===== 状态 =====
   let albums = [];
@@ -87,13 +125,13 @@
 
   // ===== 数据处理 =====
   async function loadAlbums() {
-    const { data, error } = await sb.from('albums').select('*').order('sort_order');
+    const { data, error } = await db().from('albums').select('*').order('sort_order');
     if (error) { console.warn('[album]', error); return []; }
     return data || [];
   }
 
   async function loadPhotos(albumId) {
-    const { data, error } = await sb.from('album_photos').select('*').eq('album_id', albumId).order('sort_order');
+    const { data, error } = await db().from('album_photos').select('*').eq('album_id', albumId).order('sort_order');
     if (error) return [];
     return data || [];
   }
@@ -198,7 +236,7 @@
   async function addAlbum() {
     const title = prompt('相册名称:');
     if (!title) return;
-    const { error } = await sb.from('albums').insert({
+    const { error } = await db().from('albums').insert({
       title: title.trim(),
       sort_order: -(Date.now()),
     });
@@ -210,7 +248,7 @@
     if (!currentAlbum) return;
     const title = prompt('新名称:', currentAlbum.title);
     if (!title) return;
-    const { error } = await sb.from('albums').update({ title: title.trim() }).eq('id', currentAlbum.id);
+    const { error } = await db().from('albums').update({ title: title.trim() }).eq('id', currentAlbum.id);
     if (error) { alert('❌ ' + error.message); return; }
     renderAlbumPhotos({ ...currentAlbum, title: title.trim() });
   }
@@ -221,11 +259,11 @@
     // 先删照片文件（从Storage）
     const photos = await loadPhotos(currentAlbum.id);
     for (const p of photos) {
-      await sb.storage.from('photos').remove([p.storage_path]);
+      await db().storage.from('photos').remove([p.storage_path]);
     }
     // 删数据库记录
-    await sb.from('album_photos').delete().eq('album_id', currentAlbum.id);
-    await sb.from('albums').delete().eq('id', currentAlbum.id);
+    await db().from('album_photos').delete().eq('album_id', currentAlbum.id);
+    await db().from('albums').delete().eq('id', currentAlbum.id);
     renderAlbumList();
   }
 
@@ -252,14 +290,14 @@
         const storagePath = currentAlbum.id + '/' + fname;
 
         // 上传到 Supabase
-        const { error: upErr } = await sb.storage.from('photos').upload(storagePath, compressed, {
+        const { error: upErr } = await db().storage.from('photos').upload(storagePath, compressed, {
           contentType: 'image/jpeg',
           upsert: false,
         });
         if (upErr) { console.warn('[album] upload fail:', upErr); continue; }
 
         // 记录到数据库
-        await sb.from('album_photos').insert({
+        await db().from('album_photos').insert({
           album_id: currentAlbum.id,
           filename: file.name,
           storage_path: storagePath,
@@ -316,8 +354,8 @@
     if (!confirm('确定删除这张照片？')) return;
     const photo = currentPhotos.find(p => p.id === photoId);
     if (!photo) return;
-    await sb.storage.from('photos').remove([photo.storage_path]);
-    await sb.from('album_photos').delete().eq('id', photoId);
+    await db().storage.from('photos').remove([photo.storage_path]);
+    await db().from('album_photos').delete().eq('id', photoId);
     renderAlbumPhotos(currentAlbum);
   }
 
@@ -369,8 +407,8 @@
     const to = currentPhotos[dragState.idx];
     if (from && to) {
       const fo = from.sort_order, to2 = to.sort_order;
-      await sb.from('album_photos').update({ sort_order: to2 }).eq('id', from.id);
-      await sb.from('album_photos').update({ sort_order: fo }).eq('id', to.id);
+      await db().from('album_photos').update({ sort_order: to2 }).eq('id', from.id);
+      await db().from('album_photos').update({ sort_order: fo }).eq('id', to.id);
       currentPhotos = await loadPhotos(currentAlbum.id);
       renderAlbumPhotos(currentAlbum);
     }
@@ -413,8 +451,8 @@
       const to = currentPhotos[dragState.swapIdx];
       if (from && to) {
         const fo = from.sort_order, to2 = to.sort_order;
-        await sb.from('album_photos').update({ sort_order: to2 }).eq('id', from.id);
-        await sb.from('album_photos').update({ sort_order: fo }).eq('id', to.id);
+        await db().from('album_photos').update({ sort_order: to2 }).eq('id', from.id);
+        await db().from('album_photos').update({ sort_order: fo }).eq('id', to.id);
         currentPhotos = await loadPhotos(currentAlbum.id);
         renderAlbumPhotos(currentAlbum);
       }
@@ -448,7 +486,7 @@
     const newOrder = [];
     cards.forEach(c => { const id = parseInt(c.dataset.id); if (!isNaN(id)) newOrder.push(id); });
     for (let i = 0; i < newOrder.length; i++) {
-      await sb.from('albums').update({ sort_order: i }).eq('id', newOrder[i]);
+      await db().from('albums').update({ sort_order: i }).eq('id', newOrder[i]);
     }
     albums = await loadAlbums();
     _dragAlbumId = null;
@@ -546,7 +584,7 @@
     console.log('[album] 从网站导入', SITE_ALBUMS.length, '个相册...');
     for (const sa of SITE_ALBUMS) {
       // 创建相册并获取 ID
-      const { data: newAlbum, error: aErr } = await sb.from('albums').insert({
+      const { data: newAlbum, error: aErr } = await db().from('albums').insert({
         title: sa.title,
         sort_order: -(Date.now()),
       }).select('id').single();
@@ -559,7 +597,7 @@
           storage_path: url,  // 存原始 URL（GitHub 路径）
           sort_order: i,
         }));
-        const { error: pErr } = await sb.from('album_photos').insert(batch);
+        const { error: pErr } = await db().from('album_photos').insert(batch);
         if (pErr) console.warn('[album] 照片导入失败:', sa.title, pErr);
       }
     }
@@ -581,13 +619,13 @@
       } else {
         albums = test2;
         for (const a of albums) {
-          const { count } = await sb.from('album_photos').select('id', { count: 'exact', head: true }).eq('album_id', a.id);
+          const { count } = await db().from('album_photos').select('id', { count: 'exact', head: true }).eq('album_id', a.id);
           a._count = count;
         }
       }
     } else {
       for (const a of test) {
-        const { count } = await sb.from('album_photos').select('id', { count: 'exact', head: true }).eq('album_id', a.id);
+        const { count } = await db().from('album_photos').select('id', { count: 'exact', head: true }).eq('album_id', a.id);
         a._count = count;
       }
       albums = test;

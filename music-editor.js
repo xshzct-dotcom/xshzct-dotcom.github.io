@@ -9,7 +9,29 @@
   const STORAGE_URL = SB_URL + '/storage/v1/object/public';
   let sb;
   try { sb = supabase.createClient(SB_URL, SB_KEY); }
-  catch(e) { console.warn('[music]', e); return; }
+  catch(e) { console.warn('[music]', e); sb = null; }
+
+  // 延迟初始化 sb
+  function getSb() {
+    if (sb) return sb;
+    try { if (typeof supabase !== 'undefined' && supabase.createClient) sb = supabase.createClient(SB_URL, SB_KEY); }
+    catch(e) {}
+    return sb;
+  }
+  // 安全的 db 访问（Supabase 不可用时返回 mock）
+  function db() {
+    if (getSb()) return sb;
+    const chain = (result) => new Proxy({}, {
+      get: (_, prop) => {
+        if (prop === 'then') return (resolve) => resolve(result);
+        return () => chain(result);
+      }
+    });
+    return {
+      from: () => chain({ data: [], error: null }),
+      storage: { from: () => ({ upload: async () => ({ error: null }), remove: async () => ({ error: null }) }) },
+    };
+  }
 
   let tracks = [];
   let playlists = [];  // 播放列表: { id: 'main'|albumId, title }
@@ -76,12 +98,12 @@ input[type=file].music-upload{display:none}
 
   // ===== 数据 =====
   async function loadTracks() {
-    const { data } = await sb.from('music').select('*').order('sort_order');
+    const { data } = await db().from('music').select('*').order('sort_order');
     tracks = data || [];
     // 整理播放列表
     const plMap = { 'main': { id: 'main', title: '🏠 主页', icon: '🏠', items: [] } };
     // 加载相册列表
-    const { data: albums } = await sb.from('albums').select('id,title');
+    const { data: albums } = await db().from('albums').select('id,title');
     (albums || []).forEach(a => {
       plMap[a.id] = { id: a.id, title: a.title, icon: '📸', items: [] };
     });
@@ -195,14 +217,14 @@ input[type=file].music-upload{display:none}
     for (const file of files) {
       try {
         const fname = 'music/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.mp3';
-        const { error: upErr } = await sb.storage.from('photos').upload(fname, file, {
+        const { error: upErr } = await db().storage.from('photos').upload(fname, file, {
           contentType: file.type || 'audio/mpeg',
           upsert: false,
         });
         if (upErr) { alert('上传失败: ' + upErr.message); continue; }
 
         const target = currentPlaylist || 'main';
-        const { error: dbErr } = await sb.from('music').insert({
+        const { error: dbErr } = await db().from('music').insert({
           title: file.name.replace(/\.\w+$/, ''),
           artist: '',
           album_id: target === 'main' ? null : target,
@@ -238,8 +260,8 @@ input[type=file].music-upload{display:none}
   async function delTrack(id) {
     if (!confirm('确定删除这首音乐？')) return;
     const t = tracks.find(x => x.id === id);
-    if (t) await sb.storage.from('photos').remove([t.storage_path]);
-    await sb.from('music').delete().eq('id', id);
+    if (t) await db().storage.from('photos').remove([t.storage_path]);
+    await db().from('music').delete().eq('id', id);
     await loadTracks();
     if (currentPlaylist) renderPlaylist(currentPlaylist);
     else renderPlaylists();
@@ -254,7 +276,7 @@ input[type=file].music-upload{display:none}
     const newArtist = prompt('歌手:', t.artist || '');
     const update = { title: newTitle.trim() };
     if (newArtist !== null) update.artist = newArtist.trim();
-    await sb.from('music').update(update).eq('id', id);
+    await db().from('music').update(update).eq('id', id);
     await loadTracks();
     if (currentPlaylist) renderPlaylist(currentPlaylist);
     else renderPlaylists();
@@ -282,8 +304,8 @@ input[type=file].music-upload{display:none}
     if (from && to) {
       const fromOrder = from.sort_order;
       const toOrder = to.sort_order;
-      await sb.from('music').update({ sort_order: toOrder }).eq('id', from.id);
-      await sb.from('music').update({ sort_order: fromOrder }).eq('id', to.id);
+      await db().from('music').update({ sort_order: toOrder }).eq('id', from.id);
+      await db().from('music').update({ sort_order: fromOrder }).eq('id', to.id);
       await loadTracks();
       renderPlaylist(currentPlaylist);
     }
@@ -314,7 +336,7 @@ input[type=file].music-upload{display:none}
     const ORDER_ALBUM = { '陈绮贞 - 告诉我': 1, '杨千嬅 - 小飞侠': 2, 'Cookies - 最后一块': 3 };
 
     // 收集所有现有 tracks（用于查重）
-    const { data: existing } = await sb.from('music').select('title,album_id');
+    const { data: existing } = await db().from('music').select('title,album_id');
     const exists = new Set();
     (existing || []).forEach(t => exists.add(t.album_id + '|' + t.title));
 
@@ -323,7 +345,7 @@ input[type=file].music-upload{display:none}
       for (const s of playlist) {
         const key = 'null|' + s.name;
         if (exists.has(key)) continue;
-        await sb.from('music').insert({
+        await db().from('music').insert({
           title: s.name, artist: '',
           album_id: null,
           storage_path: s.url || 'music/' + s.name + '.mp3',
@@ -338,13 +360,13 @@ input[type=file].music-upload{display:none}
         if (!album.songs || album.songs.length === 0) continue;
         // 找 Supabase 里同名的相册，找不到就自己创建
         let sbAlbumId = null;
-        const { data: found } = await sb.from('albums')
+        const { data: found } = await db().from('albums')
           .select('id').eq('title', album.title).maybeSingle();
         if (found) {
           sbAlbumId = found.id;
         } else {
           // 自己创建相册
-          const { data: created } = await sb.from('albums').insert({
+          const { data: created } = await db().from('albums').insert({
             title: album.title,
             sort_order: -(Date.now()),
           }).select('id').single();
@@ -355,7 +377,7 @@ input[type=file].music-upload{display:none}
         for (const s of album.songs) {
           const key = sbAlbumId + '|' + s.name;
           if (exists.has(key)) continue;
-          await sb.from('music').insert({
+          await db().from('music').insert({
             title: s.name, artist: '',
             album_id: sbAlbumId,
             storage_path: s.url || 'music/' + s.name + '.mp3',
