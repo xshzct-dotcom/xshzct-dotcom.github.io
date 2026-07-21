@@ -266,14 +266,14 @@ async function renderAlbumTab(){
       </div>
     `).join('')||'<div class="editor-empty">暂无相册</div>';
 
-    el.querySelectorAll('[data-ae-open]').forEach(b=>b.onclick=()=>renderAlbumPhotos(list[parseInt(b.dataset['ae-open'])]));
+    el.querySelectorAll('[data-ae-open]').forEach(b=>b.onclick=()=>renderAlbumPhotos(list[parseInt(b.dataset.aeOpen)]));
     el.querySelectorAll('[data-ae-rename]').forEach(b=>b.onclick=()=>{
-      const a=list[parseInt(b.dataset['ae-rename'])];
+      const a=list[parseInt(b.dataset.aeRename)];
       const n=prompt('新名称:',a.title);if(!n)return;
       db().from('albums').update({title:n.trim()}).eq('id',a.id).then(()=>renderAlbumTab());
     });
     el.querySelectorAll('[data-ae-del]').forEach(b=>b.onclick=()=>{
-      const a=list[parseInt(b.dataset['ae-del'])];
+      const a=list[parseInt(b.dataset.aeDel)];
       if(!confirm('删除相册「'+a.title+'」？'))return;
       db().from('albums').delete().eq('id',a.id).then(()=>renderAlbumTab());
     });
@@ -307,13 +307,13 @@ async function renderAlbumTab(){
 
         el.querySelectorAll('[data-ae-preview]').forEach(b=>{
           b.onclick=()=>{
-            const p=plist[parseInt(b.dataset['ae-preview'])];
+            const p=plist[parseInt(b.dataset.aePreview)];
             const src=p.storage_path?(STORAGE_URL+'/'+p.storage_path):('../images/'+(p.filename||''));
             window.open(src); // 简单预览
           };
         });
         el.querySelectorAll('[data-ae-pdel]').forEach(b=>b.onclick=()=>{
-          const p=plist[parseInt(b.dataset['ae-pdel'])];
+          const p=plist[parseInt(b.dataset.aePdel)];
           if(!confirm('删除该照片？'))return;
           db().from('album_photos').delete().eq('id',p.id).then(()=>renderAlbumPhotos(album));
           if(p.storage_path) db().storage.from('photos').remove([p.storage_path]).catch(()=>{});
@@ -372,7 +372,7 @@ async function renderMusicTab(){
     `).join('')||'<div class="editor-empty">暂无音乐</div>';
 
     el.querySelectorAll('[data-me-play]').forEach(b=>b.onclick=()=>{
-      const idx = parseInt(b.dataset['me-play']);
+      const idx = parseInt(b.dataset.mePlay);
       const t = list[idx];
       if(!t){ console.warn('[play] song not found at idx', idx, 'list len', list.length); return; }
       const sp = (t.storage_path || '').trim();
@@ -399,12 +399,12 @@ async function renderMusicTab(){
       });
     });
     el.querySelectorAll('[data-me-edit]').forEach(b=>b.onclick=()=>{
-      const t=list[parseInt(b.dataset['me-edit'])];
+      const t=list[parseInt(b.dataset.meEdit)];
       const nt=prompt('歌曲名:',t.title);if(!nt)return;
       db().from('music').update({title:nt.trim()}).eq('id',t.id).then(()=>renderMusicTab());
     });
     el.querySelectorAll('[data-me-del]').forEach(b=>b.onclick=()=>{
-      const idx = parseInt(b.dataset['me-del']);
+      const idx = parseInt(b.dataset.meDel);
       const t = list[idx];
       if(!t){ console.warn('[del] song not found'); return; }
       if(!confirm('删除「'+t.title+'」？'))return;
