@@ -1240,6 +1240,7 @@ async function loadFromSupabase(){
 
 // ===== 初始化 =====
 function init(){
+  console.log('[memories] init() start');
   initHeroStars();
   initMusic();
   fillTimelineIndex();
