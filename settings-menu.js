@@ -19,7 +19,7 @@
 .settings-item .sub{color:rgba(255,255,255,.4);font-size:11px}
 @media(max-width:600px){
   #settings-menu-btn{width:36px;height:36px;font-size:18px}
-  .settings-dropdown{min-width:160px;right:-8px}
+  .settings-dropdown{min-width:160px;right:0}
 }
 `;
   document.head.appendChild(CSS);
@@ -94,7 +94,7 @@
   }
 
   window.MENU = {
-    openEssay: async () => {
+    openEssay: () => {
       document.getElementById('settings-dropdown')?.classList.remove('show');
       // 打开随笔页面
       if (typeof openCardModal === 'function') {
@@ -105,22 +105,51 @@
       }
       // 等待模态框打开后进入编辑模式
       setTimeout(() => {
-        if (window.BLOG) {
-          if (typeof window.BLOG.toggle === 'function' && !window.BLOG.isEditing) {
+        if (window.BLOG && typeof window.BLOG.toggle === 'function') {
+          // 检查是否已进入编辑模式，若没有则进入
+          const isEditing = typeof window.BLOG.isEditing === 'function' ? window.BLOG.isEditing() : false;
+          if (!isEditing) {
             window.BLOG.toggle();
-          } else if (typeof window.BLOG.toggle === 'function') {
-            // 已经在编辑模式，触发一次确保 UI 显示
+          }
+          // 确保 injectEditButtons 执行
+          if (typeof window.BLOG.ensureButtons === 'function') {
+            window.BLOG.ensureButtons();
           }
         }
-      }, 200);
+      }, 350);
     },
     openAlbum: () => {
       document.getElementById('settings-dropdown')?.classList.remove('show');
-      if (window.ALBUM) window.ALBUM.show();
+      try {
+        if (window.ALBUM && typeof window.ALBUM.show === 'function') {
+          window.ALBUM.show();
+        } else {
+          // 等 album-editor.js 加载
+          const check = setInterval(() => {
+            if (window.ALBUM && typeof window.ALBUM.show === 'function') {
+              clearInterval(check);
+              window.ALBUM.show();
+            }
+          }, 100);
+          setTimeout(() => clearInterval(check), 3000);
+        }
+      } catch(e) { console.warn('[MENU] 打开相册失败', e); }
     },
     openMusic: () => {
       document.getElementById('settings-dropdown')?.classList.remove('show');
-      if (window.MUSIC) window.MUSIC.show();
+      try {
+        if (window.MUSIC && typeof window.MUSIC.show === 'function') {
+          window.MUSIC.show();
+        } else {
+          const check = setInterval(() => {
+            if (window.MUSIC && typeof window.MUSIC.show === 'function') {
+              clearInterval(check);
+              window.MUSIC.show();
+            }
+          }, 100);
+          setTimeout(() => clearInterval(check), 3000);
+        }
+      } catch(e) { console.warn('[MENU] 打开音乐失败', e); }
     },
   };
 
