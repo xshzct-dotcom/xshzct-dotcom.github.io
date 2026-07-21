@@ -1123,76 +1123,71 @@ function dbQ(){
   return {from:()=>qb({data:[],error:null})};
 }
 
-// 把 data.js 现有内容灌到 Supabase（idempotent，按 title 去重）
+// 把 data.js 现有内容灌到 Supabase（idempotent，空表时 bulk insert 一次到位）
 async function ensureSync(){
   if(!SB) return;
   try{
-    // 1. 文章
-    const allEssays = [];
-    if(typeof essayCategories !== 'undefined'){
-      essayCategories.forEach(cat => (cat.articles||[]).forEach((art, i) => {
-        allEssays.push({
-          category: cat.id, category_title: cat.title,
-          title: art.title, date: art.date || '', body: art.body || '',
-          sort_order: i,
+    // 1. 文章：先看 essays 表有没有内容，没有就把 data.js 全量灌入
+    const {count:essaysCount} = await SB.from('essays').select('*', {count:'exact', head:true});
+    if(!essaysCount || essaysCount === 0){
+      const allEssays = [];
+      if(typeof essayCategories !== 'undefined'){
+        essayCategories.forEach(cat => (cat.articles||[]).forEach((art, i) => {
+          allEssays.push({
+            category: cat.id, category_title: cat.title,
+            title: art.title, date: art.date || '', body: art.body || '',
+            sort_order: i,
+          });
+        }));
+      }
+      if(typeof travels !== 'undefined'){
+        travels.forEach((art, i) => {
+          allEssays.push({
+            category: 'travel', category_title: '旅行见闻',
+            title: art.title, date: art.date || '', body: art.body || '',
+            sort_order: -(i+1),
+          });
         });
-      }));
-    }
-    if(typeof travels !== 'undefined'){
-      travels.forEach((art, i) => {
-        allEssays.push({
-          category: 'travel', category_title: '旅行见闻',
-          title: art.title, date: art.date || '', body: art.body || '',
-          sort_order: -(i+1),
-        });
-      });
-    }
-    for(const e of allEssays){
-      try{
-        const {data:exist} = await SB.from('essays').select('id').eq('title', e.title).eq('category', e.category).limit(1);
-        if(!exist || exist.length === 0){
-          await SB.from('essays').insert(e);
-        }
-      } catch(err){ /* 单条失败不影响 */ }
+      }
+      // 分批 50 条插入（避免单次太大）
+      for(let i=0; i<allEssays.length; i+=50){
+        await SB.from('essays').insert(allEssays.slice(i, i+50));
+      }
     }
 
     // 2. 相册
-    if(Array.isArray(albums)){
+    const {count:albumsCount} = await SB.from('albums').select('*', {count:'exact', head:true});
+    if((!albumsCount || albumsCount === 0) && Array.isArray(albums)){
+      const allAlbums = albums.map((a, i) => ({
+        title: a.title, sort_order: i,
+        cover: a.cover || '',
+        photo_count: (a.photos||[]).length,
+      }));
+      for(let i=0; i<allAlbums.length; i+=50){
+        await SB.from('albums').insert(allAlbums.slice(i, i+50));
+      }
+    } else if(Array.isArray(albums)){
+      // 已存在则更新 photo_count
       for(let i=0; i<albums.length; i++){
         const a = albums[i];
-        try{
-          const {data:exist} = await SB.from('albums').select('id').eq('title', a.title).limit(1);
-          if(!exist || exist.length === 0){
-            await SB.from('albums').insert({
-              title: a.title, sort_order: i,
-              cover: a.cover || '',
-              photo_count: (a.photos||[]).length,
-            });
-          } else {
-            // 更新 photo_count 保持最新
-            await SB.from('albums').update({ photo_count: (a.photos||[]).length }).eq('id', exist[0].id);
-          }
-        } catch(err){}
+        const {data:exist} = await SB.from('albums').select('id').eq('title', a.title).limit(1);
+        if(exist && exist.length){
+          await SB.from('albums').update({photo_count: (a.photos||[]).length}).eq('id', exist[0].id);
+        }
       }
     }
 
     // 3. 音乐
-    if(typeof playlist !== 'undefined' && Array.isArray(playlist)){
-      for(let i=0; i<playlist.length; i++){
-        const m = playlist[i];
-        try{
-          // title 可能是含特殊字符的，先用 name
-          const name = m.name || m.title;
-          if(!name) continue;
-          const {data:exist} = await SB.from('music').select('id').eq('title', name).is('album_id', null).limit(1);
-          if(!exist || exist.length === 0){
-            await SB.from('music').insert({
-              title: name, artist: m.artist || '',
-              storage_path: m.url || `music/${name}.mp3`,
-              sort_order: i, album_id: null,
-            });
-          }
-        } catch(err){}
+    const {count:musicCount} = await SB.from('music').select('*', {count:'exact', head:true});
+    if((!musicCount || musicCount === 0) && typeof playlist !== 'undefined' && Array.isArray(playlist)){
+      const allMusic = playlist.map((m, i) => ({
+        title: m.name || m.title,
+        artist: m.artist || '',
+        storage_path: m.url || `music/${m.name || m.title}.mp3`,
+        sort_order: i, album_id: null,
+      })).filter(m => m.title);
+      if(allMusic.length > 0){
+        await SB.from('music').insert(allMusic);
       }
     }
     console.log('[memories] ensureSync done');

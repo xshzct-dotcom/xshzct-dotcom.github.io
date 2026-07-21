@@ -45,50 +45,40 @@ async function open(){
 function close(){ $('#editorPanel').classList.remove('open');$('#editorBackdrop').classList.remove('active');document.body.style.overflow=''; }
 window.EDITOR={open,close};
 
-// 兜底同步：script.js 没跑时，editor 自己从 data.js 拉数据同步
+// 兜底同步：script.js 没跑时，editor 自己从 data.js 拉数据同步（bulk insert）
 let _synced = false;
 async function ensureDataSync(){
   if(_synced || !sb) return;
   _synced = true;
   try{
-    if(typeof essayCategories !== 'undefined'){
-      for(const cat of essayCategories){
-        for(const art of (cat.articles||[])){
-          try{
-            const {data:exist} = await sb.from('essays').select('id').eq('title', art.title).eq('category', cat.id).limit(1);
-            if(!exist || !exist.length) await sb.from('essays').insert({category:cat.id, category_title:cat.title, title:art.title, date:art.date||'', body:art.body||'', sort_order:0});
-          }catch(e){}
-        }
+    // 文章
+    const {count:ec} = await sb.from('essays').select('*', {count:'exact', head:true});
+    if((!ec || ec === 0)){
+      const all = [];
+      if(typeof essayCategories !== 'undefined'){
+        essayCategories.forEach(cat => (cat.articles||[]).forEach((art, i) => all.push({category:cat.id, category_title:cat.title, title:art.title, date:art.date||'', body:art.body||'', sort_order:i})));
+      }
+      if(typeof travels !== 'undefined'){
+        travels.forEach((art, i) => all.push({category:'travel', category_title:'旅行见闻', title:art.title, date:art.date||'', body:art.body||'', sort_order:-(i+1)}));
+      }
+      for(let i=0;i<all.length;i+=50) await sb.from('essays').insert(all.slice(i, i+50));
+    }
+    // 相册
+    const {count:ac} = await sb.from('albums').select('*', {count:'exact', head:true});
+    if((!ac || ac === 0) && typeof albums !== 'undefined'){
+      const allA = albums.map((a, i) => ({title:a.title, sort_order:i, cover:a.cover||'', photo_count:(a.photos||[]).length}));
+      for(let i=0;i<allA.length;i+=50) await sb.from('albums').insert(allA.slice(i, i+50));
+    } else if(typeof albums !== 'undefined'){
+      for(const a of albums){
+        const {data:exist} = await sb.from('albums').select('id').eq('title', a.title).limit(1);
+        if(exist && exist.length) await sb.from('albums').update({photo_count:(a.photos||[]).length}).eq('id', exist[0].id);
       }
     }
-    if(typeof travels !== 'undefined'){
-      for(const art of travels){
-        try{
-          const {data:exist} = await sb.from('essays').select('id').eq('title', art.title).eq('category', 'travel').limit(1);
-          if(!exist || !exist.length) await sb.from('essays').insert({category:'travel', category_title:'旅行见闻', title:art.title, date:art.date||'', body:art.body||'', sort_order:0});
-        }catch(e){}
-      }
-    }
-    if(typeof albums !== 'undefined'){
-      for(let i=0;i<albums.length;i++){
-        const a = albums[i];
-        try{
-          const {data:exist} = await sb.from('albums').select('id').eq('title', a.title).limit(1);
-          if(!exist || !exist.length) await sb.from('albums').insert({title:a.title, sort_order:i, cover:a.cover||'', photo_count:(a.photos||[]).length});
-          else await sb.from('albums').update({photo_count:(a.photos||[]).length}).eq('id', exist[0].id);
-        }catch(e){}
-      }
-    }
-    if(typeof playlist !== 'undefined'){
-      for(let i=0;i<playlist.length;i++){
-        const m = playlist[i];
-        const name = m.name || m.title;
-        if(!name) continue;
-        try{
-          const {data:exist} = await sb.from('music').select('id').eq('title', name).is('album_id', null).limit(1);
-          if(!exist || !exist.length) await sb.from('music').insert({title:name, artist:m.artist||'', storage_path:m.url||`music/${name}.mp3`, sort_order:i, album_id:null});
-        }catch(e){}
-      }
+    // 音乐
+    const {count:mc} = await sb.from('music').select('*', {count:'exact', head:true});
+    if((!mc || mc === 0) && typeof playlist !== 'undefined'){
+      const allM = playlist.map((m, i) => ({title:m.name||m.title, artist:m.artist||'', storage_path:m.url||`music/${m.name||m.title}.mp3`, sort_order:i, album_id:null})).filter(m=>m.title);
+      if(allM.length) await sb.from('music').insert(allM);
     }
   }catch(e){ console.warn('[editor] ensureDataSync failed:', e); _synced = false; }
 }
