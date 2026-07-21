@@ -4,8 +4,9 @@
 (function() {
   'use strict';
 
-  // 保存网站全局相册引用（data.js 的 const albums），后面会被 local let albums 遮蔽
-  const SITE_ALBUMS = (typeof albums !== 'undefined' && Array.isArray(albums)) ? albums : [];
+  // 保存网站全局相册引用（data.js 的 const albums）
+  // 注意：下面有 let albums 会遮蔽全局变量，这里用 globalThis 访问
+  const SITE_ALBUMS = (typeof globalThis !== 'undefined' && globalThis.albums && Array.isArray(globalThis.albums)) ? globalThis.albums : [];
 
   const SB_URL = 'https://mvzbkuhwapdqcdkekczh.supabase.co';
   const SB_KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
