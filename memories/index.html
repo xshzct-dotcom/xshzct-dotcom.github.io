@@ -174,13 +174,15 @@
 <script src="../data.js?v=20260721-3"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
-// 灯箱核心 — 内联到 HTML 确保 SW 缓存旧版 script.js 时也能用
+// 灯箱核心 — 内联到 HTML，script.js 加载后会用自己的版本覆盖
+// 如果 script.js 被 SW 缓存了旧版，这里的版本仍能工作
 (function(){
   var _idx = 0, _total = 0;
-  window.openLightboxFallback = function(idx) {
+
+  function open(idx) {
     var imgs = document.querySelectorAll('.masonry-item img');
     var photos = []; imgs.forEach(function(el){ photos.push(el.src); });
-    _total = photos.length; _idx = Math.min(idx, _total-1);
+    _total = photos.length; _idx = Math.max(0, Math.min(idx, _total-1));
     if(_total === 0) return;
 
     var lb = document.getElementById('lightbox');
@@ -193,30 +195,41 @@
     img.style.opacity = '0';
     img.onload = function(){ img.style.opacity = '1'; };
     document.getElementById('lightboxCounter').textContent = (_idx+1) + ' / ' + _total;
-  };
-  window.closeLightboxFallback = function() {
+  }
+
+  function close() {
     var lb = document.getElementById('lightbox');
     lb.classList.remove('active'); lb.style.opacity = '0';
     document.body.style.overflow = '';
-  };
-  window.navLightboxFallback = function(dir) {
+  }
+
+  function nav(dir) {
     _idx += dir;
     if(_idx < 0) _idx = _total - 1;
     if(_idx >= _total) _idx = 0;
-    window.openLightboxFallback(_idx);
-  };
+    open(_idx);
+  }
 
-  // 键盘/点击事件（独立于 script.js）
+  // 暴露到 window（script.js 加载后会用自己的版本覆盖）
+  window.openLightbox = open;
+  window.closeLightbox = close;
+  window.navLightbox = nav;
+
+  // 别名兼容
+  window.openLightboxFallback = open;
+  window.closeLightboxFallback = close;
+
+  // 键盘事件
   document.addEventListener('keydown', function(e) {
     var lb = document.getElementById('lightbox');
-    if(!lb.classList.contains('active')) return;
-    if(e.key === 'Escape') window.closeLightboxFallback();
-    if(e.key === 'ArrowLeft') window.navLightboxFallback(-1);
-    if(e.key === 'ArrowRight') window.navLightboxFallback(1);
+    if(!lb || !lb.classList.contains('active')) return;
+    if(e.key === 'Escape') close();
+    if(e.key === 'ArrowLeft') nav(-1);
+    if(e.key === 'ArrowRight') nav(1);
   });
 })();
 </script>
-<script src="script.js?v=20260721-23"></script>
+<script src="script.js?v=20260721-24"></script>
 <script src="editor.js?v=20260721-11"></script>
 </body>
 </html>
