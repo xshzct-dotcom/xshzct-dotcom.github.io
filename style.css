@@ -348,3 +348,8 @@ a:active,button:active,.card:active,.album-card:active,.post-card:active{transfo
   nav a{font-size:0.75rem!important}
   #settings-menu-btn{width:28px!important;height:28px!important;font-size:15px!important}
 }
+
+/* ===== world 卡片加大：50% 宽 ===== */
+.world-grid .world-card{flex:0 0 calc(50% - 1rem)!important;max-width:480px!important}
+@media(max-width:900px){.world-grid .world-card{flex:0 0 calc(50% - 1rem)!important;max-width:480px!important}}
+@media(max-width:600px){.world-grid .world-card{flex:0 0 100%!important;max-width:480px!important}}
