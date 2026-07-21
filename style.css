@@ -381,3 +381,20 @@ a:active,button:active,.card:active,.album-card:active,.post-card:active{transfo
 /* ===== 页面过渡遮罩 ===== */
 .page-transition{position:fixed;inset:0;background:var(--bg);z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.4s ease}
 .page-transition.active{opacity:1}
+
+/* ===== 手机端 header 紧凑 + nav 文字不换行 ===== */
+@media(max-width:768px){
+  header{padding:0.8rem 1rem;flex-wrap:nowrap;gap:0.5rem}
+  .logo{font-size:1.1rem;white-space:nowrap;flex-shrink:0}
+  nav{display:flex;align-items:center;gap:0.6rem;flex-wrap:nowrap;flex-shrink:0}
+  nav a{font-size:0.85rem;white-space:nowrap}
+  .theme-toggle{font-size:1rem;padding:0.2rem}
+  #settings-menu-btn{width:30px;height:30px;font-size:16px}
+}
+@media(max-width:480px){
+  header{padding:0.6rem 0.7rem}
+  .logo{font-size:1rem}
+  nav{gap:0.35rem}
+  nav a{font-size:0.75rem}
+  #settings-menu-btn{width:28px;height:28px;font-size:15px}
+}
