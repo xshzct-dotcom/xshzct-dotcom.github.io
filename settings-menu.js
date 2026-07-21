@@ -105,60 +105,65 @@
   window.MENU = {
     openEssay: () => {
       document.getElementById('settings-dropdown')?.classList.remove('show');
-      // 打开随笔页面
-      if (typeof openCardModal === 'function') {
-        openCardModal('essay');
-      } else {
-        const card = document.querySelector('[onclick*="openCardModal(\'essay\')"]');
-        if (card) card.click();
-      }
-      // 等待模态框打开后进入编辑模式
-      setTimeout(() => {
-        if (window.BLOG && typeof window.BLOG.toggle === 'function') {
-          // 检查是否已进入编辑模式，若没有则进入
-          const isEditing = typeof window.BLOG.isEditing === 'function' ? window.BLOG.isEditing() : false;
-          if (!isEditing) {
-            window.BLOG.toggle();
-          }
-          // 确保 injectEditButtons 执行
-          if (typeof window.BLOG.ensureButtons === 'function') {
-            window.BLOG.ensureButtons();
-          }
+      // 等 BLOG 加载
+      const doOpen = () => {
+        if (typeof openCardModal === 'function') {
+          openCardModal('essay');
+        } else {
+          const card = document.querySelector('[onclick*="openCardModal(\'essay\')"]');
+          if (card) card.click();
         }
-      }, 350);
+        // 等 modal 渲染后进入编辑
+        setTimeout(() => {
+          if (window.BLOG && typeof window.BLOG.show === 'function') {
+            window.BLOG.show();  // 安全进入编辑模式
+          }
+          setTimeout(() => {
+            if (window.BLOG && typeof window.BLOG.ensureButtons === 'function') {
+              window.BLOG.ensureButtons();
+            }
+          }, 150);
+        }, 600);
+      };
+      // BLOG 还没加载好就等
+      if (!window.BLOG || typeof window.BLOG.show !== 'function') {
+        let retries = 0;
+        const wait = setInterval(() => {
+          if (window.BLOG && typeof window.BLOG.show === 'function') {
+            clearInterval(wait);
+            doOpen();
+          }
+          if (++retries > 25) clearInterval(wait);
+        }, 200);
+      } else {
+        doOpen();
+      }
     },
     openAlbum: () => {
       document.getElementById('settings-dropdown')?.classList.remove('show');
-      try {
-        if (window.ALBUM && typeof window.ALBUM.show === 'function') {
-          window.ALBUM.show();
-        } else {
-          alert('相册管理器加载中，请稍后重试...');
-          const check = setInterval(() => {
-            if (window.ALBUM && typeof window.ALBUM.show === 'function') {
-              clearInterval(check);
-              window.ALBUM.show();
-            }
-          }, 200);
-          setTimeout(() => { clearInterval(check); }, 5000);
-        }
-      } catch(e) { console.warn('[MENU] 打开相册失败', e); alert('打开相册失败: ' + e.message); }
+      const doShow = () => {
+        try { window.ALBUM.show(); } catch(e) { console.warn(e); }
+      };
+      if (!window.ALBUM || typeof window.ALBUM.show !== 'function') {
+        let retries = 0;
+        const wait = setInterval(() => {
+          if (window.ALBUM && typeof window.ALBUM.show === 'function') { clearInterval(wait); doShow(); }
+          if (++retries > 15) clearInterval(wait);
+        }, 300);
+      } else { doShow(); }
     },
     openMusic: () => {
       document.getElementById('settings-dropdown')?.classList.remove('show');
-      try {
-        if (window.MUSIC && typeof window.MUSIC.show === 'function') {
-          window.MUSIC.show();
-        } else {
-          const check = setInterval(() => {
-            if (window.MUSIC && typeof window.MUSIC.show === 'function') {
-              clearInterval(check);
-              window.MUSIC.show();
-            }
-          }, 200);
-          setTimeout(() => clearInterval(check), 5000);
-        }
-      } catch(e) { console.warn('[MENU] 打开音乐失败', e); }
+      const doShow = () => {
+        try { window.MUSIC.show(); } catch(e) { console.warn(e); }
+      };
+      if (!window.MUSIC || typeof window.MUSIC.show !== 'function') {
+        let retries = 0;
+        const wait = setInterval(() => {
+          if (window.MUSIC && typeof window.MUSIC.show === 'function') { clearInterval(wait); doShow(); }
+          if (++retries > 15) clearInterval(wait);
+        }, 300);
+      } else { doShow(); }
     },
   };
 
