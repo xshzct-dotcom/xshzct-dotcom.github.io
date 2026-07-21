@@ -354,6 +354,10 @@ function renderRiver(){
       if(img.dataset.fb !== '1'){
         img.dataset.fb = '1';
         img.src = img.dataset.full;
+      } else if(img.dataset.fb !== '2'){
+        // 第三级回退：去掉 _看图王 后缀
+        img.dataset.fb = '2';
+        img.src = img.dataset.full.replace('_看图王', '');
       } else {
         img.style.display = 'none';
         polaroid.classList.add('img-fail-frame');
@@ -440,49 +444,6 @@ function lbAutoHideControls(){
   }, 3000);
 }
 
-function openLightbox(idx, kenBurns=false){
-  if(idx<0||idx>=lightboxPhotos.length) return;
-  lightboxIdx = idx;
-  const lb = $('#lightbox');
-  const counter = $('#lightboxCounter');
-
-  lb.classList.add('active');
-  lb.style.opacity = '1';
-  lb.style.pointerEvents = 'auto';
-  if(window.SFX) window.SFX.shutter();
-  document.body.style.overflow = 'hidden';
-  lbZoom = {scale:1, bgX:50, bgY:50, dragging:false, dragX:0, dragY:0};
-
-  // 彻底清空 stage 里的 img（避免残留 src 在中央显示挡住背景图）
-  const stage = $('#lightboxStage');
-  if(stage) stage.style.display = 'none';
-  const img = $('#lightboxImg');
-  if(img){
-    img.removeAttribute('src');
-    img.removeAttribute('style');
-  }
-
-  // 关键：先显示"加载中"占位（避免大图加载过程中出现视觉撕裂）
-  lb.style.background = '#0E1116 url("data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><circle cx=%2220%22 cy=%2220%22 r=%2214%22 fill=%22none%22 stroke=%22%237C9B7E%22 stroke-width=%223%22 stroke-dasharray=%2280%22><animateTransform attributeName=%22transform%22 type=%22rotate%22 from=%220 20 20%22 to=%22360 20 20%22 dur=%221s%22 repeatCount=%22indefinite%22/></circle></svg>") center/60px no-repeat';
-
-  counter.textContent = (idx+1) + ' / ' + lightboxPhotos.length;
-  lbAutoHideControls();
-
-  // 预加载原图，加载完成后再切换背景
-  const photo = lightboxPhotos[idx];
-  const src = full(photo);
-  lb.dataset.lbSrc = src;
-  const pre = new Image();
-  pre.onload = function(){
-    lb.style.background = '#000 url(' + src + ') center/contain no-repeat';
-  };
-  pre.onerror = function(){
-    lb.style.background = '#000 url(' + src + ') center/contain no-repeat';
-  };
-  pre.src = src;
-}
-window.openLightbox = openLightbox;
-
 // ===== 灯箱（用 <img> + transform 实现 Windows Photo Viewer 风格平滑缩放） =====
 let lbZoom = {scale:1, x:0, y:0, dragging:false, lastX:0, lastY:0};
 let lbAnimating = false;  // 防止过渡期间重复触发
@@ -553,6 +514,11 @@ function openLightbox(idx, kenBurns){
   const lb = $('#lightbox');
   const counter = $('#lightboxCounter');
   const img = $('#lightboxImg');
+  const stage = $('#lightboxStage');
+
+  // 恢复 stage/img 显示（closeLightbox 设了 display:none）
+  if(stage) stage.style.display = 'flex';
+  if(img) img.style.display = 'block';
 
   resetZoom();
   applyTransform();
@@ -563,7 +529,7 @@ function openLightbox(idx, kenBurns){
   const photo = lightboxPhotos[idx];
   const src = full(photo);
   img.src = src;
-  img.style.transition = 'none';  // 切图时不要过渡（图片替换瞬间）
+  img.style.transition = 'none';
   img.style.transform = 'translate(0,0) scale(1)';
   img.style.opacity = '0';
   img.onload = function(){
@@ -606,18 +572,9 @@ function closeLightbox(){
   lb.classList.remove('active');
   lb.style.opacity = '0';
   lb.style.pointerEvents = 'none';
-  lb.style.background = '#000';
   document.body.style.overflow = '';
   if(window.SFX) window.SFX.click();
-  const stage = $('#lightboxStage');
-  if(stage) stage.style.display = 'none';
   resetZoom();
-  const img = $('#lightboxImg');
-  if(img){
-    img.removeAttribute('src');
-    img.removeAttribute('style');
-  }
-  clearTimeout(lbHideTimer);
 }
 window.closeLightbox = closeLightbox;
 
