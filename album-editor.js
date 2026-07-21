@@ -120,7 +120,7 @@
     } else {
       body.innerHTML = '<div class="album-grid" id="albumGrid">' + albums.map((a, i) => `
         <div class="album-card" draggable="${editMode}" data-id="${a.id}" data-idx="${i}"
-             onclick="ALBUM.open(${a.id})"
+             onclick="ALBUM.openById(${a.id})"
              ondragstart="ALBUM.dragAlbumStart(event,${i})"
              ondragover="ALBUM.dragAlbumOver(event,${i})"
              ondragend="ALBUM.dragAlbumEnd(event)">
@@ -173,11 +173,14 @@
 
   // ===== 相册操作 =====
   function show() {
-    document.getElementById('albumOverlay').classList.add('show');
-    renderAlbumList();
+    const ov = document.getElementById('albumOverlay');
+    if (!ov) { console.warn('[album] 找不到弹窗DOM，Supabase SDK可能未加载'); return; }
+    ov.classList.add('show');
+    renderAlbumList().catch(e => console.warn('[album] 渲染失败', e));
   }
   function hide() {
-    document.getElementById('albumOverlay').classList.remove('show');
+    const ov = document.getElementById('albumOverlay');
+    if (ov) ov.classList.remove('show');
   }
 
   async function addAlbum() {
@@ -447,12 +450,19 @@
     });
   }
 
+  // 按 ID 打开相册（供模板 onclick 使用）
+  function openAlbumById(id) {
+    const album = albums.find(a => a.id === id);
+    if (album) renderAlbumPhotos(album);
+  }
+
   // ===== 暴露全局 =====
   window.ALBUM = {
     show,
     hide,
     add: addAlbum,
     open: renderAlbumPhotos,
+    openById: openAlbumById,
     rename: renameAlbum,
     del: delAlbum,
     back,

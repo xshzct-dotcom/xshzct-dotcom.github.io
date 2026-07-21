@@ -166,6 +166,7 @@ input[type=file].music-upload{display:none}
           </div>
           <div class="actions">
             <button onclick="MUSIC.play('${t.storage_path}')">▶</button>
+            <button onclick="MUSIC.edit(${t.id})">✎</button>
             <button class="del" onclick="MUSIC.del(${t.id})">🗑</button>
           </div>
         </div>`).join('') + '</div>';
@@ -244,6 +245,21 @@ input[type=file].music-upload{display:none}
     else renderPlaylists();
   }
 
+  // ===== 编辑歌曲 =====
+  async function editTrack(id) {
+    const t = tracks.find(x => x.id === id);
+    if (!t) return;
+    const newTitle = prompt('歌曲名称:', t.title);
+    if (!newTitle) return;
+    const newArtist = prompt('歌手:', t.artist || '');
+    const update = { title: newTitle.trim() };
+    if (newArtist !== null) update.artist = newArtist.trim();
+    await sb.from('music').update(update).eq('id', id);
+    await loadTracks();
+    if (currentPlaylist) renderPlaylist(currentPlaylist);
+    else renderPlaylists();
+  }
+
   // ===== 拖拽排序 =====
   let dragTrackIdx = null;
 
@@ -287,57 +303,64 @@ input[type=file].music-upload{display:none}
     open: renderPlaylist,
     upload: uploadMusic,
     play: playTrack,
+    edit: editTrack,
     del: delTrack,
     dragStart, dragDrop,
   };
 
+  // 同步 data.js 数据到 Supabase（每次启动都执行，跳过已存在的）
+  async function syncFromDataJs() {
+    const ORDER = { '海芋恋': 1, '旅行的意义': 2, '太聪明': 3 };
+    const ORDER_ALBUM = { '陈绮贞 - 告诉我': 1, '杨千嬅 - 小飞侠': 2, 'Cookies - 最后一块': 3 };
+
+    // 收集所有现有 tracks（用于查重）
+    const { data: existing } = await sb.from('music').select('title,album_id');
+    const exists = new Set();
+    (existing || []).forEach(t => exists.add(t.album_id + '|' + t.title));
+
+    // 1. 同步主页音乐
+    if (typeof playlist !== 'undefined' && playlist.length > 0) {
+      for (const s of playlist) {
+        const key = 'null|' + s.name;
+        if (exists.has(key)) continue;
+        await sb.from('music').insert({
+          title: s.name, artist: '',
+          album_id: null,
+          storage_path: s.url || 'music/' + s.name + '.mp3',
+          sort_order: ORDER[s.name] || -(Date.now()),
+        }).catch(() => {});
+      }
+    }
+
+    // 2. 同步相册音乐（用现有 Supabase 相册匹配，不新建）
+    if (typeof albums !== 'undefined') {
+      for (const album of albums) {
+        if (!album.songs || album.songs.length === 0) continue;
+        // 找 Supabase 里同名的相册（album-editor 已导入）
+        const { data: sbAlbum } = await sb.from('albums')
+          .select('id').eq('title', album.title).maybeSingle();
+        if (!sbAlbum) continue; // 相册还没导入，跳过
+
+        for (const s of album.songs) {
+          const key = sbAlbum.id + '|' + s.name;
+          if (exists.has(key)) continue;
+          await sb.from('music').insert({
+            title: s.name, artist: '',
+            album_id: sbAlbum.id,
+            storage_path: s.url || 'music/' + s.name + '.mp3',
+            sort_order: ORDER_ALBUM[s.name] || -(Date.now()),
+          }).catch(() => {});
+        }
+      }
+    }
+  }
+
   async function init() {
     if (loaded) return;
     loaded = true;
+    // 同步 data.js 数据（每次都执行，跳过已存在的）
+    await syncFromDataJs();
     await loadTracks();
-    // 检查是否需要导入现有音乐
-    const { count } = await sb.from('music').select('id', { count: 'exact', head: true });
-    if (count === 0) {
-      const ORDER = { '海芋恋': 1, '旅行的意义': 2, '太聪明': 3 };
-      // 导入主页音乐 (playlist)
-      if (typeof playlist !== 'undefined' && playlist.length > 0) {
-        for (const s of playlist) {
-          await sb.from('music').insert({
-            title: s.name, artist: '',
-            album_id: null,
-            storage_path: s.url || 'music/' + s.name + '.mp3',
-            sort_order: ORDER[s.name] || -(Date.now()),
-          });
-        }
-        console.log('[music] 导入主页音乐', playlist.length, '首');
-      }
-      // 导入相册专用音乐
-      const ORDER_ALBUM = { '陈绮贞 - 告诉我': 1, '杨千嬅 - 小飞侠': 2, 'Cookies - 最后一块': 3 };
-      if (typeof albums !== 'undefined') {
-        for (const album of albums) {
-          if (album.songs && album.songs.length > 0) {
-            // 在 Supabase 创建同名相册
-            const { data: newAlbum, error: aErr } = await sb.from('albums').insert({
-              title: album.title || album.id,
-              sort_order: -(Date.now()),
-            }).select('id').single();
-            if (aErr || !newAlbum) continue;
-
-            for (const s of album.songs) {
-              const sortIdx = ORDER_ALBUM[s.name] ? ORDER_ALBUM[s.name] : -(Date.now());
-              await sb.from('music').insert({
-                title: s.name, artist: '',
-                album_id: newAlbum.id,
-                storage_path: s.url || 'music/' + s.name + '.mp3',
-                sort_order: sortIdx,
-              });
-            }
-            console.log('[music] 导入相册音乐:', album.title, album.songs.length, '首');
-          }
-        }
-      }
-      await loadTracks();
-    }
     addTrigger();
   }
 
