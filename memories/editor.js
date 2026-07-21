@@ -378,29 +378,18 @@ async function renderMusicTab(){
     el.querySelectorAll('[data-me-play]').forEach(b=>b.onclick=()=>{
       const idx = parseInt(b.dataset.mePlay);
       const t = list[idx];
-      if(!t){ console.warn('[play] song not found at idx', idx, 'list len', list.length); return; }
-      const sp = (t.storage_path || '').trim();
-      let url;
-      if(sp.startsWith('http')){
-        // CDN URL — 可能指向错误仓库，试试修正
-        url = sp;
-        // 如果是旧的 julian678 仓库，改成正确仓库
-        if(sp.includes('julian678')) url = sp.replace(/julian678/, 'xshzct-dotcom.github.io');
-      } else if(sp.startsWith('music/')){
-        url = MUSIC_BASE + sp.slice(6);
+      if(!t){ console.warn('[play] song not found at idx', idx); return; }
+      // 把编辑器当前列表同步到网页播放器，然后播放选中歌曲
+      const newPlaylist = list.map(tr => ({
+        name: tr.title, title: tr.title, artist: tr.artist||'',
+        url: tr.storage_path||'', storage_path: tr.storage_path||'',
+      }));
+      if(window.setPlaylistTo){
+        window.setPlaylistTo(newPlaylist, idx);
       } else {
-        url = STORAGE_URL + '/' + sp;
+        // 回退 — 控制台警告
+        console.warn('[play] 网页播放器未就绪，请刷新页面');
       }
-      const a = new Audio(url);
-      a.play().then(() => {}).catch(e => {
-        // 播放失败，试试另一个来源
-        if(sp.includes('julian678')){
-          const altUrl = 'https://cdn.jsdelivr.net/gh/xshzct-dotcom/xshzct-dotcom.github.io@main/' + sp.split('@main/')[1];
-          new Audio(altUrl).play().catch(() => alert('❌ 无法播放：' + t.title));
-        } else {
-          alert('❌ 播放失败');
-        }
-      });
     });
     el.querySelectorAll('[data-me-edit]').forEach(b=>b.onclick=()=>{
       const t=list[parseInt(b.dataset.meEdit)];

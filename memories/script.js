@@ -952,7 +952,13 @@ function initMusic(){
   bgMusic.addEventListener('ended',nextSong);
   bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';visStart();});
   bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';visStop();});
-  bgMusic.addEventListener('error',()=>nextSong());
+  let _errGuard=false;
+  bgMusic.addEventListener('error',()=>{
+    if(_errGuard) return;
+    _errGuard=true;
+    setTimeout(()=>{_errGuard=false;},1200);
+    nextSong();
+  });
 
   visBars = $$('#playerVisualizer span');
 
@@ -1005,9 +1011,23 @@ function playSong(idx){
   if(!songs||idx>=songs.length||idx<0) return;
   currentSongIdx=idx;
   const s=songs[idx];
-  // 优先用本地 ../music/（CDN 偶尔不稳定），CDN 链接保留作 fallback
-  const localUrl = musicPath((s.name||s.title)+'.mp3');
-  const url = localUrl.includes('../music/') ? localUrl : (s.url || localUrl);
+  // URL 优先级: storage_path > url > 从标题拼 CDN
+  const sp = (s.storage_path || s.url || '').trim();
+  let url;
+  if(sp.startsWith('http')){
+    url = sp;
+    if(url.includes('julian678')) url = url.replace(/julian678/g, 'xshzct-dotcom.github.io');
+  } else if(sp.startsWith('music/')){
+    url = MUSIC_BASE + sp.slice(6);
+  } else if(sp){
+    // Supabase Storage 上传的文件
+    const SURL = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos';
+    url = SURL + '/' + sp;
+  } else {
+    // 兜底：从标题拼 CDN
+    const name = (s.name || s.title || '').trim();
+    url = MUSIC_BASE + name + '.mp3';
+  }
   if(bgMusic){
     bgMusic.src=url;
     bgMusic.load();
@@ -1035,6 +1055,12 @@ function nextSong(){
   playSong(idx);
 }
 window.nextSong=nextSong;
+// 编辑器调用：把播放列表同步到网页播放器并播放指定位置
+window.setPlaylistTo = function(songs, playIdx){
+  window._currentSongs = songs;
+  currentSongIdx = playIdx != null && playIdx >= 0 ? playIdx : 0;
+  playSong(currentSongIdx);
+};
 function seek(e){
   if(!bgMusic||!bgMusic.duration) return;
   const rect=e.currentTarget.getBoundingClientRect();
