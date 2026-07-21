@@ -1185,6 +1185,7 @@ async function ensureSync(){
       } else {
         for(let i=0; i<allAlbums.length; i++){
           const a = allAlbums[i];
+          if(!a || !a.title) continue;
           const {data:exist} = await SB.from('albums').select('id').eq('title', a.title).limit(1);
           if(!exist || exist.length === 0){
             await SB.from('albums').insert(a);

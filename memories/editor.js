@@ -8,6 +8,8 @@
 const SB_URL='https://mvzbkuhwapdqcdkekczh.supabase.co';
 const SB_KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
 const STORAGE_URL=SB_URL+'/storage/v1/object/public/photos';
+const REPO='xshzct-dotcom/xshzct-dotcom.github.io@main';
+const MUSIC_BASE='https://cdn.jsdelivr.net/gh/'+REPO+'/music/';
 let sb;
 try{sb=supabase.createClient(SB_URL,SB_KEY)}catch(e){sb=null}
 
@@ -371,8 +373,13 @@ async function renderMusicTab(){
 
     el.querySelectorAll('[data-me-play]').forEach(b=>b.onclick=()=>{
       const t=list[parseInt(b.dataset['me-play'])];
-      const url=t.storage_path?(STORAGE_URL+'/'+t.storage_path):('../music/'+(t.storage_path||t.title+'.mp3'));
-      const a=new Audio(url);a.play();
+      const sp = t.storage_path || '';
+      let url;
+      if(sp.startsWith('http')) url = sp;  // CDN URL
+      else if(sp.startsWith('music/')) url = MUSIC_BASE + sp.slice(6);  // relative path
+      else url = STORAGE_URL + '/' + sp;  // Supabase storage
+      const a = new Audio(url);
+      a.play().catch(e => alert('❌ 播放失败：' + (e.message||'未知')));
     });
     el.querySelectorAll('[data-me-edit]').forEach(b=>b.onclick=()=>{
       const t=list[parseInt(b.dataset['me-edit'])];
@@ -395,19 +402,25 @@ async function renderMusicTab(){
     const uploadEl = $('#meUpload');
     if(uploadEl) uploadEl.onchange = async (e)=>{
       const files = e.target.files;
+      const total = files.length;
+      let okCount = 0, failCount = 0;
       for(const f of files){
         const fname = 'music_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
         try{
           const svc = supabase.createClient(SB_URL, _svcKey());
-          const fname = 'music_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
           const {error:upErr} = await svc.storage.from('photos').upload(fname, f, {upsert:true});
           if(!upErr){
             await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order:-Date.now(), album_id:null});
+            okCount++;
+          } else {
+            failCount++;
+            console.warn('[music upload]', upErr.message);
           }
-        }catch(err){ console.warn('[music upload]', err); }
+        }catch(err){ console.warn('[music upload]', err); failCount++; }
       }
       e.target.value = '';
       renderMusicTab();
+      if(total > 0) alert('上传完成：' + okCount + ' 首成功' + (failCount > 0 ? '，' + failCount + ' 首失败' : ''));
     };
   }, 200);
 }
