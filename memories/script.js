@@ -418,6 +418,7 @@ function openLightbox(idx, kenBurns=false){
   // 预加载原图，加载完成后再切换背景
   const photo = lightboxPhotos[idx];
   const src = full(photo);
+  lb.dataset.lbSrc = src;
   const pre = new Image();
   pre.onload = function(){
     lb.style.background = '#000 url(' + src + ') center/contain no-repeat';
@@ -434,14 +435,13 @@ let lbZoom = {scale:1, bgX:50, bgY:50, dragging:false, dragX:0, dragY:0};
 
 function applyBgZoom(lb){
   if(!lb) return;
-  const cur = lb.style.background;
-  const m = cur.match(/url\("([^"]+)"\)/);
-  if(!m) return;
+  var src = lb.dataset.lbSrc;
+  if(!src) return;
   if(lbZoom.scale <= 1.01){
-    lb.style.background = '#000 url("'+m[1]+'") center/contain no-repeat';
+    lb.style.background = '#000 url('+src+') center/contain no-repeat';
     lbZoom.bgX = 50; lbZoom.bgY = 50;
   } else {
-    lb.style.background = '#000 url("'+m[1]+'") '+lbZoom.bgX+'% '+lbZoom.bgY+'% / '+(lbZoom.scale*100)+'% no-repeat';
+    lb.style.background = '#000 url('+src+') '+lbZoom.bgX+'% '+lbZoom.bgY+'% / '+(lbZoom.scale*100)+'% no-repeat';
   }
 }
 
