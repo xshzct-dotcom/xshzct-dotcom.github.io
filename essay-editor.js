@@ -380,12 +380,63 @@
     bar.innerHTML = '<button onclick="BLOG.add()">✏️ 写新文章</button><button onclick="BLOG.openCats()">📂 管理分类</button><button onclick="BLOG.toggle()">✕ 退出编辑</button>';
     body.appendChild(bar);
 
-    body.querySelectorAll('.article-item').forEach(item => {
+    body.querySelectorAll('.article-item').forEach((item, i) => {
       if (item.querySelector('.ee-act')) return;
       const act = document.createElement('div');
       act.className = 'ee-act';
-      act.innerHTML = '<button onclick="event.stopPropagation();BLOG.edit(this)">✎ 编辑</button><button class="ee-del" onclick="event.stopPropagation();BLOG.del(this)">🗑 删除</button>';
+      act.innerHTML = '<span style="color:rgba(255,255,255,.3);margin-right:6px;cursor:grab;user-select:none">⠿</span><button onclick="event.stopPropagation();BLOG.edit(this)">✎</button><button class="ee-del" onclick="event.stopPropagation();BLOG.del(this)">🗑</button>';
       item.appendChild(act);
+
+      // 添加拖拽
+      item.draggable = true;
+      item.dataset.idx = i;
+      item.addEventListener('dragstart', e => {
+        e.dataTransfer.effectAllowed = 'move';
+        item.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', i);
+      });
+      item.addEventListener('dragend', e => {
+        item.classList.remove('dragging');
+      });
+      item.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        item.style.borderTop = '2px solid #2d7eff';
+      });
+      item.addEventListener('dragleave', e => {
+        item.style.borderTop = '';
+      });
+      item.addEventListener('drop', async e => {
+        e.preventDefault();
+        item.style.borderTop = '';
+        const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+        const toIdx = parseInt(item.dataset.idx);
+        if (fromIdx === toIdx || isNaN(fromIdx) || isNaN(toIdx)) return;
+        // 找到当前分类
+        const titleEl = item.querySelector('.title');
+        if (!titleEl) return;
+        const titleText = titleEl.textContent.trim().replace(/\s+/g, ' ');
+        for (const cat of essayCategories) {
+          for (const art of (cat.articles || [])) {
+            const artTitle = (art.title || '').trim().replace(/\s+/g, ' ');
+            if (artTitle === titleText) {
+              // 找到当前分类
+              const from = cat.articles[fromIdx];
+              const to = cat.articles[toIdx];
+              if (from && to && from._sid && to._sid) {
+                const fromOrder = from.sort_order;
+                const toOrder = to.sort_order;
+                await sb.from('essays').update({ sort_order: toOrder }).eq('id', from._sid);
+                await sb.from('essays').update({ sort_order: fromOrder }).eq('id', to._sid);
+                await refreshData();
+                if (typeof updateModalView === 'function') updateModalView();
+                setTimeout(injectEditButtons, 100);
+              }
+              return;
+            }
+          }
+        }
+      });
     });
   }
 
