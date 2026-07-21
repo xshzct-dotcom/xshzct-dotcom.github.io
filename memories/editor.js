@@ -11,6 +11,11 @@ const STORAGE_URL=SB_URL+'/storage/v1/object/public/photos';
 let sb;
 try{sb=supabase.createClient(SB_URL,SB_KEY)}catch(e){sb=null}
 
+// 工具提前声明
+function $(s,d){return(d||document).querySelector(s)}
+function $$(s,d){return Array.from((d||document).querySelectorAll(s))}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
 function db(){
   if(sb)return sb;
   const qb=r=>new Proxy({},{get:(_,p)=>{
@@ -324,8 +329,6 @@ function renderTab(){
   else if(currentTab==='album') renderAlbumTab();
   else if(currentTab==='music') renderMusicTab();
 }
-
-function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
 // ===== 齿轮绑定（在 EDITOR 定义后执行） =====
 const gearBtn = $('#navGear');
