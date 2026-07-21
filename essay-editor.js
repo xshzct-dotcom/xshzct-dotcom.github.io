@@ -4,6 +4,12 @@
 (function() {
   'use strict';
 
+  // 清理任何残留的旧浮动笔按钮
+  ['blog-pen', 'album-pen', 'music-pen'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  });
+
   const SB_URL = 'https://mvzbkuhwapdqcdkekczh.supabase.co';
   const SB_KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
   let sb;
