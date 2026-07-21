@@ -142,19 +142,12 @@
           window.MUSIC.show();
         } else {
           const check = setInterval(() => {
-    openMusic: () => {
-      document.getElementById('settings-dropdown')?.classList.remove('show');
-      try {
-        if (window.MUSIC && typeof window.MUSIC.show === 'function') {
-          window.MUSIC.show();
-        } else {
-          const check = setInterval(() => {
             if (window.MUSIC && typeof window.MUSIC.show === 'function') {
               clearInterval(check);
               window.MUSIC.show();
             }
-          }, 100);
-          setTimeout(() => clearInterval(check), 3000);
+          }, 200);
+          setTimeout(() => clearInterval(check), 5000);
         }
       } catch(e) { console.warn('[MENU] 打开音乐失败', e); }
     },
