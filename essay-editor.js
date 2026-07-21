@@ -623,10 +623,28 @@
       }
     },
     ensureButtons: () => setTimeout(injectEditButtons, 50),
-    edit: (btn) => { const d = findArticle(btn); if (d) openEditor(d); else alert('找不到文章，请刷新后重试'); },
+    edit: async (btn) => {
+      const d = findArticle(btn);
+      if (!d) { alert('找不到文章，请刷新后重试'); return; }
+      if (!d._sid) {
+        const { data: matches } = await sb.from('essays').select('id').eq('title', d.title).limit(1);
+        if (matches && matches.length > 0) d._sid = matches[0].id;
+      }
+      if (d) openEditor(d);
+    },
     del: async (btn) => {
       const d = findArticle(btn);
-      if (!d || !d._sid) { alert('找不到数据'); return; }
+      if (!d) { alert('找不到文章'); return; }
+      if (!d._sid) {
+        // 没有 _sid（data.js 数据），尝试从 Supabase 按标题查找
+        const { data: matches } = await sb.from('essays').select('id').eq('title', d.title).limit(1);
+        if (matches && matches.length > 0) {
+          d._sid = matches[0].id;
+        } else {
+          alert('找不到数据，该文章可能未同步到服务器');
+          return;
+        }
+      }
       if (!confirm('确定删除「' + d.title + '」？')) return;
       const { error } = await sb.from('essays').delete().eq('id', d._sid);
       if (error) { alert('❌ ' + error.message); return; }
