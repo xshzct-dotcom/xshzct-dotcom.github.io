@@ -29,9 +29,69 @@ function db(){
 
 // ===== 全局面板 =====
 let currentTab='essay';
-function open(){ $('#editorPanel').classList.add('open');$('#editorBackdrop').classList.add('active');document.body.style.overflow='hidden';renderTab(); }
+async function open(){
+  $('#editorPanel').classList.add('open');
+  $('#editorBackdrop').classList.add('active');
+  document.body.style.overflow='hidden';
+  // 先确保 Supabase 有数据（script.js 的同步可能在跑，等它）
+  const body = $('#editorBody');
+  body.innerHTML = '<div class="editor-empty">⏳ 同步数据中…</div>';
+  try{
+    if(window.MemoriesReady) await window.MemoriesReady;
+    else if(sb) await ensureDataSync();
+  } catch(e){ console.warn(e); }
+  renderTab();
+}
 function close(){ $('#editorPanel').classList.remove('open');$('#editorBackdrop').classList.remove('active');document.body.style.overflow=''; }
 window.EDITOR={open,close};
+
+// 兜底同步：script.js 没跑时，editor 自己从 data.js 拉数据同步
+let _synced = false;
+async function ensureDataSync(){
+  if(_synced || !sb) return;
+  _synced = true;
+  try{
+    if(typeof essayCategories !== 'undefined'){
+      for(const cat of essayCategories){
+        for(const art of (cat.articles||[])){
+          try{
+            const {data:exist} = await sb.from('essays').select('id').eq('title', art.title).eq('category', cat.id).limit(1);
+            if(!exist || !exist.length) await sb.from('essays').insert({category:cat.id, category_title:cat.title, title:art.title, date:art.date||'', body:art.body||'', sort_order:0});
+          }catch(e){}
+        }
+      }
+    }
+    if(typeof travels !== 'undefined'){
+      for(const art of travels){
+        try{
+          const {data:exist} = await sb.from('essays').select('id').eq('title', art.title).eq('category', 'travel').limit(1);
+          if(!exist || !exist.length) await sb.from('essays').insert({category:'travel', category_title:'旅行见闻', title:art.title, date:art.date||'', body:art.body||'', sort_order:0});
+        }catch(e){}
+      }
+    }
+    if(typeof albums !== 'undefined'){
+      for(let i=0;i<albums.length;i++){
+        const a = albums[i];
+        try{
+          const {data:exist} = await sb.from('albums').select('id').eq('title', a.title).limit(1);
+          if(!exist || !exist.length) await sb.from('albums').insert({title:a.title, sort_order:i, cover:a.cover||'', photo_count:(a.photos||[]).length});
+          else await sb.from('albums').update({photo_count:(a.photos||[]).length}).eq('id', exist[0].id);
+        }catch(e){}
+      }
+    }
+    if(typeof playlist !== 'undefined'){
+      for(let i=0;i<playlist.length;i++){
+        const m = playlist[i];
+        const name = m.name || m.title;
+        if(!name) continue;
+        try{
+          const {data:exist} = await sb.from('music').select('id').eq('title', name).is('album_id', null).limit(1);
+          if(!exist || !exist.length) await sb.from('music').insert({title:name, artist:m.artist||'', storage_path:m.url||`music/${name}.mp3`, sort_order:i, album_id:null});
+        }catch(e){}
+      }
+    }
+  }catch(e){ console.warn('[editor] ensureDataSync failed:', e); _synced = false; }
+}
 
 $('#editorClose').onclick=close;
 $('#editorBackdrop').onclick=close;

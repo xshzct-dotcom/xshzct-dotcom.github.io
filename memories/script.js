@@ -20,24 +20,42 @@ function getPath(p){
   if(typeof p==='string') return p;
   return p.path||p.src||p.storage_path||p.url||p.filename||'';
 }
+// 缩略图：把 images/x.jpg 映射到 ../thumbs/x.webp（与主站 getThumb 一致）
 function thumb(p){
   const s=getPath(p); if(!s) return '';
   if(s.startsWith('http')) return s;
-  if(s.startsWith('images/')||s.startsWith('thumbs/')) return '../'+s;
-  return THUMB_BASE+s;
+  // 把 images/xxx.jpg → thumbs/xxx.webp
+  let t = s;
+  if(t.startsWith('images/')) t = t.slice(7); // 去掉 images/
+  if(t.startsWith('thumbs/')) return '../'+t;
+  // 扩展名 .jpg/.jpeg/.png → .webp
+  t = t.replace(/_看图王\.jpg$/i, '.webp')
+       .replace(/\.jpg$/i, '.webp')
+       .replace(/\.jpeg$/i, '.webp')
+       .replace(/\.png$/i, '.webp');
+  return '../thumbs/'+t;
 }
+// 全图：灯箱用原图
 function full(p){
   const s=getPath(p); if(!s) return '';
   if(s.startsWith('http')) return s;
-  if(s.startsWith('images/')||s.startsWith('thumbs/')) return '../'+s;
+  if(s.startsWith('images/')) return '../'+s;
+  if(s.startsWith('thumbs/')){
+    // thumbs/xxx.webp → images/xxx.jpg
+    let t = s.replace(/^\.\.\/thumbs\//, 'images/').replace(/^thumbs\//, 'images/');
+    t = t.replace(/\.webp$/i, '.jpg');
+    return '../'+t;
+  }
   return IMG_BASE+s;
 }
+// 音乐：优先本地 ../music/，CDN URL 保留作 fallback
 function musicPath(m){
   if(!m) return '';
-  const s = typeof m==='string' ? m : (m.url||m.path||m.storage_path||'');
+  let s = typeof m==='string' ? m : (m.url||m.path||m.storage_path||'');
   if(!s) return '';
-  if(s.startsWith('http')) return s;
+  if(s.startsWith('http')) return s; // CDN URL 直用
   if(s.startsWith('music/')) return '../'+s;
+  // 兜底：根据文件名拼本地路径
   return '../music/'+s;
 }
 
@@ -1017,7 +1035,9 @@ function playSong(idx){
   if(!songs||idx>=songs.length||idx<0) return;
   currentSongIdx=idx;
   const s=songs[idx];
-  const url=s.url||musicPath(s.name+'.mp3');
+  // 优先用本地 ../music/（CDN 偶尔不稳定），CDN 链接保留作 fallback
+  const localUrl = musicPath((s.name||s.title)+'.mp3');
+  const url = localUrl.includes('../music/') ? localUrl : (s.url || localUrl);
   if(bgMusic){
     bgMusic.src=url;
     bgMusic.load();
@@ -1085,6 +1105,121 @@ function fillTimelineIndex(){
   });
 }
 
+// ===== Supabase 同步（把 data.js 现有内容同步到云端，让编辑器有真实数据可改） =====
+const SB_URL = 'https://mvzbkuhwapdqcdkekczh.supabase.co';
+const SB_KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
+let SB = null;
+try { SB = supabase.createClient(SB_URL, SB_KEY); } catch(e) { SB = null; }
+
+function dbQ(){
+  if(SB) return SB;
+  // 离线 mock
+  const qb = r => new Proxy({},{get:(_,p)=>{
+    if(['select','insert','update','delete','upsert','order','eq','limit','single','maybeSingle','filter','match'].includes(p)) return ()=>qb(r);
+    if(p==='then') return res=>res(r);
+    if(p==='catch') return ()=>{};
+    return ()=>qb(r);
+  }});
+  return {from:()=>qb({data:[],error:null})};
+}
+
+// 把 data.js 现有内容灌到 Supabase（idempotent，按 title 去重）
+async function ensureSync(){
+  if(!SB) return;
+  try{
+    // 1. 文章
+    const allEssays = [];
+    if(typeof essayCategories !== 'undefined'){
+      essayCategories.forEach(cat => (cat.articles||[]).forEach((art, i) => {
+        allEssays.push({
+          category: cat.id, category_title: cat.title,
+          title: art.title, date: art.date || '', body: art.body || '',
+          sort_order: i,
+        });
+      }));
+    }
+    if(typeof travels !== 'undefined'){
+      travels.forEach((art, i) => {
+        allEssays.push({
+          category: 'travel', category_title: '旅行见闻',
+          title: art.title, date: art.date || '', body: art.body || '',
+          sort_order: -(i+1),
+        });
+      });
+    }
+    for(const e of allEssays){
+      try{
+        const {data:exist} = await SB.from('essays').select('id').eq('title', e.title).eq('category', e.category).limit(1);
+        if(!exist || exist.length === 0){
+          await SB.from('essays').insert(e);
+        }
+      } catch(err){ /* 单条失败不影响 */ }
+    }
+
+    // 2. 相册
+    if(Array.isArray(albums)){
+      for(let i=0; i<albums.length; i++){
+        const a = albums[i];
+        try{
+          const {data:exist} = await SB.from('albums').select('id').eq('title', a.title).limit(1);
+          if(!exist || exist.length === 0){
+            await SB.from('albums').insert({
+              title: a.title, sort_order: i,
+              cover: a.cover || '',
+              photo_count: (a.photos||[]).length,
+            });
+          } else {
+            // 更新 photo_count 保持最新
+            await SB.from('albums').update({ photo_count: (a.photos||[]).length }).eq('id', exist[0].id);
+          }
+        } catch(err){}
+      }
+    }
+
+    // 3. 音乐
+    if(typeof playlist !== 'undefined' && Array.isArray(playlist)){
+      for(let i=0; i<playlist.length; i++){
+        const m = playlist[i];
+        try{
+          // title 可能是含特殊字符的，先用 name
+          const name = m.name || m.title;
+          if(!name) continue;
+          const {data:exist} = await SB.from('music').select('id').eq('title', name).is('album_id', null).limit(1);
+          if(!exist || exist.length === 0){
+            await SB.from('music').insert({
+              title: name, artist: m.artist || '',
+              storage_path: m.url || `music/${name}.mp3`,
+              sort_order: i, album_id: null,
+            });
+          }
+        } catch(err){}
+      }
+    }
+    console.log('[memories] ensureSync done');
+  } catch(e){
+    console.warn('[memories] ensureSync failed:', e);
+  }
+}
+
+// 从 Supabase 拉所有内容（编辑器打开前先拉一次，编辑器直接显示）
+async function loadFromSupabase(){
+  if(!SB) return null;
+  try{
+    const [{data:albumsData}, {data:essaysData}, {data:musicData}] = await Promise.all([
+      SB.from('albums').select('*').order('sort_order', {ascending:true}),
+      SB.from('essays').select('*').order('sort_order', {ascending:true}),
+      SB.from('music').select('*').order('sort_order', {ascending:true}),
+    ]);
+    return {
+      albums: albumsData || [],
+      essays: essaysData || [],
+      music: musicData || [],
+    };
+  } catch(e){
+    return null;
+  }
+}
+
 // ===== 初始化 =====
 function init(){
   initHeroStars();
@@ -1104,6 +1239,9 @@ function init(){
   // 随机
   const shuffle=$('#navShuffle');
   if(shuffle) shuffle.onclick = shuffleMemory;
+
+  // 同步 data.js → Supabase（让编辑器有真实数据）— 暴露 promise 给 editor 共享
+  window.MemoriesReady = ensureSync();
 
   // 全局媒体观察
   const mo = new MutationObserver(()=>{ observeFadeUps(); });
