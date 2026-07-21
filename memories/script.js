@@ -580,6 +580,7 @@ function openLightbox(idx, kenBurns=false){
   lb.classList.remove('lightbox-kenburns');
 
   lb.classList.add('active');
+  lb.style.opacity = '1';  // CSS .lightbox.active 可能被缓存/覆盖，JS 直接设
   document.body.style.overflow = 'hidden';
   lbAutoHideControls();
 
@@ -642,6 +643,7 @@ window.navLightbox = navLightbox;
 function closeLightbox(){
   const lb = $('#lightbox');
   lb.classList.remove('active');
+  lb.style.opacity = '0';
   document.body.style.overflow = '';
   $('#lightboxStage').classList.remove('zoomed');
   zoom = {scale:1, x:0, y:0};
