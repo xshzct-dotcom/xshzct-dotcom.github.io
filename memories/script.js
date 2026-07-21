@@ -260,17 +260,17 @@ function closeEssayModal(){
 window.closeEssayModal = closeEssayModal;
 $('#essayModal').onclick = e => { if(e.target===e.currentTarget) closeEssayModal(); };
 
-// ===== 全屏翻阅式相册 =====
+// ===== 记忆河流 · 散落拍立得 =====
 let lightboxPhotos = [];
 let lightboxIdx = 0;
 let allGalleryPhotos = [];
 let currentFilter = 'all';
-let viewerIdx = 0;
+const POLAROID_COUNT = 30;
 
-function initViewer(){
+function buildRiver(){
   allGalleryPhotos = [];
-  albums.forEach(album => {
-    (album.photos||[]).forEach(photo => {
+  albums.forEach(function(album){
+    (album.photos||[]).forEach(function(photo){
       allGalleryPhotos.push({
         path: photo, src: photo,
         _albumTitle: album.title,
@@ -281,75 +281,76 @@ function initViewer(){
   });
   lightboxPhotos = allGalleryPhotos;
   currentFilter = 'all';
-  viewerIdx = 0;
-  buildViewerFilters();
-  showViewerPhoto();
+  buildRiverFilters();
+  renderRiver();
 }
 
-function getFilteredViewer(){
+function getFilteredRiver(){
   if(currentFilter === 'all') return allGalleryPhotos;
-  return allGalleryPhotos.filter(p => (p._worldId||p._albumId||'') === currentFilter || p._albumId === currentFilter);
+  return allGalleryPhotos.filter(function(p){
+    return (p._worldId||p._albumId||'') === currentFilter || p._albumId === currentFilter;
+  });
 }
 
-function showViewerPhoto(){
-  var filtered = getFilteredViewer();
-  if(filtered.length === 0) return;
-  viewerIdx = Math.max(0, Math.min(viewerIdx, filtered.length - 1));
+function renderRiver(){
+  var stream = document.getElementById('riverStream');
+  if(!stream) return;
+  var filtered = getFilteredRiver();
+  var pool = filtered.length > 0 ? filtered : allGalleryPhotos;
+  var n = Math.min(POLAROID_COUNT, pool.length);
 
-  var photo = filtered[viewerIdx];
-  var img = document.getElementById('viewerImg');
-  var counter = document.getElementById('viewerCounter');
-  var album = document.getElementById('viewerAlbum');
-  var wrapper = document.getElementById('viewerWrapper');
-
-  if(!img) return;
-  img.style.opacity = '0';
-  img.src = thumb(photo);
-  img.onload = function(){
-    img.style.opacity = '1';
-    img.style.transition = 'opacity .3s ease';
-    preloadFull(photo);
-  };
-
-  if(counter) counter.textContent = (viewerIdx + 1) + ' / ' + filtered.length;
-  if(album) album.textContent = photo._albumTitle || '';
-  if(wrapper){
-    wrapper.style.transform = 'translateX(0)';
-    wrapper.style.transition = 'transform .3s ease';
+  // 随机选取 n 张（不重复）用 Fisher-Yates
+  var indices = [];
+  for(var i = 0; i < pool.length; i++) indices.push(i);
+  for(var i = indices.length - 1; i > 0; i--){
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = indices[i]; indices[i] = indices[j]; indices[j] = t;
   }
-}
+  indices = indices.slice(0, n).sort(function(a,b){return a-b;});
 
-function navViewer(dir){
-  var filtered = getFilteredViewer();
-  if(filtered.length === 0) return;
-  var oldIdx = viewerIdx;
-  viewerIdx += dir;
-  if(viewerIdx < 0) viewerIdx = filtered.length - 1;
-  if(viewerIdx >= filtered.length) viewerIdx = 0;
-  if(viewerIdx === oldIdx) return;
-
-  var wrapper = document.getElementById('viewerWrapper');
-  if(wrapper){
-    wrapper.style.transition = 'transform .2s ease-out';
-    wrapper.style.transform = 'translateX(' + (dir > 0 ? -80 : 80) + 'px)';
+  // 预计算旋转角度
+  var rotations = [];
+  var seed = Date.now() % 10000;
+  for(var i = 0; i < n; i++){
+    seed = (seed * 16807) % 2147483647;
+    rotations.push(((seed % 12) - 6));
   }
-  setTimeout(function(){ showViewerPhoto(); }, 200);
+
+  stream.innerHTML = indices.map(function(pi, i){
+    var p = pool[pi];
+    var rot = rotations[i];
+    return '<div class="polaroid" data-idx="' + pi + '" style="transform:rotate(' + rot + 'deg)" data-label="' + esc(p._albumTitle||'') + '">' +
+      '<img src="' + thumb(p) + '" alt="" decoding="async" onload="var p=this.parentElement;if(p)p.classList.remove(\'polaroid-loading\')">' +
+    '</div>';
+  }).join('');
+
+  // 每个拍立得初始状态是 loading
+  stream.querySelectorAll('.polaroid').forEach(function(el){
+    el.classList.add('polaroid-loading');
+    el.onclick = function(){
+      var idx = parseInt(el.dataset.idx);
+      if(isNaN(idx)) return;
+      lightboxPhotos = pool;
+      lightboxIdx = idx;
+      openLightbox(idx);
+    };
+  });
+
+  // 滚到第一个
+  stream.scrollLeft = 0;
 }
 
-function preloadFull(photo){
-  var src = full(photo);
-  var pre = new Image();
-  pre.onload = function(){
-    var img = document.getElementById('viewerImg');
-    var lb = document.getElementById('lightbox');
-    if(img && lb && !lb.classList.contains('active')){
-      img.src = src;
-    }
-  };
-  pre.src = src;
+function riverScroll(dir){
+  var stream = document.getElementById('riverStream');
+  if(!stream) return;
+  stream.scrollBy({left: dir * 320, behavior: 'smooth'});
 }
 
-function buildViewerFilters(){
+function riverShuffle(){
+  renderRiver();
+}
+
+function buildRiverFilters(){
   var container = document.getElementById('viewerFilters');
   if(!container) return;
   var groups = {};
@@ -361,28 +362,22 @@ function buildViewerFilters(){
   var filters = [{id:'all', title:'全部', count:allGalleryPhotos.length}];
   Object.keys(groups).forEach(function(k){ filters.push(groups[k]); });
   container.innerHTML = filters.map(function(f){
-    return '<div class="viewer-filter' + (f.id === currentFilter ? ' active' : '') + '" data-filter="' + f.id + '">' + esc(f.title) + ' &#183; ' + f.count + '</div>';
+    return '<div class="river-filter' + (f.id === currentFilter ? ' active' : '') + '" data-filter="' + f.id + '">' + esc(f.title) + ' &#183; ' + f.count + '</div>';
   }).join('');
-  container.querySelectorAll('.viewer-filter').forEach(function(el){
+  container.querySelectorAll('.river-filter').forEach(function(el){
     el.onclick = function(){
       currentFilter = el.dataset.filter;
-      viewerIdx = 0;
-      container.querySelectorAll('.viewer-filter').forEach(function(e){ e.classList.remove('active'); });
+      container.querySelectorAll('.river-filter').forEach(function(e){ e.classList.remove('active'); });
       el.classList.add('active');
-      showViewerPhoto();
+      renderRiver();
     };
   });
 }
 
-// 点击进入灯箱（全功能缩放/翻页/关闭）
-function openViewerLightbox(){
-  var filtered = getFilteredViewer();
-  if(filtered.length === 0) return;
-  lightboxPhotos = filtered;
-  openLightbox(viewerIdx);
-}
+window.riverScroll = riverScroll;
+window.riverShuffle = riverShuffle;
 
-// ===== 灯箱 v2// ===== 灯箱 v2（光标居中缩放 + 滑动切图 + 自动隐藏 UI） =====
+// ===== 灯箱 v2 =====// ===== 灯箱 v2 =====
 let zoom = {scale: 1, x: 0, y: 0};
 let lbHideTimer = null;
 function lbAutoHideControls(){
@@ -933,7 +928,7 @@ function init(){
   initMusic();
   fillTimelineIndex();
   buildTimeline();
-  initViewer();
+  buildRiver();
   buildYearHeatmap();
   bindLightboxInteractions();
   initDailyQuote();

@@ -65,20 +65,17 @@
   <div class="timeline" id="timeline"></div>
 </section>
 
-<!-- Photo Viewer — 全屏翻阅 -->
+<!-- Memory River — 记忆河流 -->
 <section class="section" id="gallery">
   <h2 class="section-title">我<em>眼</em>中的世界</h2>
-  <div class="viewer-filters" id="viewerFilters"></div>
-  <div class="viewer" id="viewer">
-    <div class="viewer-wrapper" id="viewerWrapper">
-      <img class="viewer-img" id="viewerImg" src="" alt="" onclick="openViewerLightbox()">
-    </div>
-    <button class="viewer-nav viewer-prev" onclick="navViewer(-1)" title="上一张">‹</button>
-    <button class="viewer-nav viewer-next" onclick="navViewer(1)" title="下一张">›</button>
-    <div class="viewer-info" onclick="openViewerLightbox()">
-      <div class="viewer-album" id="viewerAlbum"></div>
-      <div class="viewer-counter" id="viewerCounter">0 / 0</div>
-    </div>
+  <div class="river-filters" id="viewerFilters"></div>
+  <div class="river" id="memRiver">
+    <div class="river-stream" id="riverStream"></div>
+  </div>
+  <div class="river-controls">
+    <button class="river-ctrl river-prev" onclick="riverScroll(-1)">‹</button>
+    <button class="river-ctrl river-next" onclick="riverScroll(1)">›</button>
+    <button class="river-ctrl river-shuffle" onclick="riverShuffle()" title="换一批">🎲 换一批</button>
   </div>
 </section>
 

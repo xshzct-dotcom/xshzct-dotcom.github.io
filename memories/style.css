@@ -109,34 +109,40 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .timeline-card .tl-cat{font-size:.72rem;color:var(--text-muted);margin-top:12px;display:inline-block;padding:3px 10px;border:1px solid var(--border);border-radius:20px;letter-spacing:.5px}
 .timeline-empty{text-align:center;color:var(--text-muted);padding:60px 0;font-size:1rem}
 
-/* --- 全屏翻阅式相册 --- */
-.viewer-filters{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:20px}
-.viewer-filter{padding:7px 18px;border:1px solid var(--border);border-radius:20px;font-size:.85rem;color:var(--text-dim);transition:all .25s;cursor:pointer;background:transparent}
-.viewer-filter:hover{border-color:var(--border-hover);color:var(--text)}
-.viewer-filter.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
+/* --- 记忆河流 · 散落拍立得 --- */
+.river-filters{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:20px}
+.river-filter{padding:7px 18px;border:1px solid var(--border);border-radius:20px;font-size:.85rem;color:var(--text-dim);transition:all .25s;cursor:pointer;background:transparent}
+.river-filter:hover{border-color:var(--border-hover);color:var(--text)}
+.river-filter.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
 
-.viewer{position:relative;display:flex;align-items:center;justify-content:center;min-height:60vh;overflow:hidden;border-radius:var(--radius);background:var(--bg-elevated);border:1px solid var(--border)}
-.viewer-wrapper{width:100%;display:flex;align-items:center;justify-content:center;transition:transform .3s ease;overflow:hidden}
-.viewer-img{cursor:pointer;max-width:100%;max-height:70vh;object-fit:contain;transition:opacity .4s ease;border-radius:4px;box-shadow:0 8px 32px rgba(0,0,0,.4)}
-.viewer-img:hover{transform:scale(1.01)}
+.river{overflow:hidden;padding:20px 0;position:relative}
+.river-stream{display:flex;gap:60px;padding:20px 100px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:thin;cursor:grab}
+.river-stream:active{cursor:grabbing}
+.river-stream::-webkit-scrollbar{height:4px}
+.river-stream::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.river-stream::-webkit-scrollbar-track{background:transparent}
 
-.viewer-nav{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:52px;border-radius:50%;font-size:2rem;color:var(--text);background:rgba(14,17,22,.7);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;z-index:5;transition:all .2s;backdrop-filter:blur(4px)}
-.viewer-nav:hover{background:rgba(14,17,22,.9);border-color:var(--accent)}
-.viewer-prev{left:16px}
-.viewer-next{right:16px}
+.polaroid{flex:0 0 auto;width:260px;scroll-snap-align:center;background:#faf7f2;padding:12px 12px 36px 12px;border-radius:2px;box-shadow:0 4px 16px rgba(0,0,0,.3),0 1px 4px rgba(0,0,0,.15);transition:transform .3s cubic-bezier(.25,.1,.25,1),box-shadow .3s ease;cursor:pointer;position:relative}
+.polaroid::after{content:attr(data-label);position:absolute;bottom:10px;left:12px;right:12px;text-align:center;font-family:'Noto Serif SC',serif;font-size:.7rem;color:#8a857a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.polaroid:hover{transform:translateY(-16px) scale(1.06)!important;box-shadow:0 20px 48px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.2);z-index:10}
+.polaroid img{display:block;width:100%;height:auto;aspect-ratio:3/4;object-fit:cover;pointer-events:none}
+.polaroid-loading{background:linear-gradient(135deg,#e8e8e8 25%,#f5f5f5 50%,#e8e8e8 75%);background-size:200% 200%;animation:shimmer2 1.5s infinite}
 
-.viewer-info{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;z-index:5;cursor:pointer;padding:8px 20px;background:rgba(14,17,22,.75);border-radius:20px;backdrop-filter:blur(8px);border:1px solid var(--border)}
-.viewer-album{font-size:.85rem;color:var(--text);font-weight:500}
-.viewer-counter{font-size:.75rem;color:var(--text-muted);letter-spacing:.5px}
-.viewer-info:hover{border-color:var(--accent)}
+@keyframes shimmer2{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+.river-controls{display:flex;justify-content:center;align-items:center;gap:16px;margin-top:24px;flex-wrap:wrap}
+.river-ctrl{width:48px;height:48px;border-radius:50%;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:1.5rem;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s}
+.river-ctrl:hover{border-color:var(--accent);background:var(--accent-glow)}
+.river-shuffle{width:auto;padding:0 24px;border-radius:24px;font-size:.9rem;gap:8px}
+.river-shuffle::before{content:'\1F3B2';margin-right:4px}
 
 @media(max-width:768px){
-  .viewer{min-height:50vh}
-  .viewer-img{max-height:55vh}
-  .viewer-nav{width:40px;height:40px;font-size:1.5rem}
+  .polaroid{width:200px;padding:8px 8px 28px 8px}
+  .polaroid::after{bottom:6px;font-size:.65rem}
+  .river-stream{gap:40px;padding:16px 50px}
 }
 
-/* --- Year Heatmap (GitHub-style) --- *//* --- Year Heatmap (GitHub-style) --- */
+/* --- Year Heatmap (GitHub-style) --- *//* --- Year Heatmap (GitHub-style) --- *//* --- Year Heatmap (GitHub-style) --- */
 .year-heatmap{margin-top:40px;padding:24px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius)}
 .heatmap-title{font-family:var(--font-display);font-size:1.1rem;margin-bottom:16px;color:var(--text);text-align:center}
 .heatmap-grid{display:flex;gap:2px;justify-content:center;flex-wrap:wrap;max-width:100%}
