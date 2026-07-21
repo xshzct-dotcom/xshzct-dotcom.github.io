@@ -209,8 +209,17 @@
     };
 
     let err;
-    if (editingId) ({ error: err } = await sb.from('essays').update(data).eq('id', editingId));
-    else ({ error: err } = await sb.from('essays').insert(data));
+    if (editingId) {
+      ({ error: err } = await sb.from('essays').update(data).eq('id', editingId));
+    } else {
+      // 没有 editingId 时尝试按标题匹配（可能来自 data.js 导入的数据）
+      const { data: exist } = await sb.from('essays').select('id').eq('title', title).limit(1);
+      if (exist && exist.length > 0) {
+        ({ error: err } = await sb.from('essays').update(data).eq('id', exist[0].id));
+      } else {
+        ({ error: err } = await sb.from('essays').insert(data));
+      }
+    }
     if (err) { alert('❌ ' + err.message); return; }
     closeEditor();
     await refreshData();
@@ -650,35 +659,50 @@
     },
     ensureButtons: () => setTimeout(injectEditButtons, 50),
     edit: async (btn) => {
-      const d = findArticle(btn);
-      if (!d) { alert('找不到文章，请刷新后重试'); return; }
-      if (!d._sid) await findSid(d);
-      openEditor(d);
+      // 直接从 DOM 拿标题，从本地数组找文章
+      const item = btn.closest('.article-item');
+      if (!item) { alert('找不到文章'); return; }
+      const titleEl = item.querySelector('.title');
+      const title = titleEl ? titleEl.textContent.trim() : '';
+      if (!title) { alert('找不到文章标题'); return; }
+      // 在本地数组里找
+      let article = null;
+      if (typeof essayCategories !== 'undefined') {
+        for (const cat of essayCategories) {
+          article = (cat.articles || []).find(a => a.title === title);
+          if (article) break;
+        }
+      }
+      if (!article && typeof travels !== 'undefined') {
+        article = travels.find(a => a.title === title);
+      }
+      if (!article) { alert('找不到文章数据，请刷新后重试'); return; }
+      openEditor(article);
     },
     del: async (btn) => {
-      const d = findArticle(btn);
-      if (!d) { alert('找不到文章'); return; }
-      // 确保有 Supabase ID
-      if (!d._sid) await findSid(d);
-      if (!d._sid) {
-        alert('该文章尚未同步到服务器，请在页面刷新后重试');
-        return;
-      }
-      if (!confirm('确定删除「' + d.title + '」？')) return;
-      const { error } = await sb.from('essays').delete().eq('id', d._sid);
-      if (error) {
-        if (error.code === 'PGRST116') { alert('文章已被删除，刷新即可'); } else { alert('❌ ' + error.message); }
-        return;
-      }
-      // 从本地数组移除
+      // 直接从 DOM 拿信息，完全不依赖本地数据
+      const item = btn.closest('.article-item');
+      if (!item) { alert('找不到文章'); return; }
+      const titleEl = item.querySelector('.title');
+      const title = titleEl ? titleEl.textContent.trim() : '';
+      if (!title) { alert('找不到文章标题'); return; }
+      if (!confirm('确定删除「' + title + '」？')) return;
+
+      // 从 Supabase 删除（按标题）
+      const { error } = await sb.from('essays').delete().eq('title', title);
+      if (error) console.warn('[blog] Supabase 删除失败:', error.message);
+
+      // 从本地数组移除（无论 Supabase 是否成功）
       for (const cat of essayCategories) {
-        cat.articles = cat.articles.filter(a => a._sid !== d._sid);
+        cat.articles = cat.articles.filter(a => a.title !== title);
       }
       if (typeof travels !== 'undefined') {
         for (let i = travels.length - 1; i >= 0; i--) {
-          if (travels[i]._sid === d._sid) travels.splice(i, 1);
+          if (travels[i].title === title) travels.splice(i, 1);
         }
       }
+
+      // 刷新视图
       await refreshData();
       if (typeof updateModalView === 'function') updateModalView();
       setTimeout(injectEditButtons, 100);
