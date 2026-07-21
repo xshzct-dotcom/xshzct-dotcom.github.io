@@ -211,7 +211,6 @@ function buildGallery(){
   });
 
   // 构建筛选器
-  const worlds = worlds||[];
   const groups = {};
   allPhotos.forEach(p => {
     const k = p._worldId||p._albumId||'';
