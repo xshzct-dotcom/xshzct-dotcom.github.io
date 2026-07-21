@@ -260,300 +260,129 @@ function closeEssayModal(){
 window.closeEssayModal = closeEssayModal;
 $('#essayModal').onclick = e => { if(e.target===e.currentTarget) closeEssayModal(); };
 
-// ===== 相册：网格 + 星图 =====
+// ===== 全屏翻阅式相册 =====
 let lightboxPhotos = [];
 let lightboxIdx = 0;
-let allGalleryPhotos = []; // 星图和随机回忆用
-let currentGalleryView = 'grid';
+let allGalleryPhotos = [];
 let currentFilter = 'all';
+let viewerIdx = 0;
 
-const ASPECT_RATIOS = [
-  {w:3,h:4}, {w:1,h:1}, {w:4,h:3}, {w:4,h:5}, {w:2,h:3}, {w:3,h:2}
-];
-// 基于 photo path 的 hash 给每张照片一个稳定的比例
-function aspectFor(photo){
-  const s = getPath(photo);
-  let h=0; for(let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) & 0x7fffffff;
-  return ASPECT_RATIOS[h % ASPECT_RATIOS.length];
-}
-
-function buildGallery(){
-  const masonry=$('#masonry');
-  const filtersEl=$('#galleryFilters');
-  if(!Array.isArray(albums)||albums.length===0){
-    if(masonry) masonry.innerHTML = '<div class="timeline-empty"># 暂无相册 #</div>';
-    return;
-  }
+function initViewer(){
   allGalleryPhotos = [];
   albums.forEach(album => {
     (album.photos||[]).forEach(photo => {
-      allGalleryPhotos.push({path:photo, src:photo, _albumTitle:album.title, _albumId:album.id, _worldId:album.world||''});
+      allGalleryPhotos.push({
+        path: photo, src: photo,
+        _albumTitle: album.title,
+        _albumId: album.id,
+        _worldId: album.world||'',
+      });
     });
   });
-
-  // 筛选器
-  const worldsArr = (typeof worlds !== 'undefined') ? worlds : [];
-  const groups = {};
-  allGalleryPhotos.forEach(p => {
-    const k = p._worldId||p._albumId||'';
-    if(!groups[k]) groups[k] = {id:k,title:p._albumTitle,photos:[]};
-    groups[k].photos.push(p);
-  });
-  const filterKeys = Object.keys(groups);
-  if(filterKeys.length>1){
-    filtersEl.innerHTML = '<button class="gallery-filter active" data-filter="all">全部</button>'+filterKeys.map(k =>
-      `<button class="gallery-filter" data-filter="${esc(k)}">${esc(groups[k].title)}</button>`
-    ).join('');
-    $$('.gallery-filter').forEach(btn => {
-      btn.onclick = () => {
-        $$('.gallery-filter').forEach(b=>b.classList.remove('active'));
-        btn.classList.add('active');
-        currentFilter = btn.dataset.filter;
-        renderGrid();
-        if(currentGalleryView==='constellation') renderConstellation();
-      };
-    });
-  } else {
-    filtersEl.innerHTML = '';
-  }
-
-  // 视图切换
-  $$('.view-btn').forEach(btn => {
-    btn.onclick = () => {
-      $$('.view-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      currentGalleryView = btn.dataset.view;
-      if(currentGalleryView==='grid'){
-        $('#masonry').style.display='';
-        $('#constellationView').classList.remove('active');
-        renderGrid();
-      } else {
-        $('#masonry').style.display='none';
-        $('#constellationView').classList.add('active');
-        renderConstellation();
-      }
-    };
-  });
-
-  renderGrid();
+  lightboxPhotos = allGalleryPhotos;
+  currentFilter = 'all';
+  viewerIdx = 0;
+  buildViewerFilters();
+  showViewerPhoto();
 }
 
-function getFilteredPhotos(){
-  if(currentFilter==='all') return allGalleryPhotos;
+function getFilteredViewer(){
+  if(currentFilter === 'all') return allGalleryPhotos;
   return allGalleryPhotos.filter(p => (p._worldId||p._albumId||'') === currentFilter || p._albumId === currentFilter);
 }
 
-function renderGrid(){
-  const masonry=$('#masonry');
-  if(!masonry) return;
-  const photos = getFilteredPhotos();
-  if(photos.length===0){
-    masonry.innerHTML = '<div class="timeline-empty"># 暂无照片 #</div>';
-    return;
+function showViewerPhoto(){
+  var filtered = getFilteredViewer();
+  if(filtered.length === 0) return;
+  viewerIdx = Math.max(0, Math.min(viewerIdx, filtered.length - 1));
+
+  var photo = filtered[viewerIdx];
+  var img = document.getElementById('viewerImg');
+  var counter = document.getElementById('viewerCounter');
+  var album = document.getElementById('viewerAlbum');
+  var wrapper = document.getElementById('viewerWrapper');
+
+  if(!img) return;
+  img.style.opacity = '0';
+  img.src = thumb(photo);
+  img.onload = function(){
+    img.style.opacity = '1';
+    img.style.transition = 'opacity .3s ease';
+    preloadFull(photo);
+  };
+
+  if(counter) counter.textContent = (viewerIdx + 1) + ' / ' + filtered.length;
+  if(album) album.textContent = photo._albumTitle || '';
+  if(wrapper){
+    wrapper.style.transform = 'translateX(0)';
+    wrapper.style.transition = 'transform .3s ease';
   }
-  masonry.innerHTML = photos.map((p,i) => {
-    const src = thumb(p);
-    const fb = src.replace(/^\.\.\/thumbs\//, '../images/').replace(/\.webp$/i, '.jpg');
-    // 不带 loading="lazy" — 让所有图立即请求（即使在视窗外）。2652 个并发请求浏览器会自己排队。
-    return `<div class="masonry-item fade-up" data-idx="${i}">
-      <div class="masonry-frame">
-        <img src="${src}" alt="" decoding="async" onload="this.classList.add('loaded')" onerror="if(this.dataset.fb!=='1'){this.dataset.fb='1';this.src='${fb}';this.onerror=()=>{this.classList.add('loaded')}}" onclick="(function(t){var lb=document.getElementById('lightbox');lb.classList.add('active');var src=t.src.replace('/thumbs/','/images/').replace('.webp','.jpg');lb.style.cssText='display:flex!important;opacity:1!important;pointer-events:auto!important;z-index:99999!important;background:#000 url('+src+') center/contain no-repeat';document.body.style.overflow='hidden';var stage=document.getElementById('lightboxStage');if(stage)stage.style.display='none';var img=document.getElementById('lightboxImg');if(img){img.removeAttribute('src');img.removeAttribute('style')}})(this)">
-      </div>
-      <div class="masonry-overlay"><div class="mo-title">${esc(p._albumTitle||'')}</div></div>
-    </div>`;
+}
+
+function navViewer(dir){
+  var filtered = getFilteredViewer();
+  if(filtered.length === 0) return;
+  var oldIdx = viewerIdx;
+  viewerIdx += dir;
+  if(viewerIdx < 0) viewerIdx = filtered.length - 1;
+  if(viewerIdx >= filtered.length) viewerIdx = 0;
+  if(viewerIdx === oldIdx) return;
+
+  var wrapper = document.getElementById('viewerWrapper');
+  if(wrapper){
+    wrapper.style.transition = 'transform .2s ease-out';
+    wrapper.style.transform = 'translateX(' + (dir > 0 ? -80 : 80) + 'px)';
+  }
+  setTimeout(function(){ showViewerPhoto(); }, 200);
+}
+
+function preloadFull(photo){
+  var src = full(photo);
+  var pre = new Image();
+  pre.onload = function(){
+    var img = document.getElementById('viewerImg');
+    var lb = document.getElementById('lightbox');
+    if(img && lb && !lb.classList.contains('active')){
+      img.src = src;
+    }
+  };
+  pre.src = src;
+}
+
+function buildViewerFilters(){
+  var container = document.getElementById('viewerFilters');
+  if(!container) return;
+  var groups = {};
+  allGalleryPhotos.forEach(function(p){
+    var key = p._albumId || p._worldId || '';
+    if(!groups[key]) groups[key] = {id: key, title: p._albumTitle||key, count:0};
+    groups[key].count++;
+  });
+  var filters = [{id:'all', title:'全部', count:allGalleryPhotos.length}];
+  Object.keys(groups).forEach(function(k){ filters.push(groups[k]); });
+  container.innerHTML = filters.map(function(f){
+    return '<div class="viewer-filter' + (f.id === currentFilter ? ' active' : '') + '" data-filter="' + f.id + '">' + esc(f.title) + ' &#183; ' + f.count + '</div>';
   }).join('');
-  lightboxPhotos = photos;
-  observeFadeUps();
-}
-
-// ===== 星图（Canvas 互动） =====
-let constellationState = null;
-function renderConstellation(){
-  const canvas = $('#constellationView');
-  if(!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const photos = getFilteredPhotos();
-  // 初始化位置：每张照片分配一个随机点
-  if(!constellationState || constellationState.photos !== photos){
-    const W = canvas.parentElement.clientWidth || 800;
-    const H = canvas.parentElement.clientHeight || 500;
-    const points = photos.map((p, i) => {
-      // 用 hash 让布局稳定
-      const s = getPath(p);
-      let h=0; for(let j=0;j<s.length;j++) h = (h*31+s.charCodeAt(j))&0x7fffffff;
-      return {
-        ...p,
-        x: ((h%1000)/1000)*W,
-        y: (((h>>10)%1000)/1000)*H,
-        r: 3 + (h%4),
-        pulse: Math.random()*Math.PI*2,
-      };
-    });
-    constellationState = {
-      canvas, ctx, photos, points,
-      scale: 1, tx: 0, ty: 0,
-      dragging: false, dragX: 0, dragY: 0, hoverIdx: -1,
-      W, H,
+  container.querySelectorAll('.viewer-filter').forEach(function(el){
+    el.onclick = function(){
+      currentFilter = el.dataset.filter;
+      viewerIdx = 0;
+      container.querySelectorAll('.viewer-filter').forEach(function(e){ e.classList.remove('active'); });
+      el.classList.add('active');
+      showViewerPhoto();
     };
-    // 居中
-    let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-    for(const p of points){
-      if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
-      if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
-    }
-    // 把点云的包围盒居中到画布中央
-    constellationState.tx = (W - (maxX - minX)) / 2 - minX;
-    constellationState.ty = (H - (maxY - minY)) / 2 - minY;
-  }
-  const s = constellationState;
-  const W = s.W, H = s.H;
-  canvas.width = W; canvas.height = H;
-  canvas.style.width = W+'px';
-  canvas.style.height = H+'px';
-
-  // 事件
-  if(!s._bound){
-    s._bound = true;
-    canvas.addEventListener('mousedown', e=>{
-      s.dragging=true; s.dragX=e.clientX; s.dragY=e.clientY;
-    });
-    window.addEventListener('mouseup', ()=>{ s.dragging=false; });
-    window.addEventListener('mousemove', e=>{
-      if(s.dragging){
-        s.tx += e.clientX - s.dragX; s.dragX=e.clientX;
-        s.ty += e.clientY - s.dragY; s.dragY=e.clientY;
-        drawConstellation();
-      } else {
-        // hover 检测
-        const r = canvas.getBoundingClientRect();
-        const mx = (e.clientX - r.left - s.tx) / s.scale;
-        const my = (e.clientY - r.top - s.ty) / s.scale;
-        s.hoverIdx = -1;
-        for(let i=0;i<s.points.length;i++){
-          const p = s.points[i];
-          const d = Math.hypot(p.x-mx, p.y-my);
-          if(d < p.r+6){ s.hoverIdx = i; break; }
-        }
-        const tip = $('#constellationTooltip');
-        if(s.hoverIdx >= 0){
-          const p = s.points[s.hoverIdx];
-          tip.textContent = p._albumTitle || '';
-          tip.style.left = (p.x*s.scale + s.tx)+'px';
-          tip.style.top = (p.y*s.scale + s.ty)+'px';
-          tip.style.display = 'block';
-          canvas.style.cursor = 'pointer';
-        } else {
-          tip.style.display = 'none';
-          canvas.style.cursor = s.dragging ? 'grabbing' : 'grab';
-        }
-        drawConstellation();
-      }
-    });
-    canvas.addEventListener('wheel', e=>{
-      e.preventDefault();
-      const r = canvas.getBoundingClientRect();
-      const mx = e.clientX - r.left;
-      const my = e.clientY - r.top;
-      const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
-      const newScale = Math.max(0.4, Math.min(4, s.scale*factor));
-      // 缩放以鼠标为中心
-      s.tx = mx - (mx - s.tx) * (newScale/s.scale);
-      s.ty = my - (my - s.ty) * (newScale/s.scale);
-      s.scale = newScale;
-      drawConstellation();
-    }, {passive:false});
-    canvas.addEventListener('click', e=>{
-      const r = canvas.getBoundingClientRect();
-      const mx = (e.clientX - r.left - s.tx) / s.scale;
-      const my = (e.clientY - r.top - s.ty) / s.scale;
-      for(let i=0;i<s.points.length;i++){
-        const p = s.points[i];
-        if(Math.hypot(p.x-mx, p.y-my) < p.r+6){
-          lightboxPhotos = s.photos;
-          openLightbox(i, false);
-          break;
-        }
-      }
-    });
-  }
-
-  drawConstellation();
-}
-function drawConstellation(){
-  const s = constellationState;
-  if(!s) return;
-  const {ctx, points, scale, tx, ty, W, H, hoverIdx} = s;
-  ctx.fillStyle = '#0E1116';
-  ctx.fillRect(0,0,W,H);
-  // 视窗剔除：只画可见星 + 周边 200px
-  const pad = 200;
-  const viewMinX = -tx/scale - pad/scale, viewMaxX = (W-tx)/scale + pad/scale;
-  const viewMinY = -ty/scale - pad/scale, viewMaxY = (H-ty)/scale + pad/scale;
-  // 画连线（只画两端都在视窗附近的）
-  if(!s.linesReady){
-    // 预算每点最近的 1 个邻居（O(n²) 一次性）
-    const adj = new Array(points.length);
-    for(let i=0;i<points.length;i++){
-      const a = points[i];
-      let bestJ = -1, bestD = Infinity;
-      for(let j=0;j<points.length;j++){
-        if(i===j) continue;
-        const d = (a.x-points[j].x)*(a.x-points[j].x) + (a.y-points[j].y)*(a.y-points[j].y);
-        if(d < bestD){ bestD = d; bestJ = j; }
-      }
-      adj[i] = bestJ;
-    }
-    s.adj = adj;
-    s.linesReady = true;
-  }
-  ctx.strokeStyle = 'rgba(124,155,126,0.18)';
-  ctx.lineWidth = 0.6;
-  ctx.beginPath();
-  for(let i=0;i<points.length;i++){
-    if(!s.adj || s.adj[i] < 0) continue;
-    const a = points[i], b = points[s.adj[i]];
-    if(b._connectedTo && b._connectedTo.includes(i)) continue;
-    // 至少一端在视窗附近才画
-    const aInView = a.x>=viewMinX && a.x<=viewMaxX && a.y>=viewMinY && a.y<=viewMaxY;
-    const bInView = b.x>=viewMinX && b.x<=viewMaxX && b.y>=viewMinY && b.y<=viewMaxY;
-    if(!aInView && !bInView) continue;
-    const ax=a.x*scale+tx, ay=a.y*scale+ty;
-    const bx=b.x*scale+tx, by=b.y*scale+ty;
-    ctx.moveTo(ax,ay);
-    ctx.lineTo(bx,by);
-    if(!b._connectedTo) b._connectedTo=[];
-    b._connectedTo.push(i);
-  }
-  ctx.stroke();
-  for(const p of points) p._connectedTo=undefined;
-  // 画星点（视窗剔除）
-  for(let i=0;i<points.length;i++){
-    const p = points[i];
-    if(p.x<viewMinX||p.x>viewMaxX||p.y<viewMinY||p.y>viewMaxY) continue;
-    const isHover = i===hoverIdx;
-    const r = p.r * (isHover ? 2.8 : 1) * scale;
-    const x = p.x*scale + tx;
-    const y = p.y*scale + ty;
-    // hover 光晕（只画 hover 的）
-    if(isHover){
-      const g = ctx.createRadialGradient(x,y,0,x,y,Math.max(20, r*4));
-      g.addColorStop(0, 'rgba(124,155,126,0.5)');
-      g.addColorStop(1, 'rgba(124,155,126,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(x,y,Math.max(20, r*4),0,Math.PI*2);
-      ctx.fill();
-    }
-    // 星点
-    ctx.fillStyle = isHover ? '#7C9B7E' : 'rgba(232,228,218,0.85)';
-    ctx.beginPath();
-    ctx.arc(x,y,Math.max(1.5, r),0,Math.PI*2);
-    ctx.fill();
-  }
-  // 不再持续 60fps 动画 — 只在交互时（鼠标移动/拖拽/滚轮）重绘
+  });
 }
 
-// ===== 灯箱 v2（光标居中缩放 + 滑动切图 + 自动隐藏 UI） =====
+// 点击进入灯箱（全功能缩放/翻页/关闭）
+function openViewerLightbox(){
+  var filtered = getFilteredViewer();
+  if(filtered.length === 0) return;
+  lightboxPhotos = filtered;
+  openLightbox(viewerIdx);
+}
+
+// ===== 灯箱 v2// ===== 灯箱 v2（光标居中缩放 + 滑动切图 + 自动隐藏 UI） =====
 let zoom = {scale: 1, x: 0, y: 0};
 let lbHideTimer = null;
 function lbAutoHideControls(){
@@ -1104,7 +933,7 @@ function init(){
   initMusic();
   fillTimelineIndex();
   buildTimeline();
-  buildGallery();
+  initViewer();
   buildYearHeatmap();
   bindLightboxInteractions();
   initDailyQuote();

@@ -65,21 +65,21 @@
   <div class="timeline" id="timeline"></div>
 </section>
 
-<!-- Photo Gallery -->
+<!-- Photo Viewer — 全屏翻阅 -->
 <section class="section" id="gallery">
   <h2 class="section-title">我<em>眼</em>中的世界</h2>
-  <div class="gallery-header">
-    <div class="gallery-filters" id="galleryFilters"></div>
-    <div class="view-toggle">
-      <button class="view-btn active" data-view="grid">▦ 网格</button>
-      <button class="view-btn" data-view="constellation">✦ 星图</button>
+  <div class="viewer-filters" id="viewerFilters"></div>
+  <div class="viewer" id="viewer">
+    <div class="viewer-wrapper" id="viewerWrapper">
+      <img class="viewer-img" id="viewerImg" src="" alt="" onclick="openViewerLightbox()">
+    </div>
+    <button class="viewer-nav viewer-prev" onclick="navViewer(-1)" title="上一张">‹</button>
+    <button class="viewer-nav viewer-next" onclick="navViewer(1)" title="下一张">›</button>
+    <div class="viewer-info" onclick="openViewerLightbox()">
+      <div class="viewer-album" id="viewerAlbum"></div>
+      <div class="viewer-counter" id="viewerCounter">0 / 0</div>
     </div>
   </div>
-  <div class="masonry" id="masonry"></div>
-  <canvas class="constellation-view" id="constellationView">
-    <div class="cv-hint">拖动 · 滚轮缩放 · 点击照片进入</div>
-    <div class="constellation-tooltip" id="constellationTooltip"></div>
-  </canvas>
 </section>
 
 <!-- About with Year Heatmap -->
