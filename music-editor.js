@@ -345,12 +345,14 @@ input[type=file].music-upload{display:none}
       for (const s of playlist) {
         const key = 'null|' + s.name;
         if (exists.has(key)) continue;
-        await db().from('music').insert({
-          title: s.name, artist: '',
-          album_id: null,
-          storage_path: s.url || 'music/' + s.name + '.mp3',
-          sort_order: ORDER[s.name] || -(Date.now()),
-        }).catch(() => {});
+        try {
+          await db().from('music').insert({
+            title: s.name, artist: '',
+            album_id: null,
+            storage_path: s.url || 'music/' + s.name + '.mp3',
+            sort_order: ORDER[s.name] || -(Date.now()),
+          });
+        } catch (e) { /* 忽略单条插入失败 */ }
       }
     }
 
@@ -377,12 +379,14 @@ input[type=file].music-upload{display:none}
         for (const s of album.songs) {
           const key = sbAlbumId + '|' + s.name;
           if (exists.has(key)) continue;
-          await db().from('music').insert({
-            title: s.name, artist: '',
-            album_id: sbAlbumId,
-            storage_path: s.url || 'music/' + s.name + '.mp3',
-            sort_order: ORDER_ALBUM[s.name] || -(Date.now()),
-          }).catch(() => {});
+          try {
+            await db().from('music').insert({
+              title: s.name, artist: '',
+              album_id: sbAlbumId,
+              storage_path: s.url || 'music/' + s.name + '.mp3',
+              sort_order: ORDER_ALBUM[s.name] || -(Date.now()),
+            });
+          } catch (e) { /* 忽略单条插入失败 */ }
         }
       }
     }
