@@ -401,8 +401,9 @@ function renderConstellation(){
       if(p.x<minX) minX=p.x; if(p.x>maxX) maxX=p.x;
       if(p.y<minY) minY=p.y; if(p.y>maxY) maxY=p.y;
     }
-    constellationState.tx = (W - (minX+maxX)/2);
-    constellationState.ty = (H - (minY+maxY)/2);
+    // 把点云的包围盒居中到画布中央
+    constellationState.tx = (W - (maxX - minX)) / 2 - minX;
+    constellationState.ty = (H - (maxY - minY)) / 2 - minY;
   }
   const s = constellationState;
   const W = s.W, H = s.H;
