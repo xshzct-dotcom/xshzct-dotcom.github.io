@@ -332,21 +332,32 @@ input[type=file].music-upload{display:none}
       }
     }
 
-    // 2. 同步相册音乐（用现有 Supabase 相册匹配，不新建）
+    // 2. 同步相册音乐（自动创建Supabase相册，不依赖album-editor）
     if (typeof albums !== 'undefined') {
       for (const album of albums) {
         if (!album.songs || album.songs.length === 0) continue;
-        // 找 Supabase 里同名的相册（album-editor 已导入）
-        const { data: sbAlbum } = await sb.from('albums')
+        // 找 Supabase 里同名的相册，找不到就自己创建
+        let sbAlbumId = null;
+        const { data: found } = await sb.from('albums')
           .select('id').eq('title', album.title).maybeSingle();
-        if (!sbAlbum) continue; // 相册还没导入，跳过
+        if (found) {
+          sbAlbumId = found.id;
+        } else {
+          // 自己创建相册
+          const { data: created } = await sb.from('albums').insert({
+            title: album.title,
+            sort_order: -(Date.now()),
+          }).select('id').single();
+          if (created) sbAlbumId = created.id;
+        }
+        if (!sbAlbumId) continue;
 
         for (const s of album.songs) {
-          const key = sbAlbum.id + '|' + s.name;
+          const key = sbAlbumId + '|' + s.name;
           if (exists.has(key)) continue;
           await sb.from('music').insert({
             title: s.name, artist: '',
-            album_id: sbAlbum.id,
+            album_id: sbAlbumId,
             storage_path: s.url || 'music/' + s.name + '.mp3',
             sort_order: ORDER_ALBUM[s.name] || -(Date.now()),
           }).catch(() => {});
