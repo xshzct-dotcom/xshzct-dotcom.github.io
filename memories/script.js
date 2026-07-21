@@ -371,8 +371,7 @@ function riverScroll(dir){
 }
 
 function riverShuffle(){
-  // 跳过当前剩余队列，下一批从剩余重新洗
-  _riverQueue = [];
+  // 继续发牌 — 当一池发完才重新洗
   renderRiver();
 }
 
