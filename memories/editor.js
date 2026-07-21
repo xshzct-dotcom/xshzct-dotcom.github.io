@@ -189,15 +189,15 @@ async function renderEssayTab(){
   function editEssay(a){
     const isNew=!a;
     const category=a?a.category:'thoughts';
-    const title=a?a.title:'';
+    const articleTitle=a?a.title:'';
     const date=a?a.date||'':new Date().toLocaleDateString('zh-CN').replace(/\//g,'.');
-    const body=a?a.body:'';
+    const articleBody=a?a.body:'';
 
     body.innerHTML=`
       <div class="editor-form-group"><label>分类</label><select id="eeCat">${catIds.map((c,i)=>`<option value="${c}" ${c===category?'selected':''}>${cats[i]}</option>`).join('')}</select></div>
-      <div class="editor-form-group"><label>标题</label><input id="eeTitle" value="${esc(title)}" placeholder="文章标题"></div>
+      <div class="editor-form-group"><label>标题</label><input id="eeTitle" value="${esc(articleTitle)}" placeholder="文章标题"></div>
       <div class="editor-form-group"><label>日期</label><input id="eeDate" value="${date}" placeholder="2026.7.21"></div>
-      <div class="editor-form-group"><label>正文</label><textarea id="eeBody" placeholder="写点什么...">${esc(body)}</textarea></div>
+      <div class="editor-form-group"><label>正文</label><textarea id="eeBody" placeholder="写点什么...">${esc(articleBody)}</textarea></div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button class="editor-btn editor-btn-secondary" onclick="renderEssayTab()">取消</button>
         ${!isNew?`<button class="editor-btn editor-btn-danger" id="eeDelBtn">删除</button>`:''}
