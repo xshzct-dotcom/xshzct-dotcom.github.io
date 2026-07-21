@@ -200,7 +200,7 @@ worlds.forEach((world, index) => {
     card.onclick = () => openWorldView(world.id);
   } else {
     // 旧世界：使用川西封面作为高质量背景
-    const coverUrl = 'images/covers/oldworld_cover_v2.jpg';
+    const coverUrl = 'https://cdn.jsdelivr.net/gh/xshzct-dotcom/julian678@main/images/covers/oldworld_cover_v2.jpg';
     card.classList.add('world-old');
     card.style.backgroundImage = `url('${coverUrl}')`;
     card.innerHTML = `
@@ -349,6 +349,10 @@ function renderAlbumPhotos(photos, grid) {
 }
 function openCategory(catIndex) {
   modalStack.push({ type: 'essayCategory', catIndex, index: -1 });
+  // 童年篇切换专属背景音乐
+  if (essayCategories[catIndex] && essayCategories[catIndex].id === 'childhood') {
+    switchPlaylist(childhoodPlaylist);
+  }
   updateModalView();
 }
 function openContent(type, index) { modalStack.push({ type, index }); updateModalView(); }
@@ -370,10 +374,6 @@ function updateModalView() {
   const title = document.getElementById('modalTitle');
   const body = document.getElementById('modalBody');
   const backBtn = document.getElementById('modalBack');
-  // 内容过渡动画
-  body.classList.remove('content-enter');
-  void body.offsetWidth; // 强制回流触发重播
-  setTimeout(function() { body.classList.add('content-enter'); }, 10);
   const current = modalStack[modalStack.length - 1];
   backBtn.style.visibility = modalStack.length > 1 ? 'visible' : 'hidden';
 
@@ -396,7 +396,7 @@ function updateModalView() {
     const cat = essayCategories[current.catIndex];
     const essay = cat.articles[current.index];
     title.textContent = essay.title;
-    body.innerHTML = `<div class="content-header"><div class="content-title">${essay.title}</div><div class="content-date">${essay.date || ''}</div><div class="font-controls"><span class="font-size-label">字号</span><button onclick="changeEssayFontSize(-0.15)" title="缩小">A−</button><button onclick="changeEssayFontSize(0.15)" title="放大">A+</button></div></div><div class="content-body" style="font-size:${window.getEssayFontSize ? window.getEssayFontSize() : 1.5}rem">${formatBody(essay.body)}</div><div class="content-nav"><button onclick="prevEssayArticle(${current.catIndex}, ${current.index})" ${current.index === 0 ? 'disabled' : ''}>← 上一篇</button><span style="color:rgba(255,255,255,0.5);font-size:0.85rem;">${current.index + 1} / ${cat.articles.length}</span><button onclick="nextEssayArticle(${current.catIndex}, ${current.index})" ${current.index === cat.articles.length - 1 ? 'disabled' : ''}>下一篇 →</button></div>`;
+    body.innerHTML = `<div class="content-header"><div class="content-title">${essay.title}</div><div class="content-date">${essay.date || ''}</div></div><div class="content-body">${formatBody(essay.body)}</div><div class="content-nav"><button onclick="prevEssayArticle(${current.catIndex}, ${current.index})" ${current.index === 0 ? 'disabled' : ''}>← 上一篇</button><span style="color:rgba(255,255,255,0.5);font-size:0.85rem;">${current.index + 1} / ${cat.articles.length}</span><button onclick="nextEssayArticle(${current.catIndex}, ${current.index})" ${current.index === cat.articles.length - 1 ? 'disabled' : ''}>下一篇 →</button></div>`;
   } else if (current.type === 'travel') {
     if (current.index === -1) {
       title.textContent = '旅行见闻';
@@ -440,7 +440,7 @@ function updateModalView() {
       const g = oldworldGroups.find(x => x.id === gid);
       if (!g) return '';
       // Use group's own cover if specified, otherwise use first child album's cover
-      let cover = 'images/covers/chuanxi.png';
+      let cover = 'https://cdn.jsdelivr.net/gh/xshzct-dotcom/julian678@main/images/covers/chuanxi.png';
       if (g.cover) {
         cover = getFull(g.cover);
       } else {
@@ -485,8 +485,6 @@ function closeModal() {
   document.getElementById('cardModal').classList.remove('active'); 
   document.body.style.overflow = ''; 
   modalStack = []; 
-  // 关闭时退出文章编辑模式
-  if (window.BLOG && typeof window.BLOG.exit === 'function') window.BLOG.exit();
 }
 
 // ===== 手机端：边缘右滑返回上一级（兼容全屏手势导航） =====
@@ -933,18 +931,15 @@ function handleLightboxDoubleTap(e) {
     lightboxPanY = 0;
     updateImageTransform(true);
   } else {
-    // 双击位置放大：把点击点作为新的视觉中心
+    // 双击位置放大
     const rect = img.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
     const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
     const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
-    const oldScale = lightboxScale;
+    const offsetX = (clientX - rect.left) / rect.width;
+    const offsetY = (clientY - rect.top) / rect.height;
     lightboxScale = 2.5;
-    const dx = clientX - cx;
-    const dy = clientY - cy;
-    lightboxPanX += dx * (1 - lightboxScale / oldScale);
-    lightboxPanY += dy * (1 - lightboxScale / oldScale);
+    lightboxPanX = 0;
+    lightboxPanY = 0;
     updateImageTransform(true);
   }
 }
@@ -1077,64 +1072,18 @@ function initLightboxGestures() {
     handleLightboxDoubleTap(e);
   });
 
-  // 鼠标滚轮缩放（以光标位置为锚点）
-  stage.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const img = document.getElementById('lightboxImg');
-    if (!img) return;
-    const oldScale = lightboxScale;
-    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    const newScale = Math.max(1, Math.min(6, lightboxScale * factor));
-    if (newScale === oldScale) return;
-    // 让光标下的图片点在缩放后仍位于光标下
-    const rect = img.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dx = e.clientX - cx;
-    const dy = e.clientY - cy;
-    lightboxScale = newScale;
-    lightboxPanX += dx * (1 - newScale / oldScale);
-    lightboxPanY += dy * (1 - newScale / oldScale);
-    if (lightboxScale === 1) { lightboxPanX = 0; lightboxPanY = 0; }
-    updateImageTransform(false);
-  }, { passive: false });
-
-  // 鼠标拖动
+  // 鼠标轻扫
   let mouseDown = false;
-  let dragStartX = 0, dragStartY = 0;
-  let dragPanX = 0, dragPanY = 0;
   stage.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
+    if (lightboxScale > 1 || e.button !== 0) return;
     mouseDown = true;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    dragPanX = lightboxPanX;
-    dragPanY = lightboxPanY;
     lightboxTouchStartX = e.clientX;
     lightboxTouchStartY = e.clientY;
     lightboxTouchStartTime = Date.now();
-    if (lightboxScale > 1) {
-      e.preventDefault();
-      const img = document.getElementById('lightboxImg');
-      if (img) img.classList.add('grabbing');
-    }
-  });
-  window.addEventListener('mousemove', (e) => {
-    if (!mouseDown) return;
-    if (lightboxScale > 1) {
-      // 放大状态下拖动平移
-      const dx = e.clientX - dragStartX;
-      const dy = e.clientY - dragStartY;
-      lightboxPanX = dragPanX + dx;
-      lightboxPanY = dragPanY + dy;
-      updateImageTransform(false);
-    }
   });
   window.addEventListener('mouseup', (e) => {
     if (!mouseDown) return;
     mouseDown = false;
-    const img = document.getElementById('lightboxImg');
-    if (img) img.classList.remove('grabbing');
     if (lightboxScale <= 1) handleSwipeEnd(e.clientX, e.clientY);
   });
 }
@@ -1206,145 +1155,63 @@ document.querySelectorAll('nav a').forEach(anchor => {
   }, { passive: true });
 })();
 
-// ==================== 暗黑模式 ====================
-(function() {
-  const toggle = document.getElementById('themeToggle');
-  if (!toggle) return;
-  const saved = localStorage.getItem('theme');
-  if (saved === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-    toggle.textContent = '🌙';
-  }
-  toggle.addEventListener('click', function() {
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (isDark) {
-      document.documentElement.removeAttribute('data-theme');
-      localStorage.setItem('theme', 'light');
-      toggle.textContent = '☀️';
-    } else {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      localStorage.setItem('theme', 'dark');
-      toggle.textContent = '🌙';
+// ==================== 性能增强 ====================
+
+// 1. 注册 Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(function() {});
+}
+
+// 2. DOM 就绪后优化
+document.addEventListener('DOMContentLoaded', function() {
+  // 确保已加载的图片有 loaded 类
+  document.querySelectorAll('.album-photo-item img').forEach(function(img) {
+    if (img.complete) {
+      img.classList.add('loaded');
+      var item = img.closest('.album-photo-item');
+      if (item) item.classList.add('item-loaded');
     }
   });
-})();
 
-// ==================== 回到顶部 + 滚动进度 ====================
-(function() {
-  const btn = document.getElementById('backToTop');
-  const progress = document.getElementById('readProgress');
-  if (!btn) return;
-  let ticking = false;
-  window.addEventListener('scroll', function() {
-    if (!ticking) {
-      requestAnimationFrame(function() {
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollPercent = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
-        if (progress) {
-          progress.style.width = scrollPercent + '%';
-          progress.classList.toggle('visible', scrollPercent > 2);
+  // 3. 浏览器空闲时预加载相册封面
+  if ('requestIdleCallback' in window) {
+    requestIdleCallback(function() {
+      albums.forEach(function(a) {
+        if (a.cover) {
+          var link = document.createElement('link');
+          link.rel = 'preload'; link.as = 'image';
+          link.href = getFull(a.cover);
+          document.head.appendChild(link);
         }
-        btn.classList.toggle('visible', scrollTop > 400);
-        ticking = false;
       });
-      ticking = true;
-    }
-  }, { passive: true });
-  btn.addEventListener('click', function() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-})();
-
-// ==================== 键盘快捷键 ====================
-(function() {
-  document.addEventListener('keydown', function(e) {
-    // Esc - 关闭弹窗/灯箱
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      if (document.querySelector('.lightbox.active')) {
-        closeLightbox();
-      } else {
-        closeModal();
-      }
-      return;
-    }
-    // ← → 导航
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      const lb = document.getElementById('lightbox');
-      if (lb && lb.classList.contains('active')) {
-        e.preventDefault();
-        if (e.key === 'ArrowLeft') changePhoto(-1);
-        else changePhoto(1);
-        return;
-      }
-      // 文章导航
-      const modal = document.getElementById('cardModal');
-      if (modal && modal.classList.contains('active')) {
-        const cur = modalStack[modalStack.length - 1];
-        if (cur && cur.type === 'essayArticle') {
-          e.preventDefault();
-          if (e.key === 'ArrowLeft') {
-            // 上一篇（更旧）
-            var prevBtn = document.querySelector('.content-nav button:first-child');
-            if (prevBtn && !prevBtn.disabled) prevBtn.click();
-          } else {
-            // 下一篇（更新）
-            var nextBtn = document.querySelector('.content-nav button:last-child');
-            if (nextBtn && !nextBtn.disabled) nextBtn.click();
-          }
-        }
-      }
-    }
-  });
-})();
-
-// ==================== 文章字体大小调节 ====================
-(function() {
-  let currentFontSize = 1.5; // rem
-  const FONT_KEY = 'essayFontSize';
-  const saved = localStorage.getItem(FONT_KEY);
-  if (saved) {
-    currentFontSize = parseFloat(saved);
+    }, { timeout: 5000 });
   }
-  window.getEssayFontSize = function() { return currentFontSize; };
-  window.changeEssayFontSize = function(delta) {
-    currentFontSize = Math.max(1.0, Math.min(2.5, currentFontSize + delta));
-    localStorage.setItem(FONT_KEY, currentFontSize);
-    const body = document.querySelector('.modal-body .content-body');
-    if (body) body.style.fontSize = currentFontSize + 'rem';
-  };
-  // 在文章渲染后应用字体大小
-  var origUpdate = updateModalView;
-  if (origUpdate) {
-    var origRender = updateModalView;
-    updateModalView = function() {
-      origRender.apply(this, arguments);
-      var cb = document.querySelector('.modal-body .content-body');
-      if (cb) cb.style.fontSize = currentFontSize + 'rem';
-    };
+});
+
+// 4. 关闭模态框时释放资源
+var _originalCloseModal = window.closeModal || function(){};
+window.closeModal = function() {
+  if (typeof _albumPhotoObserver !== 'undefined' && _albumPhotoObserver) {
+    _albumPhotoObserver.disconnect();
+    _albumPhotoObserver = null;
   }
-})();
+  _originalCloseModal();
+};
 
-// ==================== 页面过渡动画 ====================
-(function() {
-  const overlay = document.getElementById('pageTransition');
-  if (!overlay) return;
-  // 淡入
-  overlay.classList.add('active');
-  setTimeout(function() {
-    overlay.classList.remove('active');
-  }, 300);
-  // 监听导航链接
-  document.querySelectorAll('nav a[href^="#"]').forEach(function(a) {
-    a.addEventListener('click', function(e) {
-      // 锚点导航 - 支持平滑滚动
-      var target = document.querySelector(this.getAttribute('href'));
-      if (target) {
-        e.preventDefault();
-        target.scrollIntoView({ behavior: 'smooth' });
-      }
-    });
-  });
-})();
-
+// 5. 窗口 resize 防抖
+var resizeTimer;
+window.addEventListener('resize', function() {
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(function() {
+    var body = document.getElementById('modalBody');
+    var thumb = document.getElementById('albumScrollbarThumb');
+    if (body && thumb && body.classList.contains('album-view')) {
+      var ratio = body.scrollTop / (body.scrollHeight - body.clientHeight);
+      if (isNaN(ratio)) ratio = 0;
+      var trackH = body.clientHeight - 8;
+      var thumbH = Math.max(40, trackH * (body.clientHeight / body.scrollHeight));
+      thumb.style.height = thumbH + 'px';
+      thumb.style.top = (ratio * (trackH - thumbH)) + 'px';
+    }
+  }, 100);
+}, { passive: true });

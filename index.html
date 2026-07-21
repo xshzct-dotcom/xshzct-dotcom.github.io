@@ -7,22 +7,17 @@
   <title>向天游的随笔</title>
   <meta name="description" content="一个怀旧的人，一个偶尔回来看看的角落。">
   <meta name="theme-color" content="#faf9f6">
-  <meta http-equiv="x-dns-prefetch-control" content="on">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <link rel="dns-prefetch" href="//github.com">
-  <link rel="dns-prefetch" href="//githubusercontent.com">
-  <link rel="dns-prefetch" href="//avatars.githubusercontent.com">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✒️</text></svg>">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="image" href="images/hero_bg.jpg?v=20260715-1" fetchpriority="high">
-  <link rel="stylesheet" href="style.css?v=20260721-8" media="all">
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  <link rel="dns-prefetch" href="https://raw.githubusercontent.com">
+  <link rel="preload" as="image" href="https://cdn.jsdelivr.net/gh/xshzct-dotcom/julian678@main/images/hero_bg.jpg?v=20260705-5" fetchpriority="high">
+  <link rel="stylesheet" href="style.css?v=20260708-1" media="all">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet"></noscript>
-  <style>body{font-family:'Cormorant Garamond','Noto Serif SC',serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;margin:0}.hero-bg{position:fixed;top:0;left:0;width:100%;height:100vh;background:url('images/hero_bg.jpg?v=20260715-1') center/cover no-repeat;z-index:0;pointer-events:none}.fade-up{opacity:0;transform:translateY(20px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}.fade-up.visible{opacity:1;transform:translateY(0)}</style>
-  <script>try{var t=localStorage.getItem('theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
+  <style>body{font-family:'Cormorant Garamond','Noto Serif SC',serif;background:#faf9f6;color:#111;-webkit-font-smoothing:antialiased;margin:0}.hero-bg{position:fixed;top:0;left:0;width:100%;height:100vh;background:url('https://cdn.jsdelivr.net/gh/xshzct-dotcom/julian678@main/images/hero_bg.jpg?v=20260705-5') center/cover no-repeat;z-index:0;pointer-events:none}.fade-up{opacity:0;transform:translateY(20px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}.fade-up.visible{opacity:1;transform:translateY(0)}</style>
 </head>
 <body>
   <div class="hero-bg" aria-hidden="true"></div>
@@ -32,7 +27,6 @@
       <a href="#albums" class="nav-link">随笔</a>
       <a href="#writing" class="nav-link">我眼中的世界</a>
       <a href="#about" class="nav-link">关于</a>
-      <button class="theme-toggle" id="themeToggle" aria-label="切换主题">☀️</button>
     </nav>
   </header>
   <section class="hero">
@@ -44,10 +38,10 @@
   <section class="section" id="albums">
     <div class="page-title"><h1>随笔</h1></div>
     <div class="posts-grid">
-      <div class="post-card fade-up" style="background-image: url('images/essay_bg.jpg')" onclick="openCardModal('essay')">
+      <div class="post-card fade-up" style="background-image: url('https://cdn.jsdelivr.net/gh/xshzct-dotcom/julian678@main/images/essay_bg.jpg')" onclick="openCardModal('essay')">
         <div class="card-overlay"><div class="card-title">随笔</div><div class="card-subtitle">童年 · 初恋 · 所思所想</div></div>
       </div>
-      <div class="post-card fade-up" style="background-image: url('images/travel_bg.jpg')" onclick="openCardModal('travel')">
+      <div class="post-card fade-up" style="background-image: url('https://cdn.jsdelivr.net/gh/xshzct-dotcom/julian678@main/images/travel_bg.jpg')" onclick="openCardModal('travel')">
         <div class="card-overlay"><div class="card-title">旅行见闻</div><div class="card-subtitle">在路上</div></div>
       </div>
     </div>
@@ -71,7 +65,7 @@
   </footer>
   <div class="music-player" id="musicPlayer">
     <div class="music-panel" id="musicPanel">
-      <div class="music-info" id="musicTitle">旅行的意义</div>
+      <div class="music-info" id="musicTitle">那个夏天</div>
       <div class="music-row">
         <button class="music-act" onclick="event.stopPropagation(); prevSong();" title="上一首">◀◀</button>
         <button class="music-act" id="playBtn" onclick="event.stopPropagation(); togglePlay();" title="播放/暂停">▶</button>
@@ -123,28 +117,8 @@
   </div>
   <div class="album-zoom-hint" id="zoomHint">按住 Ctrl + 滚动鼠标滚轮缩放缩略图</div>
   <audio id="bgMusic" preload="none"></audio>
-  
-  <!-- 阅读进度条 -->
-  <div class="read-progress" id="readProgress"></div>
-  
-  <!-- 回到顶部 -->
-  <button class="back-to-top" id="backToTop" aria-label="回到顶部">
-    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
-  </button>
-  
-  <!-- 页面过渡遮罩 -->
-  <div class="page-transition" id="pageTransition"></div>
-  
-  <script defer src="data.js?v=20260721-1"></script>
-  <script>
-  // 照片路径：新上传的走 Supabase（相册管理器），旧照片保持 GitHub
-  // 新照片由 album-editor.js 上传到 Supabase，data.js 里的旧照片维持 GitHub
-  </script>
-  <script defer src="script.js?v=20260721-3"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script defer src="essay-editor.js?v=20260721-22"></script>
-  <script defer src="album-editor.js?v=20260721-9"></script>
-  <script defer src="music-editor.js?v=20260721-9"></script>
-  <script defer src="settings-menu.js?v=20260721-6"></script>
+  <script defer src="data.js?v=20260708-1"></script>
+  <script defer src="script.js?v=20260708-1"></script>
+  <script defer src="settings-menu.js?v=1"></script>
 </body>
 </html>
