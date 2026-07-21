@@ -45,6 +45,7 @@
 .photo-item:hover img{transform:scale(1.05)}
 .photo-item .check{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.5);background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center;color:#fff;font-size:12px}
 .photo-item.selected .check{display:flex;background:#2d7eff;border-color:#2d7eff}
+.photo-item.dragging{opacity:0.4}
 .photo-item .del-btn{position:absolute;top:4px;right:4px;width:24px;height:24px;border:none;border-radius:50%;background:rgba(255,50,50,.8);color:#fff;font-size:12px;cursor:pointer;display:none;align-items:center;justify-content:center}
 .photo-item.editing .del-btn{display:flex}
 
@@ -103,13 +104,21 @@
     if (albums.length === 0) {
       body.innerHTML = '<div style="text-align:center;padding:60px 20px;color:rgba(255,255,255,.3)"><div style="font-size:48px;margin-bottom:16px">📸</div><p>还没有相册</p></div>';
     } else {
-      body.innerHTML = '<div class="album-grid">' + albums.map(a => `
-        <div class="album-card" onclick="ALBUM.open(${a.id})">
+      body.innerHTML = '<div class="album-grid" id="albumGrid">' + albums.map((a, i) => `
+        <div class="album-card" draggable="${editMode}" data-id="${a.id}" data-idx="${i}"
+             onclick="ALBUM.open(${a.id})"
+             ondragstart="ALBUM.dragAlbumStart(event,${i})"
+             ondragover="ALBUM.dragAlbumOver(event,${i})"
+             ondragend="ALBUM.dragAlbumEnd(event)">
           <img class="cover" src="${a.cover || STORAGE_URL + '/covers/placeholder.png'}" loading="lazy" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><rect fill=%22%23222%22 width=%22200%22 height=%22200%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23555%22 font-size=%2230%22>📷</text></svg>'">
           <div class="info"><div class="name">${esc(a.title)}</div><div class="count">${a._count || 0} 张</div></div>
+          ${editMode ? '<span class="album-drag" style="position:absolute;top:6px;left:6px;color:rgba(255,255,255,.3);font-size:16px;cursor:grab;text-shadow:0 1px 3px rgba(0,0,0,.5)">⠿</span>' : ''}
         </div>`).join('') + '</div>';
+      // 拖拽排序实时视觉反馈
+      if (editMode) initAlbumDrag();
     }
-    tb.innerHTML = '<button onclick="ALBUM.add()">+ 新建相册</button>';
+    tb.innerHTML = '<button onclick="ALBUM.add()">+ 新建相册</button>' +
+      (editMode ? '' : '<button onclick="ALBUM.toggleEdit()">✎ 编辑排序</button>');
     document.getElementById('albumTitle').textContent = '📸 相册';
     currentAlbum = null;
   }
@@ -127,9 +136,12 @@
     } else {
       body.innerHTML = '<div class="photo-grid" id="photoGrid">' + currentPhotos.map((p, i) => `
         <div class="photo-item ${editMode ? 'editing' : ''}" draggable="${editMode}" data-id="${p.id}" data-idx="${i}"
-             ontouchstart="${editMode ? 'ALBUM.dragStart(event,' + i + ')' : ''}"
-             ontouchmove="${editMode ? 'ALBUM.dragMove(event)' : ''}"
-             ontouchend="${editMode ? 'ALBUM.dragEnd(event)' : ''}">
+             ondragstart="ALBUM.photoDragStart(event,${i})"
+             ondragover="ALBUM.photoDragOver(event,${i})"
+             ondragend="ALBUM.photoDragEnd(event)"
+             ontouchstart="${editMode ? 'ALBUM.touchDragStart(event,' + i + ')' : ''}"
+             ontouchmove="${editMode ? 'ALBUM.touchDragMove(event)' : ''}"
+             ontouchend="${editMode ? 'ALBUM.touchDragEnd(event)' : ''}">
           <img src="${STORAGE_URL}/${p.storage_path}" loading="lazy" onclick="${editMode ? '' : 'ALBUM.preview(' + i + ')'}">
           ${editMode ? `<button class="del-btn" onclick="event.stopPropagation();ALBUM.delPhoto(${p.id})">✕</button>
           <span class="drag-handle" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.3);font-size:16px;cursor:grab">⠿</span>` : ''}
@@ -138,6 +150,7 @@
 
     tb.innerHTML = `
       <button class="ab-btn ab-btn-pri" onclick="ALBUM.upload()">📤 上传照片</button>
+      ${editMode ? '<button class="ab-btn" onclick="ALBUM.toggleEdit()">✅ 完成排序</button>' : '<button class="ab-btn" onclick="ALBUM.toggleEdit()">✎ 编辑排序</button>'}
       <button onclick="ALBUM.rename()">✏️ 重命名</button>
       <button class="ab-btn-del" onclick="ALBUM.del()">🗑 删除相册</button>
       <button onclick="ALBUM.back()">← 返回</button>
@@ -293,56 +306,131 @@
 
   // ===== 拖拽排序 =====
   let dragState = null;
-  function dragStart(e, idx) {
-    const touch = e.touches ? e.touches[0] : e;
-    dragState = { idx, startY: touch.clientY, moved: false, el: e.currentTarget };
+  let _dragAlbumId = null;
+
+  // 编辑模式切换
+  function toggleEdit() {
+    editMode = !editMode;
+    if (currentAlbum) renderAlbumPhotos(currentAlbum);
+    else renderAlbumList();
+  }
+
+  // 照片 HTML5 拖拽
+  function photoDragStart(e, idx) {
+    if (!editMode) { e.preventDefault(); return; }
+    dragState = { idx, from: idx };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', idx);
+    e.currentTarget.classList.add('dragging');
+  }
+  function photoDragOver(e, idx) {
+    if (!editMode || dragState === null) return;
+    e.preventDefault();
+    if (idx === dragState.idx) return;
+    const grid = document.getElementById('photoGrid');
+    const items = grid.querySelectorAll('.photo-item');
+    if (idx < dragState.idx) grid.insertBefore(items[dragState.idx], items[idx]);
+    else grid.insertBefore(items[dragState.idx], items[idx + 1]);
+    dragState.idx = idx;
+  }
+  async function photoDragEnd(e) {
+    e.currentTarget.classList.remove('dragging');
+    if (!dragState || dragState.idx === dragState.from) { dragState = null; return; }
+    const from = currentPhotos[dragState.from];
+    const to = currentPhotos[dragState.idx];
+    if (from && to) {
+      const fo = from.sort_order, to2 = to.sort_order;
+      await sb.from('album_photos').update({ sort_order: to2 }).eq('id', from.id);
+      await sb.from('album_photos').update({ sort_order: fo }).eq('id', to.id);
+      currentPhotos = await loadPhotos(currentAlbum.id);
+      renderAlbumPhotos(currentAlbum);
+    }
+    dragState = null;
+  }
+
+  // 触摸拖拽（照片，手机用）
+  function touchDragStart(e, idx) {
+    if (!editMode) return;
+    const touch = e.touches[0];
+    dragState = { idx, startY: touch.clientY, moved: false, el: e.currentTarget, from: idx };
     e.currentTarget.style.transition = 'none';
   }
-  function dragMove(e) {
+  function touchDragMove(e) {
     if (!dragState) return;
     e.preventDefault();
-    const touch = e.touches ? e.touches[0] : e;
+    const touch = e.touches[0];
     const diff = touch.clientY - dragState.startY;
     if (Math.abs(diff) > 10) dragState.moved = true;
     dragState.el.style.transform = 'translateY(' + diff + 'px)';
     dragState.el.style.zIndex = '10';
-    dragState.diff = diff;
-
-    // 检测应该交换的位置
+    // 检测位置
     const items = document.querySelectorAll('#photoGrid .photo-item');
-    const rect = dragState.el.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
     for (let i = 0; i < items.length; i++) {
       if (i === dragState.idx) continue;
       const r = items[i].getBoundingClientRect();
       if (touch.clientY >= r.top && touch.clientY <= r.bottom) {
-        // 交换
-        if (i !== dragState.swapIdx) {
-          dragState.swapIdx = i;
-        }
+        if (i !== dragState.swapIdx) dragState.swapIdx = i;
         break;
       }
     }
   }
-  async function dragEnd(e) {
+  async function touchDragEnd(e) {
     if (!dragState) return;
     dragState.el.style.transition = '';
     dragState.el.style.transform = '';
     dragState.el.style.zIndex = '';
-
     if (dragState.moved && dragState.swapIdx !== undefined && dragState.swapIdx !== dragState.idx) {
-      // 交换数据库中的 sort_order
       const from = currentPhotos[dragState.idx];
       const to = currentPhotos[dragState.swapIdx];
       if (from && to) {
-        const fromOrder = from.sort_order;
-        const toOrder = to.sort_order;
-        await sb.from('album_photos').update({ sort_order: toOrder }).eq('id', from.id);
-        await sb.from('album_photos').update({ sort_order: fromOrder }).eq('id', to.id);
+        const fo = from.sort_order, to2 = to.sort_order;
+        await sb.from('album_photos').update({ sort_order: to2 }).eq('id', from.id);
+        await sb.from('album_photos').update({ sort_order: fo }).eq('id', to.id);
+        currentPhotos = await loadPhotos(currentAlbum.id);
         renderAlbumPhotos(currentAlbum);
       }
     }
     dragState = null;
+  }
+
+  // 相册 HTML5 拖拽排序
+  function dragAlbumStart(e, idx) {
+    if (!editMode) { e.preventDefault(); return; }
+    _dragAlbumId = idx;
+    e.dataTransfer.effectAllowed = 'move';
+    e.currentTarget.style.opacity = '0.4';
+  }
+  function dragAlbumOver(e, idx) {
+    if (!editMode || _dragAlbumId === null) return;
+    e.preventDefault();
+    if (idx === _dragAlbumId) return;
+    const grid = document.getElementById('albumGrid');
+    const items = grid.querySelectorAll('.album-card');
+    if (idx < _dragAlbumId) grid.insertBefore(items[_dragAlbumId], items[idx]);
+    else grid.insertBefore(items[_dragAlbumId], items[idx + 1]);
+    _dragAlbumId = idx;
+  }
+  async function dragAlbumEnd(e) {
+    e.currentTarget.style.opacity = '';
+    if (_dragAlbumId === null) return;
+    // 根据 DOM 顺序重新计算 sort_order
+    const grid = document.getElementById('albumGrid');
+    const cards = grid.querySelectorAll('.album-card');
+    const newOrder = [];
+    cards.forEach(c => { const id = parseInt(c.dataset.id); if (!isNaN(id)) newOrder.push(id); });
+    for (let i = 0; i < newOrder.length; i++) {
+      await sb.from('albums').update({ sort_order: i }).eq('id', newOrder[i]);
+    }
+    albums = await loadAlbums();
+    _dragAlbumId = null;
+  }
+
+  // 初始化相册拖动高亮
+  function initAlbumDrag() {
+    document.querySelectorAll('.album-card').forEach(el => {
+      el.addEventListener('dragenter', e => e.preventDefault());
+      el.addEventListener('dragleave', e => e.preventDefault());
+    });
   }
 
   // ===== 暴露全局 =====
@@ -357,7 +445,10 @@
     upload: uploadPhotos,
     delPhoto,
     preview: previewPhoto,
-    dragStart, dragMove, dragEnd,
+    toggleEdit,
+    photoDragStart, photoDragOver, photoDragEnd,
+    touchDragStart, touchDragMove, touchDragEnd,
+    dragAlbumStart, dragAlbumOver, dragAlbumEnd,
   };
 
   // ===== 关闭按钮 =====
