@@ -353,15 +353,12 @@ function renderGrid(){
     return;
   }
   masonry.innerHTML = photos.map((p,i) => {
-    const ratio = aspectFor(p);
     const src = thumb(p);
-    return `<div class="masonry-item fade-up" data-idx="${i}" style="aspect-ratio:${ratio.w}/${ratio.h}">
-      <img src="${src}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.style.display='none'" onclick="openLightbox(${i})">
-      <div class="masonry-overlay">
-        <div>
-          <div class="mo-title">${esc(p._albumTitle||'')}</div>
-        </div>
+    return `<div class="masonry-item fade-up" data-idx="${i}">
+      <div class="masonry-frame">
+        <img src="${src}" alt="" loading="lazy" decoding="async" onclick="openLightbox(${i})">
       </div>
+      <div class="masonry-overlay"><div class="mo-title">${esc(p._albumTitle||'')}</div></div>
     </div>`;
   }).join('');
   lightboxPhotos = photos;
