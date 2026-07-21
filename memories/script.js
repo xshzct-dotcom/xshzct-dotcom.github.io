@@ -339,8 +339,10 @@ function renderRiver(){
   stream.innerHTML = indices.map(function(pi, i){
     var p = pool[pi];
     var rot = rotations[i];
-    return '<div class="polaroid" data-idx="' + pi + '" style="transform:rotate(' + rot + 'deg)" data-label="' + esc(p._albumTitle||'') + '">' +
-      '<div class="polaroid-frame"><img src="' + thumb(p) + '" alt="" decoding="async" data-full="' + full(p) + '" onload="this.parentElement.parentElement.classList.remove(\'polaroid-loading\')" onerror="if(this.dataset.fb!==\'1\'){this.dataset.fb=\'1\';this.src=this.dataset.full}"></div>' +
+    var name = (typeof p === 'string' ? p : (p.path||p.src||'')).split('/').pop().replace(/看图王\.jpg$|\.jpg$|\.jpeg$/i, '').replace(/^_+/, '');
+    return '<div class="polaroid" data-idx="' + pi + '" style="transform:rotate(' + rot + 'deg);z-index:' + (POLAROID_COUNT - i) + '" data-label="' + esc(p._albumTitle||'') + '" data-missing="暂未上传 · ' + esc(name) + '">' +
+      '<div class="polaroid-frame"><img src="' + thumb(p) + '" alt="" decoding="async" data-full="' + full(p) + '" data-name="' + esc(name) + '" onload="this.parentElement.parentElement.classList.remove(\'polaroid-loading\')" onerror="if(this.dataset.fb!==\'1\'){this.dataset.fb=\'1\';this.src=this.dataset.full;this.onerror=function(){this.style.display=\'none\';this.parentElement.parentElement.classList.add(\'img-fail-frame\')}"></div>' +
+      '<div class="polaroid-caption">' + esc(name) + '</div>' +
     '</div>';
   }).join('');
 
@@ -368,11 +370,12 @@ function riverScroll(dir){
   var stream = document.getElementById('riverStream');
   if(!stream) return;
   stream.scrollBy({left: dir * 320, behavior: 'smooth'});
+  if(window.SFX) window.SFX.flip();
 }
 
 function riverShuffle(){
-  // 继续发牌 — 当一池发完才重新洗
   renderRiver();
+  if(window.SFX) window.SFX.shutter();
 }
 
 function buildRiverFilters(){
@@ -394,9 +397,18 @@ function buildRiverFilters(){
       currentFilter = el.dataset.filter;
       container.querySelectorAll('.river-filter').forEach(function(e){ e.classList.remove('active'); });
       el.classList.add('active');
+      if(window.SFX) window.SFX.tick();
       renderRiver();
     };
   });
+  // 静音按钮
+  var mute = document.getElementById('sfxMute');
+  if(mute){
+    mute.onclick = function(){
+      if(window.SFX) window.SFX.toggle();
+      mute.textContent = window.SFX && window.SFX.enabled() ? '🔊' : '🔇';
+    };
+  }
 }
 
 window.riverScroll = riverScroll;
@@ -422,6 +434,7 @@ function openLightbox(idx, kenBurns=false){
   lb.classList.add('active');
   lb.style.opacity = '1';
   lb.style.pointerEvents = 'auto';
+  if(window.SFX) window.SFX.shutter();
   document.body.style.overflow = 'hidden';
   lbZoom = {scale:1, bgX:50, bgY:50, dragging:false, dragX:0, dragY:0};
 
@@ -508,6 +521,7 @@ function navLightbox(dir){
   lightboxIdx += dir;
   if(lightboxIdx < 0) lightboxIdx = lightboxPhotos.length - 1;
   if(lightboxIdx >= lightboxPhotos.length) lightboxIdx = 0;
+  if(window.SFX) window.SFX.flip();
   openLightbox(lightboxIdx);
 }
 window.navLightbox = navLightbox;
@@ -519,6 +533,7 @@ function closeLightbox(){
   lb.style.pointerEvents = 'none';
   lb.style.background = '#000';
   document.body.style.overflow = '';
+  if(window.SFX) window.SFX.click();
   // 恢复 stage 显示（万一后续用）
   const stage = $('#lightboxStage');
   if(stage) stage.style.display = '';
