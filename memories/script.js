@@ -399,11 +399,6 @@ function openLightbox(idx, kenBurns=false){
   lb.style.pointerEvents = 'auto';
   document.body.style.overflow = 'hidden';
 
-  // 用背景图显示原图
-  const photo = lightboxPhotos[idx];
-  const src = full(photo);
-  lb.style.background = '#000 url(' + src + ') center/contain no-repeat';
-
   // 彻底清空 stage 里的 img（避免残留 src 在中央显示挡住背景图）
   const stage = $('#lightboxStage');
   if(stage) stage.style.display = 'none';
@@ -413,8 +408,23 @@ function openLightbox(idx, kenBurns=false){
     img.removeAttribute('style');
   }
 
+  // 关键：先显示"加载中"占位（避免大图加载过程中出现视觉撕裂）
+  lb.style.background = '#0E1116 url("data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 40 40%22><circle cx=%2220%22 cy=%2220%22 r=%2214%22 fill=%22none%22 stroke=%22%237C9B7E%22 stroke-width=%223%22 stroke-dasharray=%2280%22><animateTransform attributeName=%22transform%22 type=%22rotate%22 from=%220 20 20%22 to=%22360 20 20%22 dur=%221s%22 repeatCount=%22indefinite%22/></circle></svg>") center/60px no-repeat';
+
   counter.textContent = (idx+1) + ' / ' + lightboxPhotos.length;
   lbAutoHideControls();
+
+  // 预加载原图，加载完成后再切换背景
+  const photo = lightboxPhotos[idx];
+  const src = full(photo);
+  const pre = new Image();
+  pre.onload = function(){
+    lb.style.background = '#000 url(' + src + ') center/contain no-repeat';
+  };
+  pre.onerror = function(){
+    lb.style.background = '#000 url(' + src + ') center/contain no-repeat';
+  };
+  pre.src = src;
 }
 window.openLightbox = openLightbox;
 
