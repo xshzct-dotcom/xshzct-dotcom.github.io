@@ -355,11 +355,8 @@ function renderGrid(){
   masonry.innerHTML = photos.map((p,i) => {
     const ratio = aspectFor(p);
     const src = thumb(p);
-    const paddingTop = (ratio.h/ratio.w*100).toFixed(2);
-    return `<div class="masonry-item fade-up" data-idx="${i}">
-      <div class="masonry-frame" style="padding-top:${paddingTop}%">
-        <img src="${src}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.parentElement.style.display='none'" onclick="openLightbox(${i})">
-      </div>
+    return `<div class="masonry-item fade-up" data-idx="${i}" style="aspect-ratio:${ratio.w}/${ratio.h}">
+      <img src="${src}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.style.display='none'" onclick="openLightbox(${i})">
       <div class="masonry-overlay">
         <div>
           <div class="mo-title">${esc(p._albumTitle||'')}</div>
@@ -557,9 +554,16 @@ function drawConstellation(){
   // 不再持续 60fps 动画 — 只在交互时（鼠标移动/拖拽/滚轮）重绘
 }
 
-// ===== 灯箱（全屏 + 缩放/平移/滑动/Ken Burns） =====
-let zoom = {scale: 1, x: 0, y: 0, dragging: false, dragX: 0, dragY: 0, lastTap: 0, lastTapX: 0, lastTapY: 0};
-let pinchStartDist = 0, pinchStartScale = 1;
+// ===== 灯箱 v2（光标居中缩放 + 滑动切图 + 自动隐藏 UI） =====
+let zoom = {scale: 1, x: 0, y: 0};
+let lbHideTimer = null;
+function lbAutoHideControls(){
+  clearTimeout(lbHideTimer);
+  $$('#lightbox button, #lightbox .lightbox-counter, #lightbox .lightbox-filmstrip').forEach(el => el.classList.remove('lb-hidden'));
+  lbHideTimer = setTimeout(()=>{
+    $$('#lightbox button, #lightbox .lightbox-counter, #lightbox .lightbox-filmstrip').forEach(el => el.classList.add('lb-hidden'));
+  }, 3000);
+}
 
 function openLightbox(idx, kenBurns=false){
   if(idx<0||idx>=lightboxPhotos.length) return;
@@ -569,18 +573,17 @@ function openLightbox(idx, kenBurns=false){
   const stage = $('#lightboxStage');
   const counter = $('#lightboxCounter');
   const loader = $('#lightboxLoader');
-  const filmstrip = $('#lightboxFilmstrip');
 
-  // 重置缩放
-  zoom = {scale:1, x:0, y:0, dragging:false, dragX:0, dragY:0, lastTap:0, lastTapX:0, lastTapY:0};
+  // 重置
+  zoom = {scale:1, x:0, y:0};
   applyZoom();
   stage.classList.remove('zoomed');
   updateZoomIndicator();
   lb.classList.remove('lightbox-kenburns');
-  stage.classList.remove('lightbox-kenburns');
 
   lb.classList.add('active');
   document.body.style.overflow = 'hidden';
+  lbAutoHideControls();
 
   const photo = lightboxPhotos[idx];
   const src = full(photo);
@@ -589,17 +592,8 @@ function openLightbox(idx, kenBurns=false){
   img.src = src;
   counter.textContent = `${idx+1} / ${lightboxPhotos.length}`;
 
-  img.onload = () => {
-    loader.classList.remove('show');
-    img.style.opacity = '1';
-    img.style.transition = 'opacity .3s';
-  };
-  img.onerror = () => {
-    loader.classList.remove('show');
-    counter.textContent = '加载失败';
-  };
-
-  // 影片条
+  img.onload = () => { loader.classList.remove('show'); img.style.opacity='1'; img.style.transition='opacity .3s'; };
+  img.onerror = () => { loader.classList.remove('show'); counter.textContent='加载失败'; };
   renderFilmstrip(kenBurns);
 }
 window.openLightbox = openLightbox;
@@ -612,42 +606,38 @@ function applyZoom(){
 function updateZoomIndicator(){
   const ind = $('#lightboxZoomIndicator');
   if(!ind) return;
-  if(zoom.scale > 1.01 || zoom.scale < 0.99){
-    ind.textContent = Math.round(zoom.scale*100) + '%';
-    ind.classList.add('show');
-  } else {
-    ind.classList.remove('show');
-  }
+  if(zoom.scale > 1.01){ ind.textContent = Math.round(zoom.scale*100)+'%'; ind.classList.add('show'); }
+  else ind.classList.remove('show');
 }
 
 function renderFilmstrip(kenBurns){
   const strip = $('#lightboxFilmstrip');
-  if(!strip) return;
-  // 只在照片 >= 4 时显示
-  if(lightboxPhotos.length < 4){ strip.classList.remove('show'); return; }
+  if(!strip || lightboxPhotos.length < 4){ if(strip) strip.classList.remove('show'); return; }
   strip.innerHTML = lightboxPhotos.map((p,i) =>
-    `<div class="fs-item${i===lightboxIdx?' active':''}" data-fs="${i}"><img src="${thumb(p)}" alt="" loading="lazy"></div>`
+    `<div class="fs-item${i===lightboxIdx?' active':''}" data-fs="${i}"><img src="${thumb(p)}" alt=""></div>`
   ).join('');
   strip.classList.add('show');
-  strip.querySelectorAll('[data-fs]').forEach(el => {
-    el.onclick = () => {
-      const i = parseInt(el.dataset.fs);
-      openLightbox(i, kenBurns);
-    };
-  });
-  // 滚到活动项
+  strip.querySelectorAll('[data-fs]').forEach(el => el.onclick = () => openLightbox(parseInt(el.dataset.fs)));
   const active = strip.querySelector('.fs-item.active');
   if(active) active.scrollIntoView({inline:'center', block:'nearest'});
 }
 
 function navLightbox(dir){
-  let idx = lightboxIdx + dir;
-  if(idx < 0) idx = lightboxPhotos.length - 1;
-  if(idx >= lightboxPhotos.length) idx = 0;
-  // 关闭 Ken Burns 状态
-  $('#lightbox').classList.remove('lightbox-kenburns');
-  $('#lightboxStage').classList.remove('lightbox-kenburns');
-  openLightbox(idx);
+  lightboxIdx += dir;
+  if(lightboxIdx < 0) lightboxIdx = lightboxPhotos.length - 1;
+  if(lightboxIdx >= lightboxPhotos.length) lightboxIdx = 0;
+  // 滑动动画
+  const img = $('#lightboxImg');
+  const dist = dir > 0 ? 40 : -40;
+  img.style.transition = 'opacity .15s, transform .25s ease';
+  img.style.opacity = '0';
+  img.style.transform = `translateX(${dist}px) scale(1)`;
+  setTimeout(() => {
+    img.style.transition = 'none';
+    img.style.transform = 'translate(0,0) scale(1)';
+    zoom = {scale:1, x:0, y:0};
+    openLightbox(lightboxIdx);
+  }, 200);
 }
 window.navLightbox = navLightbox;
 
@@ -655,145 +645,104 @@ function closeLightbox(){
   const lb = $('#lightbox');
   lb.classList.remove('active');
   document.body.style.overflow = '';
-  $('#lightboxImg').src = '';
-  $('#lightboxStage').classList.remove('zoomed','lightbox-kenburns');
-  lb.classList.remove('lightbox-kenburns');
-  zoom = {scale:1, x:0, y:0, dragging:false, dragX:0, dragY:0, lastTap:0, lastTapX:0, lastTapY:0};
+  $('#lightboxStage').classList.remove('zoomed');
+  zoom = {scale:1, x:0, y:0};
+  clearTimeout(lbHideTimer);
 }
 window.closeLightbox = closeLightbox;
 
-// 灯箱舞台交互
+// 灯箱交互
 function bindLightboxInteractions(){
   const stage = $('#lightboxStage');
-  const img = $('#lightboxImg');
   if(!stage) return;
 
-  // 双击缩放
+  // 双击：光标居中缩放
   stage.addEventListener('dblclick', e => {
     e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    const mx = e.clientX - r.left - r.width/2;
+    const my = e.clientY - r.top - r.height/2;
     if(zoom.scale > 1.01){
       zoom.scale = 1; zoom.x = 0; zoom.y = 0;
       stage.classList.remove('zoomed');
     } else {
-      const r = stage.getBoundingClientRect();
-      const mx = e.clientX - r.left - r.width/2;
-      const my = e.clientY - r.top - r.height/2;
       zoom.scale = 2.5;
-      zoom.x = -mx * 1.5; zoom.y = -my * 1.5;
+      zoom.x = mx - mx * 2.5;
+      zoom.y = my - my * 2.5;
       stage.classList.add('zoomed');
     }
-    applyZoom(); updateZoomIndicator();
+    applyZoom(); updateZoomIndicator(); lbAutoHideControls();
   });
 
-  // 滚轮缩放
+  // 滚轮：光标居中缩放
   stage.addEventListener('wheel', e => {
     if(!$('#lightbox').classList.contains('active')) return;
     e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 1/1.15;
-    const newScale = Math.max(0.5, Math.min(5, zoom.scale * factor));
     const r = stage.getBoundingClientRect();
     const mx = e.clientX - r.left - r.width/2;
     const my = e.clientY - r.top - r.height/2;
+    const factor = e.deltaY < 0 ? 1.2 : 1/1.2;
+    const newScale = Math.max(0.5, Math.min(5, zoom.scale * factor));
     zoom.x = mx - (mx - zoom.x) * (newScale/zoom.scale);
     zoom.y = my - (my - zoom.y) * (newScale/zoom.scale);
     zoom.scale = newScale;
     if(zoom.scale > 1.01) stage.classList.add('zoomed');
     else stage.classList.remove('zoomed');
-    applyZoom(); updateZoomIndicator();
+    applyZoom(); updateZoomIndicator(); lbAutoHideControls();
   }, {passive:false});
 
-  // 鼠标拖动（仅在缩放时）
-  let mouseDragging = false, mouseDragX=0, mouseDragY=0;
-  stage.addEventListener('mousedown', e => {
-    if(zoom.scale <= 1.01) return;
-    mouseDragging = true; mouseDragX = e.clientX; mouseDragY = e.clientY;
-  });
+  // 鼠标拖动（缩放时）
+  let md=false, mdx=0, mdy=0;
+  stage.addEventListener('mousedown', e => { if(zoom.scale <= 1.01) return; md=true; mdx=e.clientX; mdy=e.clientY; lbAutoHideControls(); });
   window.addEventListener('mousemove', e => {
-    if(!mouseDragging) return;
-    zoom.x += e.clientX - mouseDragX; mouseDragX = e.clientX;
-    zoom.y += e.clientY - mouseDragY; mouseDragY = e.clientY;
-    applyZoom();
+    if(!md) return;
+    zoom.x += e.clientX - mdx; mdx = e.clientX;
+    zoom.y += e.clientY - mdy; mdy = e.clientY;
+    applyZoom(); lbAutoHideControls();
   });
-  window.addEventListener('mouseup', () => { mouseDragging = false; });
+  window.addEventListener('mouseup', ()=>{ md = false; });
+  // 鼠标移动恢复 UI
+  stage.addEventListener('mousemove', ()=>{ lbAutoHideControls(); });
 
-  // 触摸：单指拖动（双指捏合缩放）
-  let touchMode = 'none'; // none | pan | pinch
-  let touchStartX=0, touchStartY=0, touchStartZoomX=0, touchStartZoomY=0;
-  let pinchStart = 0;
+  // 触摸
+  let tdStartX=0, tdStartY=0, tdStartZoomX=0, tdStartZoomY=0, tdMode='none', tdStartPinch=0;
   stage.addEventListener('touchstart', e => {
+    lbAutoHideControls();
     if(e.touches.length === 1){
-      // 可能是双击（缩放）或单击拖动
-      const now = Date.now();
-      if(now - zoom.lastTap < 300){
-        // 双击
-        e.preventDefault();
-        if(zoom.scale > 1.01){
-          zoom.scale = 1; zoom.x = 0; zoom.y = 0;
-          stage.classList.remove('zoomed');
-        } else {
-          const t = e.touches[0];
-          zoom.scale = 2.5;
-          zoom.x = 0; zoom.y = 0;
-          stage.classList.add('zoomed');
-        }
-        applyZoom(); updateZoomIndicator();
-        zoom.lastTap = 0;
-      } else {
-        zoom.lastTap = now;
-        zoom.lastTapX = e.touches[0].clientX;
-        zoom.lastTapY = e.touches[0].clientY;
-        touchMode = zoom.scale > 1.01 ? 'pan' : 'none';
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-        touchStartZoomX = zoom.x;
-        touchStartZoomY = zoom.y;
-      }
+      tdStartX = e.touches[0].clientX; tdStartY = e.touches[0].clientY;
+      tdStartZoomX = zoom.x; tdStartZoomY = zoom.y;
+      tdMode = zoom.scale > 1.01 ? 'pan' : 'swipe';
     } else if(e.touches.length === 2){
       e.preventDefault();
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
-      pinchStart = Math.hypot(dx, dy);
-      pinchStartScale = zoom.scale;
-      touchMode = 'pinch';
+      tdStartPinch = Math.hypot(dx, dy); tdMode = 'pinch';
     }
   }, {passive:false});
   stage.addEventListener('touchmove', e => {
-    if(touchMode === 'pan' && e.touches.length === 1){
-      e.preventDefault();
-      zoom.x = touchStartZoomX + (e.touches[0].clientX - touchStartX);
-      zoom.y = touchStartZoomY + (e.touches[0].clientY - touchStartY);
+    if(tdMode === 'swipe' && e.touches.length === 1){
+      // 收集滑动距离（在 touchend 时判断）
+    } else if(tdMode === 'pan' && e.touches.length === 1){
+      zoom.x = tdStartZoomX + (e.touches[0].clientX - tdStartX);
+      zoom.y = tdStartZoomY + (e.touches[0].clientY - tdStartY);
       applyZoom();
-    } else if(touchMode === 'pinch' && e.touches.length === 2){
-      e.preventDefault();
+    } else if(tdMode === 'pinch' && e.touches.length === 2){
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const d = Math.hypot(dx, dy);
-      const newScale = Math.max(0.5, Math.min(5, pinchStartScale * (d/pinchStart)));
-      zoom.scale = newScale;
-      if(newScale > 1.01) stage.classList.add('zoomed');
+      const ns = Math.max(0.5, Math.min(5, zoom.scale * (d/tdStartPinch)));
+      zoom.scale = ns;
+      if(ns > 1.01) stage.classList.add('zoomed');
       else stage.classList.remove('zoomed');
       applyZoom(); updateZoomIndicator();
     }
   }, {passive:false});
   stage.addEventListener('touchend', e => {
-    if(e.touches.length === 0) touchMode = 'none';
-    else if(e.touches.length === 1) {
-      touchMode = zoom.scale > 1.01 ? 'pan' : 'none';
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-      touchStartZoomX = zoom.x;
-      touchStartZoomY = zoom.y;
+    if(tdMode === 'swipe'){
+      const dx = (e.changedTouches[0] ? e.changedTouches[0].clientX : tdStartX) - tdStartX;
+      if(Math.abs(dx) > 60) navLightbox(dx > 0 ? -1 : 1);
     }
-  });
-
-  // 单击 stage（不在图片上）关闭或前进/后退
-  stage.addEventListener('click', e => {
-    if(zoom.scale > 1.01) return; // 缩放时不响应
-    const r = stage.getBoundingClientRect();
-    const x = e.clientX - r.left;
-    if(x < r.width * 0.25) navLightbox(-1);
-    else if(x > r.width * 0.75) navLightbox(1);
-    else closeLightbox();
+    tdMode = 'none';
   });
 }
 

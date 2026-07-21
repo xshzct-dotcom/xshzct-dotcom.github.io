@@ -120,35 +120,39 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .view-btn:hover{color:var(--text)}
 .view-btn.active{background:var(--accent-glow);color:var(--accent)}
 
-/* --- Masonry Gallery（拍立得感） --- */
-.masonry{column-count:3;column-gap:18px}
+/* --- Masonry Gallery（CSS Grid 固定布局，根治加载跳闪） --- */
+.masonry{
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:18px;
+  grid-auto-flow:dense;
+}
 .masonry-item{
-  break-inside:avoid;
-  margin-bottom:18px;
-  border-radius:var(--radius);
-  overflow:hidden;
-  cursor:pointer;
   position:relative;
+  overflow:hidden;
+  border-radius:var(--radius);
+  cursor:pointer;
   background:var(--bg-card);
   transition:transform .4s var(--ease),box-shadow .4s var(--ease);
   opacity:0;
-  transform:translateY(20px) rotate(0deg);
+  transform:translateY(20px);
   box-shadow:0 2px 8px rgba(0,0,0,.2);
 }
-.masonry-item.visible{opacity:1;transform:translateY(0) rotate(0deg)}
-/* 拍立得感：随机微旋转 + hover 时抬升+放大 */
-.masonry-item:nth-child(3n+1){transform:translateY(0) rotate(-1deg)}
-.masonry-item:nth-child(3n+2){transform:translateY(0) rotate(0.5deg)}
-.masonry-item:nth-child(3n+3){transform:translateY(0) rotate(0.8deg)}
-.masonry-item:hover{transform:translateY(-8px) rotate(0deg) scale(1.02)!important;box-shadow:0 16px 40px rgba(0,0,0,.5);z-index:2}
-.masonry-item .masonry-frame{
-  position:relative;
-  width:100%;
-  background:var(--bg);
-  overflow:hidden;
+.masonry-item.visible{opacity:1;transform:translateY(0)}
+/* 拍立得感：hover 抬升+放大 */
+.masonry-item:hover{
+  transform:translateY(-8px) scale(1.02)!important;
+  box-shadow:0 16px 40px rgba(0,0,0,.5);
+  z-index:2;
 }
-.masonry-item .masonry-frame img{width:100%;height:100%;display:block;object-fit:cover;transition:transform .5s var(--ease)}
-.masonry-item:hover .masonry-frame img{transform:scale(1.06)}
+.masonry-item img{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  transition:transform .5s var(--ease);
+}
+.masonry-item:hover img{transform:scale(1.06)}
 .masonry-overlay{position:absolute;inset:0;background:linear-gradient(180deg,transparent 50%,rgba(14,17,22,.85));display:flex;align-items:flex-end;padding:14px;opacity:0;transition:opacity .3s}
 .masonry-item:hover .masonry-overlay{opacity:1}
 .masonry-overlay .mo-title{font-size:.85rem;color:#fff;font-weight:500}
@@ -209,11 +213,13 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .lightbox-stage.zoomed:active{cursor:grabbing}
 .lightbox-img{max-width:92vw;max-height:88vh;object-fit:contain;user-select:none;-webkit-user-drag:none;transition:transform .35s var(--ease);transform-origin:center center;will-change:transform}
 .lightbox-stage.zoomed .lightbox-img{transition:none}
-.lightbox-close{position:fixed;top:20px;right:24px;width:44px;height:44px;border-radius:50%;font-size:1.5rem;color:var(--text);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;z-index:201;transition:all .2s;border:1px solid rgba(255,255,255,.1)}
+.lightbox-close{position:fixed;top:20px;right:24px;width:44px;height:44px;border-radius:50%;font-size:1.5rem;color:var(--text);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;z-index:201;transition:opacity .4s;border:1px solid rgba(255,255,255,.1)}
 .lightbox-close:hover{background:rgba(255,255,255,.15)}
-.lightbox-prev,.lightbox-next{position:fixed;top:50%;transform:translateY(-50%);width:54px;height:54px;border-radius:50%;font-size:1.8rem;color:var(--text);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;z-index:201;transition:all .2s;border:1px solid rgba(255,255,255,.1)}
+.lightbox-prev,.lightbox-next{position:fixed;top:50%;transform:translateY(-50%);width:54px;height:54px;border-radius:50%;font-size:1.8rem;color:var(--text);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;z-index:201;transition:opacity .4s;border:1px solid rgba(255,255,255,.1)}
 .lightbox-prev{left:20px}.lightbox-next{right:20px}
 .lightbox-prev:hover,.lightbox-next:hover{background:rgba(255,255,255,.15)}
+/* 自动隐藏 */
+.lb-hidden{opacity:0!important;pointer-events:none}
 .lightbox-counter{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);color:var(--text-dim);font-size:.85rem;z-index:201;background:rgba(0,0,0,.4);padding:4px 12px;border-radius:12px;backdrop-filter:blur(8px)}
 .lightbox-zoom-indicator{position:fixed;top:20px;left:24px;color:var(--text-dim);font-size:.78rem;z-index:201;background:rgba(0,0,0,.4);padding:4px 10px;border-radius:10px;backdrop-filter:blur(8px);display:none}
 .lightbox-zoom-indicator.show{display:block}
@@ -313,7 +319,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 
 /* --- Responsive --- */
 @media(max-width:1024px){
-  .masonry{column-count:2}
+  .masonry{grid-template-columns:repeat(2, 1fr)}
   .timeline::before{left:20px}
   .timeline-item:nth-child(odd),.timeline-item:nth-child(even){flex-direction:row}
   .timeline-dot{left:20px}
@@ -327,8 +333,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   .nav-hamburger{display:flex}
   .hero{min-height:80vh}
   .section{padding:60px 16px}
-  .masonry{column-count:2}
-  .masonry-item:nth-child(3n+1),.masonry-item:nth-child(3n+2),.masonry-item:nth-child(3n+3){transform:rotate(0deg)}
+  .masonry{grid-template-columns:repeat(2, 1fr)}
   .timeline-card{width:calc(100% - 48px);margin-left:36px}
   .player{gap:10px;padding:10px 16px}
   .player-info{max-width:120px;font-size:.8rem}
@@ -344,6 +349,6 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   .hero-title{font-size:2rem}
   .section-title{font-size:1.6rem}
   .gallery-filter{padding:6px 14px;font-size:.8rem}
-  .masonry{column-count:1}
+  .masonry{grid-template-columns:1fr}
   .daily-quote .dq-text{font-size:1.1rem}
 }
