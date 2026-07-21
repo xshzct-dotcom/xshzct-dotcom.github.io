@@ -396,19 +396,29 @@ async function renderMusicTab(){
       const nt=prompt('歌曲名:',t.title);if(!nt)return;
       db().from('music').update({title:nt.trim()}).eq('id',t.id).then(()=>renderMusicTab());
     });
-    el.querySelectorAll('[data-me-del]').forEach(b=>b.onclick=()=>{
+    el.querySelectorAll('[data-me-del]').forEach(b=>b.onclick=async ()=>{
       const idx = parseInt(b.dataset.meDel);
       const t = list[idx];
-      if(!t){ console.warn('[del] song not found'); return; }
+      if(!t || !t.id){ console.warn('[del] song not found or no id'); return; }
       if(!confirm('删除「'+t.title+'」？'))return;
-      if(sb){
+      try{
         const svcDel = supabase.createClient(SB_URL, _svcKey());
-        svcDel.from('music').delete().eq('id',t.id).then(()=>{
-          renderMusicTab();
-          if(window.reloadFromSupabase) window.reloadFromSupabase();
-        });
+        const {error} = await svcDel.from('music').delete().eq('id', t.id);
+        if(error){
+          console.error('[del] delete failed:', error.message);
+          alert('删除失败：' + error.message);
+          return;
+        }
+        // 同时删 Supabase Storage 里的文件
+        if(t.storage_path){
+          svcDel.storage.from('photos').remove([t.storage_path]).catch(()=>{});
+        }
+        renderMusicTab();
+        if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 500);
+      } catch(e){
+        console.error('[del] error:', e);
+        alert('删除出错：' + e.message);
       }
-      if(t.storage_path && sb) sb.storage.from('photos').remove([t.storage_path]).catch(()=>{});
     });
     // 拖拽排序
     bindDragSort(el, list, 'music', 'sort_order', ()=>renderList());
