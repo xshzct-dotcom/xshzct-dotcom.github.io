@@ -469,7 +469,7 @@ function renderConstellation(){
         const p = s.points[i];
         if(Math.hypot(p.x-mx, p.y-my) < p.r+6){
           lightboxPhotos = s.photos;
-          openLightbox(i, true);
+          openLightbox(i, false);
           break;
         }
       }
@@ -768,12 +768,7 @@ function shuffleMemory(){
   if(allGalleryPhotos.length === 0) return;
   const idx = randi(0, allGalleryPhotos.length-1);
   lightboxPhotos = allGalleryPhotos;
-  openLightbox(idx, true);
-  // Ken Burns 动画
-  setTimeout(() => {
-    $('#lightbox').classList.add('lightbox-kenburns');
-    $('#lightboxStage').classList.add('lightbox-kenburns');
-  }, 600);
+  openLightbox(idx, false);
   // 自动播放音乐
   if(typeof togglePlay === 'function' && bgMusic && !isPlaying){
     bgMusic.play().catch(()=>{});
