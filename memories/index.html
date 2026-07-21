@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>向天游的随笔 · Memories</title>
+<meta name="description" content="一个存放过去的角落">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Inter','Noto Serif SC',system-ui,sans-serif;background:#0a0a0a;color:#e8e4db;margin:0}</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="nav" id="nav">
+  <a class="nav-brand" href="#hero">向天游</a>
+  <div class="nav-links" id="navLinks">
+    <a href="#essays">随笔</a>
+    <a href="#gallery">相册</a>
+    <a href="#about">关于</a>
+  </div>
+  <div class="nav-hamburger" id="navHamburger">
+    <span></span><span></span><span></span>
+  </div>
+  <button class="nav-gear" id="navGear" title="管理菜单" aria-label="管理菜单">⚙️</button>
+</nav>
+
+<!-- Hero -->
+<section class="hero" id="hero">
+  <div class="hero-bg" id="heroBg"></div>
+  <div class="hero-content">
+    <h1 class="hero-title">向天游的随笔</h1>
+    <p class="hero-sub">一个存放过去的角落</p>
+  </div>
+  <div class="hero-scroll" onclick="document.getElementById('essays').scrollIntoView({behavior:'smooth'})">⌄</div>
+</section>
+
+<!-- Essays Timeline -->
+<section class="section" id="essays">
+  <h2 class="section-title">随笔</h2>
+  <div class="timeline" id="timeline"></div>
+</section>
+
+<!-- Photo Gallery -->
+<section class="section" id="gallery">
+  <h2 class="section-title">我眼中的世界</h2>
+  <div class="gallery-filters" id="galleryFilters"></div>
+  <div class="masonry" id="masonry"></div>
+</section>
+
+<!-- About -->
+<section class="section about" id="about">
+  <h2 class="section-title">关于</h2>
+  <p>创建于2026年5月3号</p>
+  <p>谨此纪念我曾有过的青春</p>
+</section>
+
+<!-- Music Player -->
+<div class="player" id="player">
+  <div class="player-toggle" id="playerToggle" onclick="togglePlayer()">⌃</div>
+  <div class="player-info" id="playerTitle">那个夏天</div>
+  <div class="player-controls">
+    <button onclick="prevSong()" title="上一首">◀◀</button>
+    <button id="playBtn" onclick="togglePlay()" title="播放/暂停">▶</button>
+    <button onclick="nextSong()" title="下一首">▶▶</button>
+  </div>
+  <div class="player-bar" id="playerBar" onclick="seek(event)">
+    <div class="player-progress" id="playerProgress"></div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" onclick="closeLightbox()">×</button>
+  <button class="lightbox-prev" onclick="navLightbox(-1)">‹</button>
+  <button class="lightbox-next" onclick="navLightbox(1)">›</button>
+  <img class="lightbox-img" id="lightboxImg" src="" alt="">
+  <div class="lightbox-counter" id="lightboxCounter"></div>
+  <div class="lightbox-loader" id="lightboxLoader">加载中…</div>
+</div>
+
+<!-- Modal (essay reading) -->
+<div class="modal-overlay" id="essayModal">
+  <div class="modal-content" id="essayModalContent"></div>
+</div>
+
+<!-- Editor Panel -->
+<div class="editor-backdrop" id="editorBackdrop"></div>
+<div class="editor-panel" id="editorPanel">
+  <button class="editor-close" id="editorClose">×</button>
+  <div class="editor-tabs" id="editorTabs">
+    <button class="editor-tab active" data-tab="essay">文章</button>
+    <button class="editor-tab" data-tab="album">相册</button>
+    <button class="editor-tab" data-tab="music">音乐</button>
+  </div>
+  <div class="editor-body" id="editorBody"></div>
+</div>
+
+<!-- Password Overlay -->
+<div class="pwd-overlay" id="pwdOverlay">
+  <div class="pwd-box">
+    <h3>旧世界</h3>
+    <p style="margin-top:8px">提示：作者真实名字</p>
+    <input type="password" id="pwdInput" placeholder="请输入密码" maxlength="8">
+    <p class="pwd-error" id="pwdError"></p>
+    <button class="pwd-btn-ok" onclick="checkPwd()">确定</button>
+    <button class="pwd-btn-cancel" onclick="closePwdModal()">取消</button>
+  </div>
+</div>
+
+<audio id="bgMusic" preload="none"></audio>
+
+<script src="../data.js"></script>
+<script src="script.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="editor.js"></script>
+</body>
+</html>
