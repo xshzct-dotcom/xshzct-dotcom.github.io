@@ -563,18 +563,6 @@ function bindLightboxInteractions(){
   });
   window.addEventListener('mouseup', function(){ lbZoom.dragging = false; });
 
-  // 单击：缩放时不管，未缩放时翻页/关闭
-  lb.addEventListener('click', e => {
-    if(lbZoom.scale > 1.01) return;
-    if(e.target.closest('.lightbox-close') || e.target.closest('.lightbox-prev') || e.target.closest('.lightbox-next')) return;
-    if(e.target.closest('.lightbox-filmstrip')) return;
-    var r = lb.getBoundingClientRect();
-    var x = e.clientX - r.left;
-    if(x < r.width * 0.25) navLightbox(-1);
-    else if(x > r.width * 0.75) navLightbox(1);
-    else closeLightbox();
-  });
-
   // 触摸
   var tdMode='none', tdStartX=0, tdStartY=0, tdStartBgX=50, tdStartBgY=50, tdDistX=0, tdStartDist=0;
   lb.addEventListener('touchstart', function(e){
