@@ -630,10 +630,9 @@ window.closeLightbox = closeLightbox;
 
 // 灯箱交互
 function bindLightboxInteractions(){
-  // 简化：不做缩放/拖动，只保留：单击空白翻页/关闭
+  // 简化：单击空白翻页/关闭
   const lb = $('#lightbox');
   if(!lb) return;
-  // 单击灯箱空白处：左半 = 上一张，右半 = 下一张，中 = 关闭
   lb.addEventListener('click', e => {
     if(e.target.closest('.lightbox-close') || e.target.closest('.lightbox-prev') || e.target.closest('.lightbox-next')) return;
     if(e.target.closest('.lightbox-counter') || e.target.closest('.lightbox-filmstrip')) return;
