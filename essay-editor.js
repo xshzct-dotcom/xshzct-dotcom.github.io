@@ -430,7 +430,7 @@
 
     const bar = document.createElement('div');
     bar.className = 'ee-toolbar';
-    bar.innerHTML = '<button onclick="BLOG.add()">✏️ 写新文章</button><button onclick="BLOG.openCats()">📂 管理分类</button> <button onclick="BLOG.showAll()">📋 所有文章</button> <button onclick="BLOG.toggle()">✕ 退出编辑</button>';
+    bar.innerHTML = '<button onclick="BLOG.add()">✏️ 写新文章</button><button onclick="BLOG.openCats()">📂 管理分类</button> <button onclick="BLOG.showAll()">📋 所有文章</button> <button onclick="BLOG.openTravel()">✈️ 旅行见闻</button> <button onclick="BLOG.toggle()">✕ 退出编辑</button>';
     body.appendChild(bar);
 
     // 辅助：从标题找文章数据
@@ -603,6 +603,25 @@
     add: () => openEditor(null),
     show: () => { if (!editMode) toggleMode(); },
     showAll: renderAllArticles,
+    openTravel: () => {
+      // 切换到旅行见闻视图
+      if (typeof updateModalView === 'function') {
+        try {
+          // 通过设置 modalStack 切换到旅行视图
+          if (typeof openCardModal === 'function') {
+            openCardModal('travel');
+          } else {
+            // 降级：弹窗提示
+            const card = document.querySelector('[onclick*="openCardModal(\'travel\')"]');
+            if (card) card.click();
+          }
+          setTimeout(() => {
+            if (typeof updateModalView === 'function') updateModalView();
+            setTimeout(injectEditButtons, 100);
+          }, 100);
+        } catch(e) { console.warn('[blog] 打开旅行见闻失败', e); }
+      }
+    },
     ensureButtons: () => setTimeout(injectEditButtons, 50),
     edit: (btn) => { const d = findArticle(btn); if (d) openEditor(d); else alert('找不到文章，请刷新后重试'); },
     del: async (btn) => {
