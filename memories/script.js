@@ -487,65 +487,72 @@ function drawConstellation(){
   const {ctx, points, scale, tx, ty, W, H, hoverIdx} = s;
   ctx.fillStyle = '#0E1116';
   ctx.fillRect(0,0,W,H);
-  // 画连线：每张照片连到最近的另一张（最多 2 条线）
-  ctx.strokeStyle = 'rgba(124,155,126,0.12)';
-  ctx.lineWidth = 0.5;
-  for(let i=0;i<points.length;i++){
-    const a = points[i];
-    const dists = [];
-    for(let j=0;j<points.length;j++){
-      if(i===j) continue;
-      const b = points[j];
-      dists.push({j, d:Math.hypot(a.x-b.x, a.y-b.y)});
+  // 视窗剔除：只画可见星 + 周边 200px
+  const pad = 200;
+  const viewMinX = -tx/scale - pad/scale, viewMaxX = (W-tx)/scale + pad/scale;
+  const viewMinY = -ty/scale - pad/scale, viewMaxY = (H-ty)/scale + pad/scale;
+  // 画连线（只画两端都在视窗附近的）
+  if(!s.linesReady){
+    // 预算每点最近的 1 个邻居（O(n²) 一次性）
+    const adj = new Array(points.length);
+    for(let i=0;i<points.length;i++){
+      const a = points[i];
+      let bestJ = -1, bestD = Infinity;
+      for(let j=0;j<points.length;j++){
+        if(i===j) continue;
+        const d = (a.x-points[j].x)*(a.x-points[j].x) + (a.y-points[j].y)*(a.y-points[j].y);
+        if(d < bestD){ bestD = d; bestJ = j; }
+      }
+      adj[i] = bestJ;
     }
-    dists.sort((x,y)=>x.d-y.d);
-    for(let k=0;k<Math.min(2, dists.length);k++){
-      const b = points[dists[k].j];
-      // 避免重复
-      if(b._connectedTo && b._connectedTo.includes(i)) continue;
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      ctx.stroke();
-      if(!b._connectedTo) b._connectedTo=[];
-      b._connectedTo.push(i);
-    }
+    s.adj = adj;
+    s.linesReady = true;
   }
+  ctx.strokeStyle = 'rgba(124,155,126,0.18)';
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  for(let i=0;i<points.length;i++){
+    if(!s.adj || s.adj[i] < 0) continue;
+    const a = points[i], b = points[s.adj[i]];
+    if(b._connectedTo && b._connectedTo.includes(i)) continue;
+    // 至少一端在视窗附近才画
+    const aInView = a.x>=viewMinX && a.x<=viewMaxX && a.y>=viewMinY && a.y<=viewMaxY;
+    const bInView = b.x>=viewMinX && b.x<=viewMaxX && b.y>=viewMinY && b.y<=viewMaxY;
+    if(!aInView && !bInView) continue;
+    const ax=a.x*scale+tx, ay=a.y*scale+ty;
+    const bx=b.x*scale+tx, by=b.y*scale+ty;
+    ctx.moveTo(ax,ay);
+    ctx.lineTo(bx,by);
+    if(!b._connectedTo) b._connectedTo=[];
+    b._connectedTo.push(i);
+  }
+  ctx.stroke();
   for(const p of points) p._connectedTo=undefined;
-  // 画星点
-  const t = Date.now()/1000;
+  // 画星点（视窗剔除）
   for(let i=0;i<points.length;i++){
     const p = points[i];
+    if(p.x<viewMinX||p.x>viewMaxX||p.y<viewMinY||p.y>viewMaxY) continue;
     const isHover = i===hoverIdx;
-    const pulse = 1 + Math.sin(t*1.5 + p.pulse) * 0.2;
-    const r = p.r * pulse * (isHover ? 2.5 : 1) * scale;
+    const r = p.r * (isHover ? 2.8 : 1) * scale;
     const x = p.x*scale + tx;
     const y = p.y*scale + ty;
-    // 光晕
+    // hover 光晕（只画 hover 的）
     if(isHover){
-      const g = ctx.createRadialGradient(x,y,0,x,y,r*3);
+      const g = ctx.createRadialGradient(x,y,0,x,y,Math.max(20, r*4));
       g.addColorStop(0, 'rgba(124,155,126,0.5)');
       g.addColorStop(1, 'rgba(124,155,126,0)');
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(x,y,r*3,0,Math.PI*2);
+      ctx.arc(x,y,Math.max(20, r*4),0,Math.PI*2);
       ctx.fill();
     }
     // 星点
     ctx.fillStyle = isHover ? '#7C9B7E' : 'rgba(232,228,218,0.85)';
     ctx.beginPath();
-    ctx.arc(x,y,Math.max(1.5,r),0,Math.PI*2);
+    ctx.arc(x,y,Math.max(1.5, r),0,Math.PI*2);
     ctx.fill();
   }
-  // 持续动画（脉冲）
-  if(s._animating) return;
-  s._animating = true;
-  function loop(){
-    if(!constellationState) return;
-    drawConstellation();
-    requestAnimationFrame(loop);
-  }
-  loop();
+  // 不再持续 60fps 动画 — 只在交互时（鼠标移动/拖拽/滚轮）重绘
 }
 
 // ===== 灯箱（全屏 + 缩放/平移/滑动/Ken Burns） =====
