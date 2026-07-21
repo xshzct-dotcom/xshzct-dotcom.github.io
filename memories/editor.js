@@ -16,6 +16,35 @@ function $(s,d){return(d||document).querySelector(s)}
 function $$(s,d){return Array.from((d||document).querySelectorAll(s))}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
+// ===== 共享：拖拽排序 =====
+async function bindDragSort(listEl, data, table, sortField, onReorder){
+  if(!listEl) return;
+  const items = listEl.querySelectorAll('[draggable="true"]');
+  items.forEach(el=>{
+    el.addEventListener('dragstart', e=>{
+      e.dataTransfer.setData('text/plain', el.dataset.idx);
+      el.classList.add('dragging');
+    });
+    el.addEventListener('dragend', ()=>{ el.classList.remove('dragging'); });
+    el.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+    el.addEventListener('drop', async e=>{
+      e.preventDefault();
+      const from = parseInt(e.dataTransfer.getData('text/plain'));
+      const to = parseInt(el.dataset.idx);
+      if(from===to || isNaN(from) || isNaN(to)) return;
+      const item = data.splice(from,1)[0];
+      data.splice(to,0,item);
+      // 批量更新 sort_order
+      try{
+        for(let j=0;j<data.length;j++){
+          await db().from(table).update({[sortField]:j}).eq('id', data[j].id);
+        }
+      }catch(e){ console.warn('[drag] sort update failed:', e); }
+      if(onReorder) onReorder();
+    });
+  });
+}
+
 function db(){
   if(sb)return sb;
   const qb=r=>new Proxy({},{get:(_,p)=>{
@@ -140,22 +169,8 @@ async function renderEssayTab(){
     list.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editEssay(all[parseInt(b.dataset.edit)]));
     list.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delEssay(all[parseInt(b.dataset.del)]));
 
-    // Drag
-    list.querySelectorAll('.ee-list-item').forEach(el=>{
-      el.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',el.dataset.idx);el.classList.add('dragging')});
-      el.addEventListener('dragend',e=>{el.classList.remove('dragging')});
-      el.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move'});
-      el.addEventListener('dragleave',e=>{});
-      el.addEventListener('drop',async e=>{
-        e.preventDefault();
-        const from=parseInt(e.dataTransfer.getData('text/plain'));
-        const to=parseInt(el.dataset.idx);
-        if(from===to||isNaN(from)||isNaN(to))return;
-        const item=all.splice(from,1)[0];all.splice(to,0,item);
-        for(let j=0;j<all.length;j++) await db().from('essays').update({sort_order:j}).eq('id',all[j].id);
-        renderList();
-      });
-    });
+    // 拖拽排序
+    bindDragSort(list, all, 'essays', 'sort_order', ()=>renderList());
   }
 
   // 编辑/新建
@@ -228,7 +243,8 @@ async function renderAlbumTab(){
   function renderList(){
     const el=$('#aeList');
     el.innerHTML=list.map((a,i)=>`
-      <div class="editor-list-item">
+      <div class="editor-list-item" draggable="true" data-idx="${i}" data-id="${a.id}">
+        <span class="editor-drag-handle">⠿</span>
         <div class="info"><div class="title">${esc(a.title)}</div><div class="meta">${a.sort_order!==undefined?'排序:'+a.sort_order:''}</div></div>
         <div class="actions">
           <button class="editor-btn-sm" data-ae-open="${i}">📂</button>
@@ -249,6 +265,8 @@ async function renderAlbumTab(){
       if(!confirm('删除相册「'+a.title+'」？'))return;
       db().from('albums').delete().eq('id',a.id).then(()=>renderAlbumTab());
     });
+    // 拖拽排序
+    bindDragSort(el, list, 'albums', 'sort_order', ()=>renderList());
   }
 
   function renderAlbumPhotos(album){
@@ -329,7 +347,8 @@ async function renderMusicTab(){
   function renderList(){
     const el=$('#meList');
     el.innerHTML=list.map((t,i)=>`
-      <div class="editor-list-item">
+      <div class="editor-list-item" draggable="true" data-idx="${i}" data-id="${t.id}">
+        <span class="editor-drag-handle">⠿</span>
         <div class="info"><div class="title">${esc(t.title)}</div><div class="meta">${t.artist||''} · 歌单:${t.album_id||'主页'}</div></div>
         <div class="actions">
           <button class="editor-btn-sm" data-me-play="${i}">▶</button>
@@ -355,6 +374,8 @@ async function renderMusicTab(){
       db().from('music').delete().eq('id',t.id).then(()=>renderMusicTab());
       if(t.storage_path) db().storage.from('photos').remove([t.storage_path]).catch(()=>{});
     });
+    // 拖拽排序
+    bindDragSort(el, list, 'music', 'sort_order', ()=>renderList());
   }
   renderList();
 
