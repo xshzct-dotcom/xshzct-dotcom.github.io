@@ -357,7 +357,7 @@ function renderGrid(){
     // 不带 loading="lazy" — 让所有图立即请求（即使在视窗外）。2652 个并发请求浏览器会自己排队。
     return `<div class="masonry-item fade-up" data-idx="${i}">
       <div class="masonry-frame">
-        <img src="${src}" alt="" decoding="async" onload="this.classList.add('loaded')" onerror="if(this.dataset.fb!=='1'){this.dataset.fb='1';this.src='${fb}';this.onerror=()=>{this.classList.add('loaded')}}" onclick="openLightbox(${i})">
+        <img src="${src}" alt="" decoding="async" onload="this.classList.add('loaded')" onerror="if(this.dataset.fb!=='1'){this.dataset.fb='1';this.src='${fb}';this.onerror=()=>{this.classList.add('loaded')}}" onclick="window._lbDebug && window._lbDebug(${i}); openLightbox(${i});">
       </div>
       <div class="masonry-overlay"><div class="mo-title">${esc(p._albumTitle||'')}</div></div>
     </div>`;
