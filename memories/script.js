@@ -20,17 +20,15 @@ function getPath(p){
   if(typeof p==='string') return p;
   return p.path||p.src||p.storage_path||p.url||p.filename||'';
 }
-// 缩略图：把 images/x.jpg 映射到 ../thumbs/x.webp（与主站 getThumb 一致）
+// 缩略图：把 images/x.jpg 映射到 ../thumbs/x.webp（保留 _看图王 等后缀，只改扩展名）
 function thumb(p){
   const s=getPath(p); if(!s) return '';
   if(s.startsWith('http')) return s;
-  // 把 images/xxx.jpg → thumbs/xxx.webp
+  // 把 images/xxx.jpg → thumbs/xxx.webp（只改扩展名，不动文件名其他部分）
   let t = s;
-  if(t.startsWith('images/')) t = t.slice(7); // 去掉 images/
+  if(t.startsWith('images/')) t = t.slice(7);
   if(t.startsWith('thumbs/')) return '../'+t;
-  // 扩展名 .jpg/.jpeg/.png → .webp
-  t = t.replace(/_看图王\.jpg$/i, '.webp')
-       .replace(/\.jpg$/i, '.webp')
+  t = t.replace(/\.jpg$/i, '.webp')
        .replace(/\.jpeg$/i, '.webp')
        .replace(/\.png$/i, '.webp');
   return '../thumbs/'+t;
