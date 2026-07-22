@@ -936,9 +936,7 @@ function openAlbumLightbox(albumId){
   openLightbox(0);
 }
 
-// ===== 音乐播放器 + 可视化 =====
-// 设计：不用 WebAudio API，HTML5 <audio> 直接播保证有声音
-// 频谱条用算法模拟（基于歌曲进度 + 多频正弦波混合）
+// ===== 音乐播放器 =====
 let currentSongIdx=0, isPlaying=false, bgMusic=null;
 
 function initMusic(){
@@ -953,6 +951,7 @@ function initMusic(){
   bgMusic.addEventListener('ended',nextSong);
   bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';});
   bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';});
+  bgMusic.addEventListener('waiting',()=>{$('#playerTitle').textContent='缓冲中…';});
   let _errGuard=false;
   bgMusic.addEventListener('error',()=>{
     if(_errGuard) return;
@@ -961,50 +960,53 @@ function initMusic(){
     nextSong();
   });
 
-  // 首次点击：重试 play（浏览器 autoplay 拦截后的标准做法）
-  const kickStart = ()=>{
+  // 立刻用 data.js playlist 初始化第一首歌（不等 DB，快）
+  if(typeof playlist !== 'undefined' && playlist.length > 0){
+    const first = playlist[0];
+    const sp = (first.url || '').trim();
+    let url;
+    if(sp.startsWith('http')) url = sp;
+    else if(sp.startsWith('music/')) url = MUSIC_BASE + sp.slice(6);
+    else url = MUSIC_BASE + (first.name || '') + '.mp3';
+    bgMusic.src = url;
+    bgMusic.load(); // 开始加载（不播，等用户点击）
+    $('#playerTitle').textContent = first.name || '未知';
+    window._currentSongs = playlist.map(m => ({
+      name: m.name, title: m.name, artist: m.artist || '',
+      url: m.url || '', storage_path: m.url || '',
+    }));
+    currentSongIdx = 0;
+  }
+
+  // 首次有效点击 → 播放（页面内任何点击都算用户手势）
+  document.addEventListener('click', function clickPlay(){
     if(window._userStarted) return;
     if(!bgMusic.src) return;
     window._userStarted = true;
     bgMusic.play().catch(()=>{});
-  };
-  document.addEventListener('click', kickStart);
-  document.addEventListener('keydown', kickStart);
-  document.addEventListener('touchstart', kickStart);
+  });
 }
 
 function switchPlaylist(songs){
   window._currentSongs = songs || [];
   currentSongIdx = 0;
-  if(window._currentSongs.length > 0){
-    playSong(0);
-  }
+  if(window._currentSongs.length) playSong(0);
 }
 function playSong(idx){
-  const songs=window._currentSongs;
-  if(!songs||idx>=songs.length||idx<0) return;
-  currentSongIdx=idx;
-  const s=songs[idx];
-  // URL 优先级: storage_path > url > 从标题拼 CDN
+  const songs = window._currentSongs;
+  if(!songs || idx < 0 || idx >= songs.length) return;
+  currentSongIdx = idx;
+  const s = songs[idx];
   const sp = (s.storage_path || s.url || '').trim();
   let url;
-  if(sp.startsWith('http')){
-    url = sp;
-  } else if(sp.startsWith('music/')){
-    url = MUSIC_BASE + sp.slice(6);
-  } else if(sp){
-    // Supabase Storage 上传的文件
-    url = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/' + sp;
-  } else {
-    // 兜底：从标题拼 CDN
-    url = MUSIC_BASE + (s.name || s.title || '') + '.mp3';
-  }
-  if(bgMusic){
-    bgMusic.src=url;
-    bgMusic.load();
-    bgMusic.play().catch(()=>{});
-    $('#playerTitle').textContent=s.name||s.title||'未知';
-  }
+  if(sp.startsWith('http')) url = sp;
+  else if(sp.startsWith('music/')) url = MUSIC_BASE + sp.slice(6);
+  else if(sp) url = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/' + sp;
+  else url = MUSIC_BASE + (s.name || s.title || '') + '.mp3';
+  bgMusic.src = url;
+  bgMusic.load();
+  bgMusic.play().catch(()=>{});
+  $('#playerTitle').textContent = s.name || s.title || '未知';
 }
 function togglePlay(){
   if(!bgMusic) return;
