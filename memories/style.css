@@ -31,6 +31,7 @@
   --cat-firstlove: #b88a9e;     /* 初恋篇 — 灰粉 */
   --cat-thoughts: #b8a67a;      /* 所思所想 — 哑金 */
   --cat-travel: #7aa8b5;        /* 旅行见闻 — 灰青 */
+  --cat-default: #7c9b7e;       /* 新增分类兜底 — 鼠尾草绿 */
   --radius-sm: 8px;
   --radius: 14px;
   --radius-lg: 20px;
@@ -110,6 +111,8 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .cat-firstlove .timeline-dot{background:var(--cat-firstlove);box-shadow:0 0 0 4px var(--bg),0 0 16px rgba(236,72,153,.25)}
 .cat-thoughts .timeline-dot{background:var(--cat-thoughts);box-shadow:0 0 0 4px var(--bg),0 0 16px rgba(245,158,11,.25)}
 .cat-travel .timeline-dot{background:var(--cat-travel);box-shadow:0 0 0 4px var(--bg),0 0 16px rgba(6,182,212,.25)}
+/* 未知分类兜底 */
+.timeline-item:not([class*="cat-"]) .timeline-dot{background:var(--cat-default);box-shadow:0 0 0 4px var(--bg),0 0 16px var(--accent-glow)}
 .timeline-card{width:calc(50% - 40px);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;cursor:pointer;transition:transform .3s var(--ease),border-color .3s,box-shadow .3s}
 .timeline-card:hover{transform:translateY(-4px);border-color:var(--border-hover);box-shadow:var(--shadow-md)}
 .timeline-card .tl-date{font-size:.78rem;color:var(--text-dim);margin-bottom:8px;font-weight:500;letter-spacing:.8px;text-transform:uppercase}
