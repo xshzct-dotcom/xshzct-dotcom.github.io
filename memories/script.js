@@ -17,7 +17,7 @@ function randi(min,max){return Math.floor(rand(min,max+1))}
 const REPO = 'xshzct-dotcom/xshzct-dotcom.github.io@main';
 const IMG_BASE = 'https://cdn.jsdelivr.net/gh/'+REPO+'/images/';
 const THUMB_BASE = 'https://cdn.jsdelivr.net/gh/'+REPO+'/thumbs/';
-const MUSIC_BASE = 'https://cdn.jsdelivr.net/gh/'+REPO+'/music/';
+const MUSIC_BASE = 'https://xshzct-dotcom.github.io/music/';
 function getPath(p){
   if(!p) return '';
   if(typeof p==='string') return p;
