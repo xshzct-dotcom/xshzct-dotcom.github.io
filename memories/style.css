@@ -187,10 +187,6 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .player-controls #playBtn{width:44px;height:44px;font-size:1.1rem;background:var(--accent-glow);color:var(--accent)}
 .player-bar{flex:1;height:4px;background:rgba(232,228,218,.08);border-radius:2px;position:relative;cursor:pointer;min-width:60px;overflow:hidden}
 .player-progress{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:2px;width:0%;transition:width .1s linear}
-/* 音频可视化柱 */
-.player-visualizer{display:flex;gap:2px;align-items:flex-end;height:18px;width:32px;flex-shrink:0}
-.player-visualizer span{display:block;flex:1;background:var(--accent);border-radius:1px;height:4px;transition:height .12s ease-out;min-height:2px}
-.player-visualizer:not(.active) span{height:3px!important;opacity:.3}
 .player-toggle{position:absolute;top:-20px;right:16px;font-size:.7rem;width:28px;height:20px;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glass-border);border-bottom:none;border-radius:8px 8px 0 0;color:var(--text-dim);cursor:pointer}
 
 /* --- Lightbox (全屏 + 缩放/平移) --- */
@@ -336,7 +332,6 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   .timeline-card{width:calc(100% - 48px);margin-left:36px}
   .player{gap:10px;padding:10px 16px}
   .player-info{max-width:120px;font-size:.8rem}
-  .player-visualizer{width:24px}
   .editor-panel{width:100%}
   .modal-content{padding:24px}
   .modal-essay-title{font-size:1.4rem}
