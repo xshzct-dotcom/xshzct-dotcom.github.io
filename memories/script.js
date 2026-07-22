@@ -233,8 +233,8 @@ function openEssayModal(essay){
   const content=$('#essayModalContent');
   if(!overlay||!content) return;
   const curIdx = _timelineItems.findIndex(t => t.title === essay.title);
-  const hasPrev = curIdx > 0;
-  const hasNext = curIdx < _timelineItems.length - 1;
+  const hasPrev = curIdx >= 0 && curIdx > 0;
+  const hasNext = curIdx >= 0 && curIdx < _timelineItems.length - 1;
   function fmtBody(b){
     if(!b) return '';
     return b.split('\n').filter(l=>l.trim()).map(l=>`<p>${esc(l)}</p>`).join('');

@@ -27,10 +27,10 @@
   --shadow-sm: 0 2px 8px rgba(0,0,0,.35);
   --shadow-md: 0 8px 32px rgba(0,0,0,.45);
   --shadow-lg: 0 20px 60px rgba(0,0,0,.55);
-  --cat-childhood: #6366f1;     /* 童年篇 — 靛蓝 */
-  --cat-firstlove: #ec4899;     /* 初恋篇 — 粉红 */
-  --cat-thoughts: #f59e0b;      /* 所思所想 — 琥珀 */
-  --cat-travel: #06b6d4;        /* 旅行见闻 — 青蓝 */
+  --cat-childhood: #7a8ba8;     /* 童年篇 — 灰蓝 */
+  --cat-firstlove: #b88a9e;     /* 初恋篇 — 灰粉 */
+  --cat-thoughts: #b8a67a;      /* 所思所想 — 哑金 */
+  --cat-travel: #7aa8b5;        /* 旅行见闻 — 灰青 */
   --radius-sm: 8px;
   --radius: 14px;
   --radius-lg: 20px;
