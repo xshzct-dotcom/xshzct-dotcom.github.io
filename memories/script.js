@@ -952,12 +952,6 @@ function initMusic(){
   bgMusic.addEventListener('ended',nextSong);
   bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';visStart();});
   bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';visStop();});
-  bgMusic.addEventListener('waiting',()=>{$('#playerTitle').textContent='加载中…';});
-  bgMusic.addEventListener('canplay',()=>{
-    if(window._currentSongs&&window._currentSongs[currentSongIdx]){
-      $('#playerTitle').textContent=window._currentSongs[currentSongIdx].name||window._currentSongs[currentSongIdx].title||'未知';
-    }
-  });
   let _errGuard=false;
   bgMusic.addEventListener('error',()=>{
     if(_errGuard) return;
@@ -969,24 +963,13 @@ function initMusic(){
 
   visBars = $$('#playerVisualizer span');
 
-  // 不在这里用 data.js 初始化 playlist — 等 loadFromSupabase 从 DB 拉
-  // 这样删歌后刷新不会出现"data.js 旧歌 + DB 新歌"两个不同步的状态
-  window._currentSongs = window._currentSongs || [];
-  currentSongIdx = 0;
-  // 加载中提示，避免显示 HTML 默认的旧标题误导用户
-  const pt = $('#playerTitle');
-  if(pt) pt.textContent = '加载播放列表…';
-  // 任何一次用户交互都启动音乐（避开浏览器 autoplay 拦截）
-  // playlist 还没就绪就继续等，不要设 _userStarted
+  // 一次点击就启动播放（避开 autoplay 拦截）
+  // 已 _userStarted 后此 listener 自动 noop
   const kickStart = ()=>{
-    const songs = window._currentSongs;
-    if(!songs || songs.length === 0) return; // 等 DB 拉完
-    document.removeEventListener('click', kickStart);
-    document.removeEventListener('keydown', kickStart);
-    document.removeEventListener('touchstart', kickStart);
     if(window._userStarted) return;
+    if(!bgMusic.src) return; // 等 playlist 就绪
     window._userStarted = true;
-    playSong(currentSongIdx || 0);
+    bgMusic.play().catch(()=>{});
   };
   document.addEventListener('click', kickStart);
   document.addEventListener('keydown', kickStart);
@@ -1032,29 +1015,10 @@ function visTick(){
 }
 
 function switchPlaylist(songs){
-  window._currentSongs=songs;
-  currentSongIdx=0;
-  if(songs&&songs.length){
-    const s=songs[0];
-    const sp=(s.storage_path||s.url||'').trim();
-    let url;
-    if(sp.startsWith('http')) url=sp;
-    else if(sp.startsWith('music/')) url=MUSIC_BASE+sp.slice(6);
-    else if(sp) url='https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/'+sp;
-    else url=MUSIC_BASE+(s.name||s.title||'')+'.mp3';
-    if(bgMusic){
-      // 如果当前 src 就是这首歌的 URL，跳过 reload 避免中断播放
-      const isSame = bgMusic.src && bgMusic.src.endsWith(url.substring(url.lastIndexOf('/')+1));
-      if(!isSame){
-        bgMusic.src=url;
-        bgMusic.load();
-        // 用户已交互过就直接播；否则只设 src 等用户点 ▶
-        if(window._userStarted){
-          bgMusic.play().catch(()=>{});
-        }
-      }
-    }
-    $('#playerTitle').textContent=s.name||s.title||'未知';
+  window._currentSongs = songs || [];
+  currentSongIdx = 0;
+  if(window._currentSongs.length > 0){
+    playSong(0);
   }
 }
 function playSong(idx){
@@ -1071,12 +1035,10 @@ function playSong(idx){
     url = MUSIC_BASE + sp.slice(6);
   } else if(sp){
     // Supabase Storage 上传的文件
-    const SURL = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos';
-    url = SURL + '/' + sp;
+    url = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/' + sp;
   } else {
     // 兜底：从标题拼 CDN
-    const name = (s.name || s.title || '').trim();
-    url = MUSIC_BASE + name + '.mp3';
+    url = MUSIC_BASE + (s.name || s.title || '') + '.mp3';
   }
   if(bgMusic){
     bgMusic.src=url;
@@ -1379,12 +1341,7 @@ function init(){
   console.log('[memories] init() start');
   initHeroStars();
   initMusic();
-  ensureSync().then(() => loadFromSupabase()).then(() => {
-    buildTimeline();
-    buildRiver();
-    buildYearHeatmap();
-    window._testReady = true;
-  });
+  // 歌单同步在下面 init() 末尾统一处理（带 data.js 兜底）
   fillTimelineIndex();
   buildTimeline();
   buildRiver();
@@ -1403,6 +1360,20 @@ function init(){
 
   // 同步 data.js → Supabase（让编辑器有真实数据）— 暴露 promise 给 editor 共享
   window.MemoriesReady = ensureSync();
+
+  // 拉 DB 歌单 + 立刻播第一首
+  ensureSync().then(() => loadFromSupabase()).then(() => {
+    // DB 没有歌时用 data.js 兜底
+    if(!window._currentSongs || window._currentSongs.length === 0){
+      if(typeof playlist !== 'undefined' && Array.isArray(playlist) && playlist.length > 0){
+        const newPlaylist = playlist.map(m => ({
+          name: m.name||m.title, title: m.name||m.title,
+          artist: m.artist||'', url: m.url||'', storage_path: m.url||'',
+        }));
+        switchPlaylist(newPlaylist);
+      }
+    }
+  }).catch(e => console.warn('[memories] init playlist failed:', e));
 
   // 全局媒体观察
   const mo = new MutationObserver(()=>{ observeFadeUps(); });
