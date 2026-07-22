@@ -1124,8 +1124,9 @@ async function loadFromSupabase(){
       if(typeof essayCategories !== 'undefined'){
         essayCategories.splice(0, essayCategories.length, ...cats);
       }
-      // 重建时间线
+      // 重建时间线索引 + 显示
       fillTimelineIndex();
+      buildTimeline();
     }
 
     // 2. 相册 — 从 albums 表加载
