@@ -216,48 +216,77 @@ async function renderEssayTab(){
     <div id="eeList"></div>
   `;
 
+  // 按分类分组
+  const groups = {};
+  all.forEach(a => {
+    const cid = a.category || 'other';
+    if(!groups[cid]) groups[cid] = {title: a.category_title || cid, items: []};
+    groups[cid].items.push(a);
+  });
+
   function renderList(){
     const list=$('#eeList');
-    list.innerHTML=all.map((a,i)=>`
-      <div class="ee-list-item" draggable="true" data-idx="${i}" data-sid="${a.id}">
+    // 两层菜单：第一层是分类卡片，第二层是分类下的文章
+    list.innerHTML = '<div id="eeCats"></div>';
+    const catsEl = list.querySelector('#eeCats');
+    // 计算每个分类的排序：按文章数降序
+    const sortedCats = Object.entries(groups).sort((a,b) => b[1].items.length - a[1].items.length);
+    catsEl.innerHTML = sortedCats.map(([cid, g]) => {
+      const col = `var(--cat-${cid}, var(--cat-default))`;
+      return `<div class="ee-cat-card" data-cat="${cid}" style="border-left:4px solid ${col};padding:14px 16px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:12px">
+        <span style="color:${col};font-size:1.2rem">●</span>
+        <div style="flex:1">
+          <div style="font-size:1rem;font-weight:600;color:var(--text)">${esc(g.title)}</div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">${g.items.length} 篇 · ${g.items[0]?.date || ''} ~ ${g.items[g.items.length-1]?.date || ''}</div>
+        </div>
+        <span style="color:var(--text-muted);font-size:1.2rem">›</span>
+      </div>`;
+    }).join('');
+    // 点击分类进入二级
+    catsEl.querySelectorAll('.ee-cat-card').forEach(c => {
+      c.onclick = () => renderArticlesInCat(c.dataset.cat);
+    });
+  }
+
+  // 显示某分类下的文章
+  function renderArticlesInCat(catId){
+    const g = groups[catId];
+    if(!g) return;
+    // 按日期降序
+    const items = [...g.items].sort((a,b) => (b.date||'').localeCompare(a.date||''));
+    const list=$('#eeList');
+    const col = `var(--cat-${catId}, var(--cat-default))`;
+    list.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="ee-btn" id="eeBack">← 返回分类</button>
+        <span style="color:${col};font-size:1.05rem;font-weight:600;flex:1">● ${esc(g.title)} (${items.length} 篇)</span>
+        <button class="editor-btn editor-btn-primary" data-ee-new>✏️ 写新文章</button>
+      </div>
+      <div id="eeArticles"></div>
+    `;
+    document.getElementById('eeBack').onclick = () => renderList();
+    document.querySelector('[data-ee-new]').onclick = () => editEssay(null, catId);
+    const articlesEl = document.getElementById('eeArticles');
+    articlesEl.innerHTML = items.map((a,i) => `
+      <div class="ee-list-item" data-idx="${i}" data-sid="${a.id}">
         <span class="ee-drag">⠿</span>
         <span class="e-title">${esc(a.title)}</span>
-        <span class="e-meta">${a.category_title||''} · ${a.date||''}</span>
+        <span class="e-meta">${a.date||''}</span>
         <div class="ee-actions">
           <button class="ee-btn" data-edit="${i}">✎</button>
           <button class="ee-btn del" data-del="${i}">🗑</button>
         </div>
       </div>
     `).join('');
-
-    list.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editEssay(all[parseInt(b.dataset.edit)]));
-    list.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delEssay(all[parseInt(b.dataset.del)]));
-
-    // 按分类分组（方便看）
-    const groups = {};
-    all.forEach(a => {
-      const cid = a.category || 'other';
-      if(!groups[cid]) groups[cid] = {title: a.category_title || cid, items: []};
-      groups[cid].items.push(a);
-    });
-    // 在列表上方加分类分组统计
-    const statsHtml = Object.values(groups).map(g => {
-      const col = `var(--cat-${g.items[0].category || 'default'}, var(--cat-default))`;
-      return `<span style="color:${col};font-size:.75rem;margin:0 8px">● ${g.title} (${g.items.length})</span>`;
-    }).join('');
-    const statsEl = document.createElement('div');
-    statsEl.innerHTML = statsHtml;
-    statsEl.style.cssText = 'padding:8px 4px 12px;border-bottom:1px solid var(--border);margin-bottom:8px';
-    list.parentNode.insertBefore(statsEl, list);
-
-    // 拖拽排序
-    bindDragSort(list, all, 'essays', 'sort_order', ()=>renderList());
+    const itemList = items;
+    articlesEl.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => editEssay(itemList[parseInt(b.dataset.edit)]));
+    articlesEl.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delEssay(itemList[parseInt(b.dataset.del)]));
   }
 
   // 编辑/新建
-  function editEssay(a){
+  function editEssay(a, defaultCat){
     const isNew=!a;
-    const category=a?a.category:'thoughts';
+    const category=a?a.category:(defaultCat||'thoughts');
     const articleTitle=a?a.title:'';
     const date=a?a.date||'':new Date().toLocaleDateString('zh-CN').replace(/\//g,'.');
     const articleBody=a?a.body:'';
