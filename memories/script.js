@@ -1166,9 +1166,36 @@ async function loadFromSupabase(){
       allGalleryPhotos = [];
       merged.forEach(album => {
         (album.photos||[]).forEach(photo => {
-          allGalleryPhotos.push({path:photo, src:photo, _albumTitle:album.title, _albumId:album.id, _worldId:album.world||''});
+          const p = typeof photo === 'string' ? {path:photo, src:photo} : photo;
+          allGalleryPhotos.push({path:p.path||p.src||'', src:p.src||p.path||'', _albumTitle:album.title, _albumId:album.id, _worldId:album.world||''});
         });
       });
+      // 从 album_photos 表加载用户上传的照片补充到相册
+      const {data:albumPhotos} = await SB.from('album_photos').select('*').order('sort_order', {ascending:true});
+      if(albumPhotos && albumPhotos.length > 0){
+        const photoMap = {};
+        albumPhotos.forEach(ap => {
+          if(!photoMap[ap.album_id]) photoMap[ap.album_id] = [];
+          photoMap[ap.album_id].push(ap);
+        });
+        // 按 album.id 分配照片到对应相册
+        merged.forEach(album => {
+          const aid = album.id;
+          if(aid && photoMap[aid]){
+            photoMap[aid].forEach(ap => {
+              const sp = ap.storage_path || ap.filename || '';
+              // 照片可能是在 Supabase Storage 或 images/
+              const imgUrl = sp.startsWith('images/') ? ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//,''))
+                : ('https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/' + sp);
+              if(!album.photos) album.photos = [];
+              if(!album.photos.includes(imgUrl) && !album.photos.includes(sp)){
+                album.photos.push(imgUrl || sp);
+                allGalleryPhotos.push({path:imgUrl||sp, src:imgUrl||sp, _albumTitle:album.title, _albumId:album.id});
+              }
+            });
+          }
+        });
+      }
     }
 
     // 3. 音乐 — 从 music 表加载排序
