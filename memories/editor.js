@@ -457,24 +457,37 @@ async function renderMusicTab(){
       const files = e.target.files;
       const total = files.length;
       let okCount = 0, failCount = 0;
+      const errors = [];
       for(const f of files){
         const fname = 'music_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
         try{
           // 用 anon key 上传（RLS 已允许）
-          const {error:upErr} = await sb.storage.from('photos').upload(fname, f, {upsert:true});
+          const {error:upErr, data:upData} = await sb.storage.from('photos').upload(fname, f, {
+            upsert: true,
+            contentType: f.type || 'audio/mpeg',
+            cacheControl: '3600'
+          });
           if(!upErr){
-            await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order:-Date.now(), album_id:null});
-            okCount++;
+            const {error:dbErr} = await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order:-Date.now(), album_id:null});
+            if(dbErr){
+              failCount++;
+              errors.push(f.name + ': DB - ' + dbErr.message);
+            } else {
+              okCount++;
+            }
           } else {
             failCount++;
-            console.warn('[music upload]', upErr.message);
+            errors.push(f.name + ': Storage - ' + (upErr.message||JSON.stringify(upErr)));
           }
-        }catch(err){ console.warn('[music upload]', err); failCount++; }
+        }catch(err){ errors.push(f.name + ': ' + err.message); failCount++; }
       }
       e.target.value = '';
       renderMusicTab();
       if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 2000);
-      if(total > 0) alert('上传完成：' + okCount + ' 首成功' + (failCount > 0 ? '，' + failCount + ' 首失败' : ''));
+      if(total > 0){
+        const msg = '上传完成：' + okCount + ' 首成功' + (failCount > 0 ? '，' + failCount + ' 首失败\n\n错误：\n' + errors.join('\n') : '');
+        if(failCount > 0) alert(msg); else if(okCount > 0) console.log(msg);
+      }
     };
   }, 200);
 }
