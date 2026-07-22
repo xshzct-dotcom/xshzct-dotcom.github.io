@@ -944,122 +944,62 @@ function initMusic(){
   if(!bgMusic) return;
   bgMusic.volume=0.5;
   bgMusic.addEventListener('timeupdate',()=>{
-    if(bgMusic.duration){
+    if(bgMusic.duration)
       $('#playerProgress').style.width = (bgMusic.currentTime/bgMusic.duration)*100+'%';
-    }
   });
   bgMusic.addEventListener('ended',nextSong);
-  bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='\u23F8';});
-  bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='\u25B6';});
-  bgMusic.addEventListener('waiting',()=>{$('#playerTitle').textContent='\u7f13\u51b2\u4e2d\u2026';});
-  bgMusic.addEventListener('canplay',()=>{
-    if(window._currentSongs && window._currentSongs[currentSongIdx]){
-      const s=window._currentSongs[currentSongIdx];
-      $('#playerTitle').textContent=s.name||s.title||'\u672a\u77e5';
-    }
-  });
-  // 缓冲超时：8 秒还在缓冲就跳下一首
-  let _bufTimer=null;
-  function clearBufTimer(){ if(_bufTimer){ clearTimeout(_bufTimer); _bufTimer=null; } }
-  bgMusic.addEventListener('waiting',()=>{ clearBufTimer(); _bufTimer=setTimeout(()=>{ console.warn('[player] buffer timeout, skip'); nextSong(); },8000); });
-  bgMusic.addEventListener('canplay',()=>{ clearBufTimer(); });
-  bgMusic.addEventListener('error',()=>{ clearBufTimer(); });
-  let _errGuard=false;
-  bgMusic.addEventListener('error',()=>{
-    if(_errGuard) return;
-    _errGuard=true;
-    setTimeout(()=>{_errGuard=false;},1200);
-    nextSong();
-  });
+  bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';});
+  bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';});
+  bgMusic.addEventListener('error',()=>{ setTimeout(nextSong,1200); });
 
-  // 立刻用 data.js playlist 初始化第一首歌（不等 DB，快）
-  if(typeof playlist !== 'undefined' && playlist.length > 0){
-    const first = playlist[0];
-    const sp = (first.url || '').trim();
-    let url;
-    if(sp.startsWith('http')) url = sp;
-    else if(sp.startsWith('music/')) url = MUSIC_BASE + sp.slice(6);
-    else url = MUSIC_BASE + (first.name || '') + '.mp3';
-    bgMusic.src = url;
-    bgMusic.load(); // 开始加载（不播，等用户点击）
-    $('#playerTitle').textContent = first.name || '未知';
-    window._currentSongs = playlist.map(m => ({
-      name: m.name, title: m.name, artist: m.artist || '',
-      url: m.url || '', storage_path: m.url || '',
+  // 立即用 data.js 初始化（不等 DB）
+  if(typeof playlist!=='undefined' && playlist.length>0){
+    const p=playlist[0];
+    bgMusic.src = (p.url||'').startsWith('http') ? p.url : MUSIC_BASE+(p.name||'')+'.mp3';
+    bgMusic.load();
+    $('#playerTitle').textContent = p.name||'未知';
+    window._currentSongs = playlist.map(m=>({
+      name:m.name,title:m.name,artist:m.artist||'',url:m.url||'',storage_path:m.url||''
     }));
     currentSongIdx = 0;
   }
 
-  // 首次有效点击 → 播放（页面内任何点击都算用户手势）
-  document.addEventListener('click', function clickPlay(){
-    if(window._userStarted) return;
-    if(!bgMusic.src) return;
-    window._userStarted = true;
-    bgMusic.play().catch(()=>{});
-  });
+  // 首次点击 → 播放（手势）
+  const _c=()=>{if(!window._userStarted&&bgMusic.src){window._userStarted=true;bgMusic.play().catch(()=>{});}};
+  document.addEventListener('click',_c); document.addEventListener('keydown',_c); document.addEventListener('touchstart',_c);
 }
 
 function switchPlaylist(songs){
-  window._currentSongs = songs || [];
-  currentSongIdx = 0;
+  window._currentSongs=songs||[];
+  currentSongIdx=0;
   if(window._currentSongs.length) playSong(0);
 }
 function playSong(idx){
-  const songs = window._currentSongs;
-  if(!songs || idx < 0 || idx >= songs.length) return;
-  currentSongIdx = idx;
-  const s = songs[idx];
-  const sp = (s.storage_path || s.url || '').trim();
-  let url;
-  if(sp.startsWith('http')) url = sp;
-  else if(sp.startsWith('music/')) url = MUSIC_BASE + sp.slice(6);
-  else if(sp) url = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/' + sp;
-  else url = MUSIC_BASE + (s.name || s.title || '') + '.mp3';
-  bgMusic.src = url;
-  bgMusic.load();
-  bgMusic.play().catch(()=>{});
-  $('#playerTitle').textContent = s.name || s.title || '未知';
+  const s=window._currentSongs;
+  if(!s||idx<0||idx>=s.length) return;
+  currentSongIdx=idx;
+  const t=s[idx];
+  const sp=(t.storage_path||t.url||'').trim();
+  let url = sp.startsWith('http') ? sp
+          : sp.startsWith('music/') ? MUSIC_BASE+sp.slice(6)
+          : sp ? 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/'+sp
+          : MUSIC_BASE+(t.name||t.title||'')+'.mp3';
+  bgMusic.src=url; bgMusic.load(); bgMusic.play().catch(()=>{});
+  $('#playerTitle').textContent=t.name||t.title||'未知';
 }
 function togglePlay(){
   if(!bgMusic) return;
-  if(isPlaying){ bgMusic.pause(); return; }
-  // 如果 src 为空或还没加载过，先加载当前歌
-  if(!bgMusic.src || bgMusic.src===window.location.href || bgMusic.readyState===0){
-    const songs=window._currentSongs;
-    if(songs&&songs.length>0) playSong(currentSongIdx);
-  }
+  if(isPlaying) { bgMusic.pause(); return; }
+  if(!bgMusic.src||bgMusic.readyState===0){ const s=window._currentSongs; if(s&&s.length) playSong(currentSongIdx); else return; }
   bgMusic.play().catch(()=>{});
 }
-window.togglePlay=togglePlay;
-function prevSong(){
-  const songs=window._currentSongs;
-  if(!songs||songs.length===0) return;
-  let idx=currentSongIdx-1; if(idx<0) idx=songs.length-1;
-  playSong(idx);
-}
-window.prevSong=prevSong;
-function nextSong(){
-  const songs=window._currentSongs;
-  if(!songs||songs.length===0) return;
-  let idx=currentSongIdx+1; if(idx>=songs.length) idx=0;
-  playSong(idx);
-}
-window.nextSong=nextSong;
-// 编辑器调用：把播放列表同步到网页播放器并播放指定位置
-window.setPlaylistTo = function(songs, playIdx){
-  window._currentSongs = songs;
-  currentSongIdx = playIdx != null && playIdx >= 0 ? playIdx : 0;
-  playSong(currentSongIdx);
-};
-function seek(e){
-  if(!bgMusic||!bgMusic.duration) return;
-  const rect=e.currentTarget.getBoundingClientRect();
-  const pct=(e.clientX-rect.left)/rect.width;
-  bgMusic.currentTime=pct*bgMusic.duration;
-}
-window.seek=seek;
+function prevSong(){ const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx-1; if(i<0)i=s.length-1; playSong(i); }
+function nextSong(){ const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx+1; if(i>=s.length)i=0; playSong(i); }
+function seek(e){ const b=$('#playerBar'); if(!b||!bgMusic.duration) return; const r=b.getBoundingClientRect(); bgMusic.currentTime=((e.clientX-r.left)/r.width)*bgMusic.duration; }
 function togglePlayer(){ $('#player').classList.toggle('collapsed'); }
+window.togglePlay=togglePlay; window.prevSong=prevSong; window.nextSong=nextSong;
 window.togglePlayer=togglePlayer;
+window.setPlaylistTo=function(s,i){ window._currentSongs=s; currentSongIdx=i>=0?i:0; playSong(currentSongIdx); };
 
 // ===== 滚动观察器 =====
 function observeFadeUps(){
