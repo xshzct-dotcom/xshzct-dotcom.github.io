@@ -207,13 +207,13 @@ function buildTimeline(){
     return t.length>len ? t.slice(0,len)+'…' : t;
   }
   timeline.innerHTML = items.map((item,i) => `
-    <div class="timeline-item fade-up" data-idx="${i}">
+    <div class="timeline-item fade-up cat-${item.catId}" data-idx="${i}">
       <div class="timeline-dot"></div>
       <div class="timeline-card" data-idx="${i}">
         <div class="tl-date">${item.date||''}</div>
         <div class="tl-title">${esc(item.title)}</div>
         <div class="tl-excerpt">${esc(excerpt(item.body,120))}</div>
-        <span class="tl-cat">${item.cat}</span>
+        <span class="tl-cat" style="color:var(--cat-${item.catId})">● ${item.cat}</span>
       </div>
     </div>
   `).join('');
@@ -242,7 +242,7 @@ function openEssayModal(essay){
   content.innerHTML = `
     <button class="modal-close" onclick="closeEssayModal()">×</button>
     <div class="modal-essay-title">${esc(essay.title)}</div>
-    <div class="modal-essay-date">${essay.date||''} · ${essay.cat||''}</div>
+    <div class="modal-essay-date">${essay.date||''} · <span style="color:var(--cat-${essay.catId})">● ${esc(essay.cat||'')}</span></div>
     <div class="modal-essay-body">${fmtBody(essay.body)}</div>
     <div class="modal-nav">
       <button class="editor-btn editor-btn-secondary" ${hasPrev?'':'disabled'} onclick="${hasPrev?'openEssayModal(_timelineItems['+ (curIdx-1) +'])':'void 0'}">← 上一篇</button>
