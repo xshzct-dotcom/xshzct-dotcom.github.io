@@ -963,12 +963,43 @@ function initMusic(){
 
   visBars = $$('#playerVisualizer span');
 
-  // 一次点击就启动播放（避开 autoplay 拦截）
-  // 已 _userStarted 后此 listener 自动 noop
+  // 初始化 Web Audio API 真实频谱分析
+  // 在 audio 被 play() 之前创建 MediaElementSource，保证路由正常
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 64;
+    audioSource = audioCtx.createMediaElementSource(bgMusic);
+    audioSource.connect(analyser);
+    analyser.connect(audioCtx.destination);
+  } catch(e) {
+    console.warn('[player] WebAudio init failed:', e);
+    audioCtx = null;
+  }
+
+  // 频谱 tick 常驻循环（requestAnimationFrame 一直跑，isPlaying false 时跳过）
+  (function tick(){
+    if(audioCtx && analyser && isPlaying && visBars){
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(data);
+      const len = data.length;
+      const seg = Math.floor(len/4);
+      for(let i=0;i<4;i++){
+        let sum=0;
+        for(let j=0;j<seg;j++) sum += data[i*seg+j];
+        const v = sum/seg/255;
+        if(visBars[i]) visBars[i].style.height = (4 + v*14)+'px';
+      }
+    }
+    requestAnimationFrame(tick);
+  })();
+
+  // 一次用户交互：恢复 AudioContext（浏览器默认 suspended）+ 播放
   const kickStart = ()=>{
     if(window._userStarted) return;
     if(!bgMusic.src) return; // 等 playlist 就绪
     window._userStarted = true;
+    if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     bgMusic.play().catch(()=>{});
   };
   document.addEventListener('click', kickStart);
@@ -977,7 +1008,6 @@ function initMusic(){
 }
 
 function visStart(){
-  // 用纯 CSS 动画，避开 Web Audio API 拦截 HTML5 audio 导致的没声音问题
   $('#playerVisualizer').classList.add('active');
 }
 function visStop(){
