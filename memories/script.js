@@ -233,6 +233,7 @@ function openEssayModal(essay){
   const content=$('#essayModalContent');
   if(!overlay||!content) return;
   const curIdx = _timelineItems.findIndex(t => t.title === essay.title);
+  console.log('[essay] curIdx:', curIdx, 'total:', _timelineItems.length, 'title:', essay.title, 'cat:', essay.cat);
   const hasPrev = curIdx >= 0 && curIdx > 0;
   const hasNext = curIdx >= 0 && curIdx < _timelineItems.length - 1;
   function fmtBody(b){
