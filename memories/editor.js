@@ -268,7 +268,7 @@ async function renderEssayTab(){
     document.querySelector('[data-ee-new]').onclick = () => editEssay(null, catId);
     const articlesEl = document.getElementById('eeArticles');
     articlesEl.innerHTML = items.map((a,i) => `
-      <div class="ee-list-item" data-idx="${i}" data-sid="${a.id}">
+      <div class="ee-list-item" draggable="true" data-idx="${i}" data-sid="${a.id}">
         <span class="ee-drag">⠿</span>
         <span class="e-title">${esc(a.title)}</span>
         <span class="e-meta">${a.date||''}</span>
@@ -281,6 +281,31 @@ async function renderEssayTab(){
     const itemList = items;
     articlesEl.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => editEssay(itemList[parseInt(b.dataset.edit)]));
     articlesEl.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delEssay(itemList[parseInt(b.dataset.del)]));
+    // 拖拽排序（文章内部排序）
+    (function(el, data, catId){
+      if(!el) return;
+      const items = el.querySelectorAll('[draggable="true"]');
+      items.forEach(card => {
+        card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', card.dataset.idx); card.style.opacity='0.4'; });
+        card.addEventListener('dragend', () => { card.style.opacity='1'; });
+        card.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+        card.addEventListener('drop', async e => {
+          e.preventDefault();
+          const from = parseInt(e.dataTransfer.getData('text/plain'));
+          const to = parseInt(card.dataset.idx);
+          if(from===to || isNaN(from) || isNaN(to)) return;
+          const item = data.splice(from,1)[0];
+          data.splice(to,0,item);
+          if(sb){
+            for(let j=0;j<data.length;j++){
+              await sb.from('essays').update({sort_order:j}).eq('id', data[j].id).catch(()=>{});
+            }
+          }
+          renderArticlesInCat(catId);
+          if(window.reloadFromSupabase) setTimeout(window.reloadFromSupabase, 2000);
+        });
+      });
+    })(articlesEl, itemList, catId);
   }
 
   // 编辑/新建
