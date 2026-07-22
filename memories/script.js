@@ -949,9 +949,21 @@ function initMusic(){
     }
   });
   bgMusic.addEventListener('ended',nextSong);
-  bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';});
-  bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';});
-  bgMusic.addEventListener('waiting',()=>{$('#playerTitle').textContent='缓冲中…';});
+  bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='\u23F8';});
+  bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='\u25B6';});
+  bgMusic.addEventListener('waiting',()=>{$('#playerTitle').textContent='\u7f13\u51b2\u4e2d\u2026';});
+  bgMusic.addEventListener('canplay',()=>{
+    if(window._currentSongs && window._currentSongs[currentSongIdx]){
+      const s=window._currentSongs[currentSongIdx];
+      $('#playerTitle').textContent=s.name||s.title||'\u672a\u77e5';
+    }
+  });
+  // 缓冲超时：8 秒还在缓冲就跳下一首
+  let _bufTimer=null;
+  function clearBufTimer(){ if(_bufTimer){ clearTimeout(_bufTimer); _bufTimer=null; } }
+  bgMusic.addEventListener('waiting',()=>{ clearBufTimer(); _bufTimer=setTimeout(()=>{ console.warn('[player] buffer timeout, skip'); nextSong(); },8000); });
+  bgMusic.addEventListener('canplay',()=>{ clearBufTimer(); });
+  bgMusic.addEventListener('error',()=>{ clearBufTimer(); });
   let _errGuard=false;
   bgMusic.addEventListener('error',()=>{
     if(_errGuard) return;
