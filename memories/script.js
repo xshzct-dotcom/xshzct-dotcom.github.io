@@ -406,11 +406,6 @@ function riverScroll(dir){
   if(window.SFX) window.SFX.flip();
 }
 
-function riverShuffle(){
-  renderRiver();
-  if(window.SFX) window.SFX.shutter();
-}
-
 function buildRiverFilters(){
   var container = document.getElementById('viewerFilters');
   if(!container) return;
@@ -445,7 +440,6 @@ function buildRiverFilters(){
 }
 
 window.riverScroll = riverScroll;
-window.riverShuffle = riverShuffle;
 
 // ===== 灯箱 v2 =====// ===== 灯箱 v2 =====
 let zoom = {scale: 1, x: 0, y: 0};
@@ -781,117 +775,6 @@ document.addEventListener('keydown', e => {
   }
   if($('#essayModal').classList.contains('active') && e.key === 'Escape') closeEssayModal();
 });
-
-// ===== 随机回忆（Ken Burns） =====
-function shuffleMemory(){
-  if(allGalleryPhotos.length === 0) return;
-  const idx = randi(0, allGalleryPhotos.length-1);
-  lightboxPhotos = allGalleryPhotos;
-  openLightbox(idx, false);
-  // 自动播放音乐
-  if(typeof togglePlay === 'function' && bgMusic && !isPlaying){
-    bgMusic.play().catch(()=>{});
-  }
-}
-window.shuffleMemory = shuffleMemory;
-
-// ===== 年份热力图 =====
-function buildYearHeatmap(){
-  const grid = $('#heatmapGrid');
-  if(!grid) return;
-  // 统计每天的条目数（文章+照片，按日期）
-  const counts = {};
-  function addDate(d){
-    if(!d) return;
-    // d 形如 "2026.6.22" 或 "2026-06-22"
-    const m = String(d).match(/(\d{4})[.\-/年](\d{1,2})[.\-/月](\d{1,2})/);
-    if(!m) return;
-    const key = `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
-    counts[key] = (counts[key]||0) + 1;
-  }
-  if(typeof essayCategories !== 'undefined'){
-    essayCategories.forEach(cat => (cat.articles||[]).forEach(a => addDate(a.date)));
-  }
-  if(typeof travels !== 'undefined') travels.forEach(a => addDate(a.date));
-
-  // 生成 52 周 × 7 天 的网格（最近一年）
-  const today = new Date();
-  const startDate = new Date(today);
-  startDate.setDate(startDate.getDate() - 364);
-  // 对齐到周日开始
-  const dow = startDate.getDay();
-  startDate.setDate(startDate.getDate() - dow);
-
-  const maxCount = Math.max(1, ...Object.values(counts));
-  const cells = [];
-  const monthLabels = [];
-  let lastMonth = -1;
-  for(let week=0; week<53; week++){
-    for(let day=0; day<7; day++){
-      const d = new Date(startDate);
-      d.setDate(d.getDate() + week*7 + day);
-      if(d > today) continue;
-      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      const c = counts[key] || 0;
-      let level = 0;
-      if(c > 0) level = Math.min(4, Math.ceil((c/maxCount)*4));
-      cells.push({d, key, level, count: c});
-      // 月份标签（每个月的第一格上方）
-      const m = d.getMonth();
-      if(d.getDate() <= 7 && m !== lastMonth){
-        monthLabels.push({week, month: m});
-        lastMonth = m;
-      }
-    }
-  }
-
-  const monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-  let html = '<div style="display:flex;flex-direction:column;gap:2px">';
-  // 月份标签行
-  html += '<div style="display:flex;gap:2px;padding-left:24px;font-size:.65rem;color:var(--text-muted)">';
-  for(let i=0;i<53;i++) html += `<div style="flex:1">${monthLabels.find(m=>m.week===i) ? monthNames[monthLabels.find(m=>m.week===i).month] : ''}</div>`;
-  html += '</div>';
-  // 周日开始
-  html += '<div style="display:flex;gap:2px"><div style="display:flex;flex-direction:column;gap:2px;font-size:.6rem;color:var(--text-muted);margin-right:4px"><span>日</span><span></span><span>一</span><span></span><span>二</span><span></span><span>三</span><span></span><span>四</span><span></span><span>五</span><span></span><span>六</span></div>';
-  // 7 行（周日到周六）× 53 列
-  for(let day=0; day<7; day++){
-    html += '<div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0">';
-    for(let week=0; week<53; week++){
-      const cell = cells.find(c => {
-        const diff = Math.floor((c.d - startDate)/(1000*60*60*24));
-        return diff === week*7 + day;
-      });
-      if(cell){
-        html += `<div class="heatmap-cell" data-level="${cell.level}" data-key="${cell.key}" data-count="${cell.count}" data-date="${cell.d.getFullYear()}.${cell.d.getMonth()+1}.${cell.d.getDate()}" style="aspect-ratio:1;flex:1"></div>`;
-      } else {
-        html += '<div style="aspect-ratio:1;flex:1"></div>';
-      }
-    }
-    html += '</div>';
-  }
-  html += '</div></div>';
-  grid.innerHTML = html;
-
-  // tooltip
-  const tooltip = $('#heatmapTooltip');
-  grid.querySelectorAll('.heatmap-cell').forEach(cell => {
-    cell.addEventListener('mouseenter', e => {
-      const date = cell.dataset.date;
-      const count = cell.dataset.count;
-      const level = cell.dataset.level;
-      if(level === '0' && count === '0') return;
-      tooltip.textContent = `${date} · ${count} 条`;
-      tooltip.style.display = 'block';
-    });
-    cell.addEventListener('mousemove', e => {
-      tooltip.style.left = (e.clientX - 30) + 'px';
-      tooltip.style.top = (e.clientY - 36) + 'px';
-    });
-    cell.addEventListener('mouseleave', () => {
-      tooltip.style.display = 'none';
-    });
-  });
-}
 
 // ===== 旧世界密码 =====
 let pwdCallback=null;
@@ -1258,7 +1141,6 @@ function init(){
   fillTimelineIndex();
   buildTimeline();
   buildRiver();
-  buildYearHeatmap();
   bindLightboxInteractions();
   initDailyQuote();
   observeFadeUps();
@@ -1266,10 +1148,6 @@ function init(){
   // 齿轮
   const gear=$('#navGear');
   if(gear) gear.onclick = () => { if(window.EDITOR && window.EDITOR.open) window.EDITOR.open(); };
-
-  // 随机
-  const shuffle=$('#navShuffle');
-  if(shuffle) shuffle.onclick = shuffleMemory;
 
   // 同步 data.js → Supabase（让编辑器有真实数据）— 暴露 promise 给 editor 共享
   window.MemoriesReady = ensureSync();
