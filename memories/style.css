@@ -333,8 +333,8 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 }
 @media(max-width:768px){
   .nav{padding:0 12px;gap:8px}
-  .nav-links{display:flex;gap:14px;flex:1;justify-content:center}
-  .nav-links a{font-size:.8rem}
+  .nav-links{display:flex;gap:14px;flex:1;justify-content:space-around;align-items:center}
+  .nav-links a{font-size:1rem;padding:8px 4px;flex:1;text-align:center}
   .nav-right{gap:4px}
   .nav-right .nav-icon-btn{width:32px;height:32px;font-size:1rem}
   .nav-shuffle{font-size:.85rem!important}
@@ -357,5 +357,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   .gallery-filter{padding:6px 14px;font-size:.8rem}
   .masonry-item{width:100%}
   .daily-quote .dq-text{font-size:1.1rem}
+  .nav-links a{font-size:.95rem;padding:8px 2px}
+  .nav{padding:0 8px}
 }
 
