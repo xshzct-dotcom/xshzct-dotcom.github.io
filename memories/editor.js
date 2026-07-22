@@ -233,6 +233,23 @@ async function renderEssayTab(){
     list.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editEssay(all[parseInt(b.dataset.edit)]));
     list.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delEssay(all[parseInt(b.dataset.del)]));
 
+    // 按分类分组（方便看）
+    const groups = {};
+    all.forEach(a => {
+      const cid = a.category || 'other';
+      if(!groups[cid]) groups[cid] = {title: a.category_title || cid, items: []};
+      groups[cid].items.push(a);
+    });
+    // 在列表上方加分类分组统计
+    const statsHtml = Object.values(groups).map(g => {
+      const col = `var(--cat-${g.items[0].category || 'default'}, var(--cat-default))`;
+      return `<span style="color:${col};font-size:.75rem;margin:0 8px">● ${g.title} (${g.items.length})</span>`;
+    }).join('');
+    const statsEl = document.createElement('div');
+    statsEl.innerHTML = statsHtml;
+    statsEl.style.cssText = 'padding:8px 4px 12px;border-bottom:1px solid var(--border);margin-bottom:8px';
+    list.parentNode.insertBefore(statsEl, list);
+
     // 拖拽排序
     bindDragSort(list, all, 'essays', 'sort_order', ()=>renderList());
   }
@@ -272,14 +289,14 @@ async function renderEssayTab(){
         else{data.sort_order=0;await db().from('essays').insert(data);}
       }
       renderEssayTab();
-      if(typeof buildTimeline==='function') buildTimeline();
+      if(window.reloadFromSupabase) setTimeout(window.reloadFromSupabase, 2000);
     };
 
     if(!isNew) $('#eeDelBtn').onclick=async()=>{
       if(!confirm('确定删除「'+title+'」？'))return;
       await db().from('essays').delete().eq('id',a.id);
       renderEssayTab();
-      if(typeof buildTimeline==='function') buildTimeline();
+      if(window.reloadFromSupabase) setTimeout(window.reloadFromSupabase, 2000);
     };
   }
 
