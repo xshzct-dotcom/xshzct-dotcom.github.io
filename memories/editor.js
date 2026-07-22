@@ -75,6 +75,40 @@ async function bindDragSort(listEl, data, table, sortField, onReorder){
   });
 }
 
+// 照片缩略图拖拽排序（用 data-i 而非 data-idx）
+function bindPhotoDragSort(listEl, data, album){
+  if(!listEl) return;
+  const cards = listEl.querySelectorAll('.ae-photo-card');
+  cards.forEach(card=>{
+    card.addEventListener('dragstart', e=>{
+      e.dataTransfer.setData('text/plain', card.dataset.i);
+      card.style.opacity='0.4';
+    });
+    card.addEventListener('dragend', ()=>{ card.style.opacity='1'; });
+    card.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+    card.addEventListener('drop', async e=>{
+      e.preventDefault();
+      const from = parseInt(e.dataTransfer.getData('text/plain'));
+      const to = parseInt(card.dataset.i);
+      if(from===to || isNaN(from) || isNaN(to)) return;
+      const item = data.splice(from,1)[0];
+      data.splice(to,0,item);
+      // 批量更新 sort_order
+      try{
+        if(sb){
+          for(let j=0;j<data.length;j++){
+            const {error} = await sb.from('album_photos').update({sort_order:j}).eq('id', data[j].id);
+            if(error) console.warn('[photo drag]', error);
+          }
+        }
+      }catch(e){ console.warn('[photo drag] failed:', e); }
+      // 重新渲染
+      renderAlbumPhotos(album);
+      if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 1500);
+    });
+  });
+}
+
 function db(){
   if(sb)return sb;
   const qb=r=>new Proxy({},{get:(_,p)=>{
@@ -315,30 +349,67 @@ async function renderAlbumTab(){
       `;
       function renderPhotos(){
         const el=$('#aePhotoList');
-        el.innerHTML=plist.map((p,i)=>`
-          <div class="editor-list-item">
-            <span class="editor-drag-handle" draggable="true">⠿</span>
-            <div class="info"><div class="title">${p.storage_path||p.filename||'照片'+(i+1)}</div></div>
-            <div class="actions">
-              <button class="editor-btn-sm" data-ae-preview="${i}">👁</button>
-              <button class="editor-btn-sm del" data-ae-pdel="${i}">🗑</button>
+        // 用 grid 布局展示缩略图
+        el.style.display = 'grid';
+        el.style.gridTemplateColumns = 'repeat(auto-fill, minmax(140px, 1fr))';
+        el.style.gap = '10px';
+        el.style.padding = '10px 0';
+        el.innerHTML = plist.map((p,i) => {
+          // storage_path 是相对路径如 "images/oldworld/桂林/DSC_xxx.jpg"
+          // Supabase Storage 文件是 "music_xxx.mp3" 之类
+          // 计算 URL
+          const sp = p.storage_path || p.filename || '';
+          const isStorage = !sp.startsWith('images/') && !sp.startsWith('thumbs/');
+          const thumbUrl = isStorage
+            ? (STORAGE_URL + '/' + sp)
+            : ('https://xshzct-dotcom.github.io/thumbs/' + sp.replace(/^images\//, ''));
+          const fullUrl = isStorage
+            ? (STORAGE_URL + '/' + sp)
+            : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
+          const fname = (p.filename || sp.split('/').pop() || '').replace(/\.[^.]+$/, '');
+          return `
+          <div class="ae-photo-card" data-i="${i}" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:8px;overflow:hidden;cursor:pointer;transition:all .2s" draggable="true">
+            <img src="${thumbUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;background:#1a1d2e" onerror="this.style.opacity=.2" />
+            <div class="ae-photo-overlay" style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.8) 0%,rgba(0,0,0,0) 50%);opacity:0;transition:opacity .2s;display:flex;flex-direction:column;justify-content:flex-end;padding:8px">
+              <div style="font-size:.7rem;color:#fff;line-height:1.3;max-height:2.6em;overflow:hidden;text-overflow:ellipsis;word-break:break-all">${esc(fname)}</div>
+              <div style="display:flex;gap:4px;margin-top:6px">
+                <button data-ae-preview="${i}" style="flex:1;padding:4px;background:rgba(255,255,255,.2);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.75rem" title="预览">👁 预览</button>
+                <button data-ae-pdel="${i}" style="flex:1;padding:4px;background:rgba(220,38,38,.7);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.75rem" title="删除">🗑 删除</button>
+              </div>
             </div>
+            <div style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;font-size:.65rem;padding:2px 6px;border-radius:3px;pointer-events:none">${i+1}</div>
+            <div style="position:absolute;top:4px;right:4px;color:rgba(255,255,255,.5);font-size:.85rem;cursor:grab;pointer-events:none">⠿</div>
           </div>
-        `).join('')||'<div class="editor-empty">暂无照片，上传一些吧</div>';
+          `;
+        }).join('') || '<div class="editor-empty" style="grid-column:1/-1">暂无照片，上传一些吧</div>';
 
-        el.querySelectorAll('[data-ae-preview]').forEach(b=>{
-          b.onclick=()=>{
-            const p=plist[parseInt(b.dataset.aePreview)];
-            const src=p.storage_path?(STORAGE_URL+'/'+p.storage_path):('../images/'+(p.filename||''));
-            window.open(src); // 简单预览
+        // Hover 显示操作
+        el.querySelectorAll('.ae-photo-card').forEach(card => {
+          const overlay = card.querySelector('.ae-photo-overlay');
+          card.addEventListener('mouseenter', () => { overlay.style.opacity = '1'; });
+          card.addEventListener('mouseleave', () => { overlay.style.opacity = '0'; });
+        });
+        el.querySelectorAll('[data-ae-preview]').forEach(b => {
+          b.onclick = e => {
+            e.stopPropagation();
+            const p = plist[parseInt(b.dataset.aePreview)];
+            const sp = p.storage_path || p.filename || '';
+            const isStorage = !sp.startsWith('images/');
+            const src = isStorage ? (STORAGE_URL + '/' + sp) : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
+            window.open(src);
           };
         });
-        el.querySelectorAll('[data-ae-pdel]').forEach(b=>b.onclick=()=>{
-          const p=plist[parseInt(b.dataset.aePdel)];
-          if(!confirm('删除该照片？'))return;
-          db().from('album_photos').delete().eq('id',p.id).then(()=>renderAlbumPhotos(album));
-          if(p.storage_path) db().storage.from('photos').remove([p.storage_path]).catch(()=>{});
+        el.querySelectorAll('[data-ae-pdel]').forEach(b => {
+          b.onclick = e => {
+            e.stopPropagation();
+            const p = plist[parseInt(b.dataset.aePdel)];
+            if (!confirm('删除该照片？')) return;
+            db().from('album_photos').delete().eq('id', p.id).then(() => renderAlbumPhotos(album));
+            if (p.storage_path) db().storage.from('photos').remove([p.storage_path]).catch(() => {});
+          };
         });
+        // 拖拽排序
+        bindPhotoDragSort(el, plist, album);
       }
       renderPhotos();
 
