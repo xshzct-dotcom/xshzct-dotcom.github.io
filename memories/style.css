@@ -346,3 +346,36 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   .masonry-item{width:100%}
   .daily-quote .dq-text{font-size:1.1rem}
 }
+
+/* ===== 音乐星图 ===== */
+.star-map{position:fixed;inset:0;z-index:300;background:radial-gradient(ellipse at 40% 30%,#0d1224 0%,#05080f 60%,#000 100%);display:none;overflow:hidden;cursor:default}
+.star-map.active{display:block}
+.star-map-canvas{position:absolute;inset:0;width:100%;height:100%}
+.star-map-close{position:absolute;top:18px;right:20px;z-index:10;width:40px;height:40px;border:1px solid rgba(255,255,255,.15);border-radius:50%;background:rgba(255,255,255,.06);color:#fff;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .25s}
+.star-map-close:hover{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3)}
+.star-map-title{position:absolute;top:24px;left:50%;transform:translateX(-50%);z-index:10;color:rgba(255,255,255,.5);font-size:.85rem;letter-spacing:4px;text-transform:uppercase;pointer-events:none}
+.star-map-satellites{position:absolute;inset:0;z-index:5}
+
+/* 卫星 */
+.satellite{position:absolute;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:transform .4s cubic-bezier(.34,1.56,.64,1),opacity .4s;opacity:0;z-index:5}
+.satellite.visible{opacity:1}
+.satellite:hover{z-index:10}
+.satellite:hover .satellite-orb{transform:scale(1.25)}
+.satellite:hover .satellite-label{opacity:1;transform:translateY(0)}
+.satellite-orb{width:var(--size);height:var(--size);border-radius:50%;position:relative;transition:transform .35s cubic-bezier(.34,1.56,.64,1);box-shadow:0 0 var(--glow-size) var(--color),0 0 calc(var(--glow-size)*3) calc(var(--glow-size)*.3) var(--color);background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.4) 0%,var(--color) 60%,rgba(0,0,0,.6) 100%)}
+.satellite-orb::after{content:'';position:absolute;inset:3px;border-radius:50%;background:radial-gradient(circle at 25% 20%,rgba(255,255,255,.5) 0%,transparent 70%)}
+.satellite-orb.pulse{animation:pulse-glow 1.5s ease-in-out infinite}
+.satellite-label{color:rgba(255,255,255,.85);font-size:.78rem;margin-top:8px;white-space:nowrap;text-shadow:0 0 12px rgba(0,0,0,.9);opacity:0;transform:translateY(4px);transition:all .3s;pointer-events:none;font-weight:500;letter-spacing:.5px}
+.satellite.hovered .satellite-label{opacity:1;transform:translateY(0)}
+.satellite .satellite-sub{color:rgba(255,255,255,.4);font-size:.6rem;margin-top:2px;opacity:0;transition:opacity .3s;pointer-events:none}
+.satellite.hovered .satellite-sub{opacity:1}
+
+/* 星座连线 canvas */
+.constellation-canvas{position:absolute;inset:0;z-index:3;pointer-events:none}
+
+/* 浮动照片 */
+.star-photos{position:absolute;inset:0;z-index:8;pointer-events:none}
+.star-photo{position:absolute;width:80px;height:80px;border-radius:12px;object-fit:cover;opacity:0;transition:all .8s cubic-bezier(.34,1.56,.64,1);pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1)}
+.star-photo.show{opacity:.85}
+
+@keyframes pulse-glow{0%,100%{box-shadow:0 0 var(--glow-size) var(--color),0 0 calc(var(--glow-size)*3) calc(var(--glow-size)*.3) var(--color)}50%{box-shadow:0 0 calc(var(--glow-size)*1.4) var(--color),0 0 calc(var(--glow-size)*5) calc(var(--glow-size)*.5) var(--color)}}
