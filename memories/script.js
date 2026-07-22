@@ -853,7 +853,14 @@ function initMusic(){
   // 首次点击 → 授权播放手势（不播歌，等 DB 加载完毕再播）
   document.addEventListener('click', _grant); document.addEventListener('keydown', _grant); document.addEventListener('touchstart', _grant);
 }
-function _grant(){ if(!window._userStarted) window._userStarted=true; }
+function _grant(){ 
+  if(window._userStarted) return;
+  window._userStarted = true;
+  // 如果 switchPlaylist 已加载好歌，立即播放
+  if(bgMusic && bgMusic.src && bgMusic.src !== window.location.href && bgMusic.paused){
+    bgMusic.play().catch(()=>{});
+  }
+}
 
 function switchPlaylist(songs){
   window._currentSongs=songs||[];
