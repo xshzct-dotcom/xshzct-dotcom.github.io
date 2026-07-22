@@ -228,13 +228,24 @@ function buildTimeline(){
 
 // 文章阅读弹窗
 let _timelineItems = [];
-function openEssayModal(essay){
+window._timelineItems = _timelineItems;
+function openEssayModal(essay, catOnly){
   const overlay=$('#essayModal');
   const content=$('#essayModalContent');
   if(!overlay||!content) return;
-  const curIdx = _timelineItems.findIndex(t => t.title === essay.title);
+  // 如果 catOnly 为 true，只在同分类内导航
+  const pool = catOnly ? window._timelineItems.filter(t => t.catId === essay.catId) : window._timelineItems;
+  const curIdx = pool.findIndex(t => t.title === essay.title);
   const hasPrev = curIdx >= 0 && curIdx > 0;
-  const hasNext = curIdx >= 0 && curIdx < _timelineItems.length - 1;
+  const hasNext = curIdx >= 0 && curIdx < pool.length - 1;
+  // 存当前分类 ID 到 window，供按钮查找
+  window._essayCatId = essay.catId;
+  function navTo(offset){
+    const p = window._timelineItems.filter(t => t.catId === window._essayCatId);
+    const i = p.findIndex(t => t.title === essay.title) + offset;
+    if(i>=0 && i<p.length) openEssayModal(p[i], true);
+  }
+  content.innerHTML = `
   function fmtBody(b){
     if(!b) return '';
     return b.split('\n').filter(l=>l.trim()).map(l=>`<p>${esc(l)}</p>`).join('');
@@ -245,9 +256,9 @@ function openEssayModal(essay){
     <div class="modal-essay-date">${essay.date||''} · <span style="color:var(--cat-${essay.catId})">● ${esc(essay.cat||'')}</span></div>
     <div class="modal-essay-body">${fmtBody(essay.body)}</div>
     <div class="modal-nav">
-      <button class="editor-btn editor-btn-secondary" ${hasPrev?'':'disabled'} onclick="${hasPrev?'openEssayModal(window._timelineItems['+ (curIdx-1) +'])':'void 0'}">← 上一篇</button>
-      <span style="color:var(--text-muted);font-size:.85rem">${curIdx+1}/${_timelineItems.length}</span>
-      <button class="editor-btn editor-btn-secondary" ${hasNext?'':'disabled'} onclick="${hasNext?'openEssayModal(window._timelineItems['+ (curIdx+1) +'])':'void 0'}">下一篇 →</button>
+      <button class="editor-btn editor-btn-secondary" ${hasPrev?'':'disabled'} onclick="${hasPrev?'navTo(-1)':'void 0'}">← 上一篇</button>
+      <span style="color:var(--text-muted);font-size:.85rem">${curIdx+1}/${pool.length}</span>
+      <button class="editor-btn editor-btn-secondary" ${hasNext?'':'disabled'} onclick="${hasNext?'navTo(1)':'void 0'}">下一篇 →</button>
     </div>
   `;
   overlay.classList.add('active');
