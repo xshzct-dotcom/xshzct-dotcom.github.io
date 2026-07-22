@@ -468,7 +468,7 @@ async function renderMusicTab(){
             cacheControl: '3600'
           });
           if(!upErr){
-            const {error:dbErr} = await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order:-Date.now(), album_id:null});
+            const {error:dbErr} = await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order:Date.now(), album_id:null});
             if(dbErr){
               failCount++;
               errors.push(f.name + ': DB - ' + dbErr.message);
