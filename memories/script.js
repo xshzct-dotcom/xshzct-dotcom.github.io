@@ -949,13 +949,11 @@ function fillTimelineIndex(){
   if(typeof travels !== 'undefined'){
     travels.forEach(art => _timelineItems.push({...art, cat:'旅行见闻', catId:'travel'}));
   }
-  // 排序：先按 sort_order（编辑器自定义），再按日期（新的在上）
+  // 排序：按日期新的在上，同日期按 sort_order
   _timelineItems.sort((a,b)=>{
-    var ao=a.sort_order!=null?a.sort_order:0, bo=b.sort_order!=null?b.sort_order:0;
-    if(ao!==bo) return ao-bo;
     var da=a.date||'', db=b.date||'';
     if(da>db) return -1; if(da<db) return 1;
-    return 0;
+    return (b.sort_order||0)-(a.sort_order||0);
   });
   // 从 Supabase 同步 sort_order（如果已编辑过）
   loadSortOrderFromDB();
