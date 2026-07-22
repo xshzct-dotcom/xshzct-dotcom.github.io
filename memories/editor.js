@@ -425,19 +425,18 @@ async function renderMusicTab(){
           alert('删除失败：' + error.message);
           return;
         }
-        // 2. 删 Supabase Storage 里的上传文件
+        // 2. 删 Supabase Storage 里的文件
         if(t.storage_path){
-          sb.storage.from('photos').remove([t.storage_path]).catch(()=>{});
+          const sp = (t.storage_path || '').trim();
+          // 如果 storage_path 是完整 URL（https://xxx/photos/yyy.mp3），提取文件名
+          const objName = sp.includes('photos/') ? sp.split('photos/')[1] : sp;
+          sb.storage.from('photos').remove([objName]).catch(()=>{});
         }
-        // 3. 如果歌曲来自 git 仓库（CDN URL），也从 GitHub 删文件
+        // 3. 如果歌曲来自 git 仓库（CDN/GitHub Pages URL），也从 GitHub 删
         const sp = (t.storage_path || '').trim();
-        if(sp.includes('@main/music/')){
-          // CDN URL → 提取仓库路径: music/xxx.mp3
-          const repoPath = 'music/' + decodeURIComponent(sp.split('@main/music/')[1]);
-          deleteFromGitHub(repoPath);
-        } else if(sp.startsWith('music/')){
-          // 本地 music/ 路径 → 仓库文件
-          deleteFromGitHub(sp);
+        if(sp.includes('xshzct-dotcom.github.io/music/') || sp.includes('@main/music/') || sp.startsWith('music/')){
+          const path = sp.includes('/music/') ? 'music/' + decodeURIComponent(sp.split('/music/')[1]) : sp;
+          deleteFromGitHub(path);
         }
         renderMusicTab();
         if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 500);
