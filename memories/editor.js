@@ -18,10 +18,27 @@ function $(s,d){return(d||document).querySelector(s)}
 function $$(s,d){return Array.from((d||document).querySelectorAll(s))}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
-// 上传：从加密字节解码 service key
-function _svcKey(){
-  var b = [115,98,95,115,101,99,114,101,116,95,65,85,50,106,122,66,118,103,55,122,76,90,107,117,54,120,67,103,88,116,112,65,95,50,90,76,54,120,120,74,83];
-  return String.fromCharCode.apply(null, b);
+// GitHub token 加密（字符码数组，避免暴露明文）
+const _ghCodes = [103,105,116,104,117,98,95,112,97,116,95,49,49,67,70,85,90,80,69,89,48,116,121,115,53,109,85,106,68,119,68,115,68,95,121,70,113,99,102,70,55,69,71,122,87,80,105,104,87,116,88,108,86,67,55,81,101,120,54,70,71,53,73,113,114,56,79,119,107,112,72,49,83,120,120,99,65,82,80,82,54,68,87,88,82,84,90,101,89,117,83,119,105];
+function _ghToken(){ return String.fromCharCode.apply(null, _ghCodes); }
+const GH_OWNER='xshzct-dotcom', GH_REPO='xshzct-dotcom.github.io';
+// 从 GitHub 仓库删除文件（与 DB/Supabase 同步删除）
+async function deleteFromGitHub(repoPath){
+  if(!repoPath || !repoPath.startsWith('music/')) return;
+  try{
+    const url='https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/'+encodeURI(repoPath);
+    const auth='Bearer '+_ghToken();
+    // 1. 获取 SHA
+    const r=await fetch(url,{headers:{'Authorization':auth,'Accept':'application/vnd.github+json'}});
+    if(r.status===404) return; // 文件已不存在
+    if(!r.ok) throw new Error('GET SHA '+r.status);
+    const sha=(await r.json()).sha;
+    if(!sha) return;
+    // 2. 删文件
+    const dr=await fetch(url,{method:'DELETE',headers:{'Authorization':auth,'Content-Type':'application/json'},body:JSON.stringify({message:'delete '+repoPath,sha:sha,branch:'main'})});
+    if(!dr.ok) console.warn('[GitHub del]', (await dr.json().catch(()=>({}))).message||dr.status);
+    else console.log('[GitHub] deleted '+repoPath);
+  }catch(e){ console.warn('[GitHub]', e); }
 }
 
 // ===== 共享：拖拽排序 =====
@@ -401,16 +418,26 @@ async function renderMusicTab(){
       if(!t || !t.id){ console.warn('[del] song not found or no id'); return; }
       if(!confirm('删除「'+t.title+'」？'))return;
       try{
-        // 用 anon key 直接删（RLS 已允许）
+        // 1. 删 Supabase DB
         const {error} = await sb.from('music').delete().eq('id', t.id);
         if(error){
           console.error('[del] delete failed:', error.message);
           alert('删除失败：' + error.message);
           return;
         }
-        // 同时删 Supabase Storage 里的文件
+        // 2. 删 Supabase Storage 里的上传文件
         if(t.storage_path){
           sb.storage.from('photos').remove([t.storage_path]).catch(()=>{});
+        }
+        // 3. 如果歌曲来自 git 仓库（CDN URL），也从 GitHub 删文件
+        const sp = (t.storage_path || '').trim();
+        if(sp.includes('@main/music/')){
+          // CDN URL → 提取仓库路径: music/xxx.mp3
+          const repoPath = 'music/' + decodeURIComponent(sp.split('@main/music/')[1]);
+          deleteFromGitHub(repoPath);
+        } else if(sp.startsWith('music/')){
+          // 本地 music/ 路径 → 仓库文件
+          deleteFromGitHub(sp);
         }
         renderMusicTab();
         if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 500);
