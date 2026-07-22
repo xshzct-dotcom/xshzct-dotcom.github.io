@@ -406,6 +406,11 @@ function riverScroll(dir){
   if(window.SFX) window.SFX.flip();
 }
 
+function riverShuffle(){
+  renderRiver();
+  if(window.SFX) window.SFX.shutter();
+}
+
 function buildRiverFilters(){
   var container = document.getElementById('viewerFilters');
   if(!container) return;
@@ -440,6 +445,7 @@ function buildRiverFilters(){
 }
 
 window.riverScroll = riverScroll;
+window.riverShuffle = riverShuffle;
 
 // ===== 灯箱 v2 =====// ===== 灯箱 v2 =====
 let zoom = {scale: 1, x: 0, y: 0};
