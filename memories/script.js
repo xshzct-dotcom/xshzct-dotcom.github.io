@@ -976,42 +976,12 @@ function initMusic(){
   document.addEventListener('touchstart', kickStart);
 }
 
-function setupAudioAnalyser(){
-  if(audioCtx) return;
-  try{
-    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    audioSource = audioCtx.createMediaElementSource(bgMusic);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 64;
-    audioSource.connect(analyser);
-    analyser.connect(audioCtx.destination);
-  }catch(e){ audioCtx=null; }
-}
 function visStart(){
-  if(!audioCtx) setupAudioAnalyser();
-  if(!analyser) return;
-  if(audioCtx.state==='suspended') audioCtx.resume();
+  // 用纯 CSS 动画，避开 Web Audio API 拦截 HTML5 audio 导致的没声音问题
   $('#playerVisualizer').classList.add('active');
-  visTick();
 }
 function visStop(){
   $('#playerVisualizer').classList.remove('active');
-}
-function visTick(){
-  if(!isPlaying || !analyser) return;
-  const data = new Uint8Array(analyser.frequencyBinCount);
-  analyser.getByteFrequencyData(data);
-  // 4 根柱：取 4 个频段
-  const len = data.length;
-  const seg = Math.floor(len/4);
-  for(let i=0;i<4;i++){
-    let sum=0;
-    for(let j=0;j<seg;j++) sum += data[i*seg+j];
-    const v = sum/seg/255; // 0~1
-    const h = 4 + v*14;
-    if(visBars[i]) visBars[i].style.height = h+'px';
-  }
-  requestAnimationFrame(visTick);
 }
 
 function switchPlaylist(songs){
