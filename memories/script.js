@@ -991,7 +991,7 @@ function dbQ(){
 async function ensureSync(){
   if(!SB) return;
   // 用 localStorage 记录是否已经做过首次同步，避免每次刷新又把删的歌补回来
-  if(localStorage.getItem('memories.didFirstSync') === '1') return;
+  if(localStorage.getItem('memories.didFirstSync2') === '1') return;
   try{
     // === 1. 文章：表空 bulk insert，否则不动 ===
     const {count:essaysCount} = await SB.from('essays').select('*', {count:'exact', head:true});
@@ -1073,7 +1073,7 @@ async function ensureSync(){
       // 有数据 → 不再补缺，DB 是 source of truth
     }
     // 标记已完成首次同步，以后不再跑同步逻辑
-    try{ localStorage.setItem('memories.didFirstSync', '1'); }catch(e){}
+    try{ localStorage.setItem('memories.didFirstSync2', '1'); }catch(e){}
     console.log('[memories] ensureSync done');
   } catch(e){
     console.warn('[memories] ensureSync failed:', e);
