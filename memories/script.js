@@ -850,20 +850,10 @@ function initMusic(){
     $('#playerTitle').textContent = playlist[0].name||'未知';
   }
 
-  // 首次点击 → 播放（手势）
-  const _c=()=>{
-    if(window._userStarted) return;
-    window._userStarted=true;
-    // 用 _currentSongs 里的第一首（保证跟最终歌单一致）
-    const s=window._currentSongs;
-    if(s&&s.length>0){
-      playSong(0);
-    } else if(bgMusic.src){
-      bgMusic.play().catch(()=>{});
-    }
-  };
-  document.addEventListener('click',_c); document.addEventListener('keydown',_c); document.addEventListener('touchstart',_c);
+  // 首次点击 → 授权播放手势（不播歌，等 DB 加载完毕再播）
+  document.addEventListener('click', _grant); document.addEventListener('keydown', _grant); document.addEventListener('touchstart', _grant);
 }
+function _grant(){ if(!window._userStarted) window._userStarted=true; }
 
 function switchPlaylist(songs){
   window._currentSongs=songs||[];
@@ -880,7 +870,9 @@ function playSong(idx){
           : sp.startsWith('music/') ? MUSIC_BASE+sp.slice(6)
           : sp ? 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/'+sp
           : MUSIC_BASE+(t.name||t.title||'')+'.mp3';
-  bgMusic.src=url; bgMusic.load(); bgMusic.play().catch(()=>{});
+  bgMusic.src=url; bgMusic.load();
+  // 用户已点过页面（授权手势）→ play；否则等用户点
+  if(window._userStarted) bgMusic.play().catch(()=>{});
   $('#playerTitle').textContent=t.name||t.title||'未知';
 }
 function togglePlay(){
@@ -1197,10 +1189,9 @@ function init(){
   // 同步 data.js → Supabase（让编辑器有真实数据）— 暴露 promise 给 editor 共享
   window.MemoriesReady = ensureSync();
 
-  // 拉 DB 歌单 + 播放第一首
+  // 拉 DB 歌单 + 播放第一首（用户手势授权后才播放）
   ensureSync().then(() => loadFromSupabase()).then(() => {
-    // 用 DB 歌单替换（仅在用户还没开始播放时，避免中断）
-    if(window._currentSongs && window._currentSongs.length > 0 && !window._userStarted){
+    if(window._currentSongs && window._currentSongs.length > 0){
       switchPlaylist(window._currentSongs);
     }
   }).catch(e => console.warn('[memories] init playlist failed:', e));
