@@ -555,7 +555,7 @@ async function renderMusicTab(){
       if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 2000);
       if(total > 0){
         const msg = '上传完成：' + okCount + ' 首成功' + (failCount > 0 ? '，' + failCount + ' 首失败\n\n错误：\n' + errors.join('\n') : '');
-        if(failCount > 0) alert(msg); else if(okCount > 0) console.log(msg);
+        alert(msg);
       }
     };
   }, 200);
