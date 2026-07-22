@@ -65,7 +65,6 @@
 
 .track-list{display:flex;flex-direction:column;gap:6px}
 .track-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(255,255,255,.04);border-radius:8px;border:1px solid rgba(255,255,255,.05)}
-.track-item.dragging{opacity:.5}
 .track-item .num{color:rgba(255,255,255,.3);font-size:12px;width:20px;text-align:center}
 .track-item .info{flex:1}
 .track-item .info .title{color:#fff;font-size:14px}
@@ -73,6 +72,9 @@
 .track-item .actions{display:flex;gap:4px}
 .track-item .actions button{padding:4px 8px;border:1px solid rgba(255,255,255,.1);border-radius:4px;background:transparent;color:rgba(255,255,255,.5);font-size:11px;cursor:pointer;transition:all .2s}
 .track-item .actions button:hover{color:#fff;background:rgba(255,255,255,.1)}
+.track-item .actions button[data-move]{padding:4px 7px;border:1px solid rgba(255,255,255,.08);border-radius:4px;background:transparent;color:rgba(255,255,255,.45);font-size:11px;cursor:pointer;transition:all .2s}
+.track-item .actions button[data-move]:hover:not(:disabled){color:#fff;background:rgba(255,255,255,.1)}
+.track-item .actions button[data-move]:disabled{opacity:.25;cursor:default}
 .track-item .actions .del{border-color:rgba(255,80,80,.25);color:rgba(255,130,130,.7)}
 .track-item .actions .del:hover{background:rgba(255,50,50,.15)!important;color:#ff7a7a}
 
@@ -177,21 +179,36 @@ input[type=file].music-upload{display:none}
       body.innerHTML = '<div style="text-align:center;padding:60px 20px;color:rgba(255,255,255,.3)"><div style="font-size:48px;margin-bottom:16px">🎶</div><p>暂无音乐<br><span style="font-size:13px">点击下方上传</span></p></div>';
     } else {
       body.innerHTML = '<div class="track-list">' + pl.items.map((t, i) => `
-        <div class="track-item" draggable="true" data-id="${t.id}"
-             ondragstart="MUSIC.dragStart(event,${i})"
-             ondragover="event.preventDefault()"
-             ondrop="MUSIC.dragDrop(event,${i})">
+        <div class="track-item" data-id="${t.id}">
           <div class="num">${i + 1}</div>
           <div class="info">
             <div class="title">${esc(t.title)}</div>
             <div class="artist">${esc(t.artist || '未知')}</div>
           </div>
           <div class="actions">
+            <button ${i===0?'disabled':''} data-move="${i}" data-dir="-1">▲</button>
+            <button ${i===pl.items.length-1?'disabled':''} data-move="${i}" data-dir="1">▼</button>
             <button onclick="MUSIC.play('${t.storage_path}')">▶</button>
             <button onclick="MUSIC.edit(${t.id})">✎</button>
             <button class="del" onclick="MUSIC.del(${t.id})">🗑</button>
           </div>
         </div>`).join('') + '</div>';
+
+    // ▲▼ 移动
+    body.querySelectorAll('[data-move]').forEach(b => {
+      b.onclick = async () => {
+        const i = parseInt(b.dataset.move);
+        const dir = parseInt(b.dataset.dir);
+        const j = i + dir;
+        if (j < 0 || j >= pl.items.length) return;
+        const aa = pl.items[i], bb = pl.items[j];
+        await db().from('music').update({ sort_order: bb.sort_order }).eq('id', aa.id);
+        await db().from('music').update({ sort_order: aa.sort_order }).eq('id', bb.id);
+        // 刷新整个播放列表（保留当前播放列表上下文）
+        await loadTracks();
+        renderPlaylist(currentPlaylist);
+      };
+    });
     }
 
     tb.innerHTML = `
@@ -282,35 +299,7 @@ input[type=file].music-upload{display:none}
     else renderPlaylists();
   }
 
-  // ===== 拖拽排序 =====
-  let dragTrackIdx = null;
-
-  function dragStart(e, idx) {
-    dragTrackIdx = idx;
-    e.dataTransfer.effectAllowed = 'move';
-    e.currentTarget.classList.add('dragging');
-  }
-
-  async function dragDrop(e, dropIdx) {
-    e.preventDefault();
-    document.querySelectorAll('.track-item.dragging').forEach(el => el.classList.remove('dragging'));
-    if (dragTrackIdx === null || dragTrackIdx === dropIdx) return;
-
-    const pl = playlists.find(p => p.id == currentPlaylist);
-    if (!pl) return;
-
-    const from = pl.items[dragTrackIdx];
-    const to = pl.items[dropIdx];
-    if (from && to) {
-      const fromOrder = from.sort_order;
-      const toOrder = to.sort_order;
-      await db().from('music').update({ sort_order: toOrder }).eq('id', from.id);
-      await db().from('music').update({ sort_order: fromOrder }).eq('id', to.id);
-      await loadTracks();
-      renderPlaylist(currentPlaylist);
-    }
-    dragTrackIdx = null;
-  }
+  // ===== 拖拽排序（已废弃，改用 ▲▼）=====
 
   // ===== 触发按钮 =====
   // 由 settings-menu 统一管理入口
@@ -327,7 +316,6 @@ input[type=file].music-upload{display:none}
     play: playTrack,
     edit: editTrack,
     del: delTrack,
-    dragStart, dragDrop,
   };
 
   // 同步 data.js 数据到 Supabase（每次启动都执行，跳过已存在的）
