@@ -240,11 +240,12 @@ function openEssayModal(essay, catOnly){
   const hasNext = curIdx >= 0 && curIdx < pool.length - 1;
   // 存当前分类 ID 到 window，供按钮查找
   window._essayCatId = essay.catId;
-  function navTo(offset){
+  window._essayTitle = essay.title;
+  window.essayNavTo = function(offset){
     const p = window._timelineItems.filter(t => t.catId === window._essayCatId);
-    const i = p.findIndex(t => t.title === essay.title) + offset;
+    const i = p.findIndex(t => t.title === window._essayTitle) + offset;
     if(i>=0 && i<p.length) openEssayModal(p[i], true);
-  }
+  };
   function fmtBody(b){
     if(!b) return '';
     return b.split('\n').filter(l=>l.trim()).map(l=>`<p>${esc(l)}</p>`).join('');
@@ -255,9 +256,9 @@ function openEssayModal(essay, catOnly){
     <div class="modal-essay-date">${essay.date||''} · <span style="color:var(--cat-${essay.catId})">● ${esc(essay.cat||'')}</span></div>
     <div class="modal-essay-body">${fmtBody(essay.body)}</div>
     <div class="modal-nav">
-      <button class="editor-btn editor-btn-secondary" ${hasPrev?'':'disabled'} onclick="${hasPrev?'navTo(-1)':'void 0'}">← 上一篇</button>
+      <button class="editor-btn editor-btn-secondary" ${hasPrev?'':'disabled'} onclick="${hasPrev?'essayNavTo(-1)':'void 0'}">← 上一篇</button>
       <span style="color:var(--text-muted);font-size:.85rem">${curIdx+1}/${pool.length}</span>
-      <button class="editor-btn editor-btn-secondary" ${hasNext?'':'disabled'} onclick="${hasNext?'navTo(1)':'void 0'}">下一篇 →</button>
+      <button class="editor-btn editor-btn-secondary" ${hasNext?'':'disabled'} onclick="${hasNext?'essayNavTo(1)':'void 0'}">下一篇 →</button>
     </div>
   `;
   overlay.classList.add('active');
