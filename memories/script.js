@@ -841,14 +841,14 @@ function initMusic(){
   bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';});
   bgMusic.addEventListener('error',()=>{ setTimeout(nextSong,1200); });
 
-  // 立即用 data.js 初始化（不预加载 bgMusic.src，避免放错歌）
+  // 立即用 data.js 初始化 _currentSongs（只当后备，不设标题不预加载）
   if(typeof playlist!=='undefined' && playlist.length>0){
     window._currentSongs = playlist.map(m=>({
       name:m.name,title:m.name,artist:m.artist||'',url:m.url||'',storage_path:m.url||''
     }));
     currentSongIdx = 0;
-    $('#playerTitle').textContent = playlist[0].name||'未知';
   }
+  // 标题由 switchPlaylist 设定，这里不设防止闪一下 data.js 的歌名
 
   // 首次点击 → 授权播放手势（不播歌，等 DB 加载完毕再播）
   document.addEventListener('click', _grant); document.addEventListener('keydown', _grant); document.addEventListener('touchstart', _grant);
