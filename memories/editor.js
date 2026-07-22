@@ -355,21 +355,19 @@ async function renderAlbumTab(){
         el.style.gap = '10px';
         el.style.padding = '10px 0';
         el.innerHTML = plist.map((p,i) => {
-          // storage_path 是相对路径如 "images/oldworld/桂林/DSC_xxx.jpg"
-          // Supabase Storage 文件是 "music_xxx.mp3" 之类
-          // 计算 URL
+          // storage_path 可能是：
+          // - "images/oldworld/..." 仓库里的全图
+          // - "music_xxx.mp3" 上传到 Supabase Storage 的
+          // 缩略图直接用全图（浏览器自动缩放显示）
           const sp = p.storage_path || p.filename || '';
           const isStorage = !sp.startsWith('images/') && !sp.startsWith('thumbs/');
-          const thumbUrl = isStorage
-            ? (STORAGE_URL + '/' + sp)
-            : ('https://xshzct-dotcom.github.io/thumbs/' + sp.replace(/^images\//, ''));
-          const fullUrl = isStorage
+          const imgUrl = isStorage
             ? (STORAGE_URL + '/' + sp)
             : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
           const fname = (p.filename || sp.split('/').pop() || '').replace(/\.[^.]+$/, '');
           return `
           <div class="ae-photo-card" data-i="${i}" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:8px;overflow:hidden;cursor:pointer;transition:all .2s" draggable="true">
-            <img src="${thumbUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;background:#1a1d2e" onerror="this.style.opacity=.2" />
+            <img src="${imgUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;background:#1a1d2e" onerror="this.style.opacity=.2" />
             <div class="ae-photo-overlay" style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.8) 0%,rgba(0,0,0,0) 50%);opacity:0;transition:opacity .2s;display:flex;flex-direction:column;justify-content:flex-end;padding:8px">
               <div style="font-size:.7rem;color:#fff;line-height:1.3;max-height:2.6em;overflow:hidden;text-overflow:ellipsis;word-break:break-all">${esc(fname)}</div>
               <div style="display:flex;gap:4px;margin-top:6px">
