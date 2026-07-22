@@ -283,23 +283,21 @@ async function renderEssayTab(){
     const itemList = items;
     articlesEl.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => editEssay(itemList[parseInt(b.dataset.edit)]));
     articlesEl.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delEssay(itemList[parseInt(b.dataset.del)]));
-    // 上下移动
+    // 上下移动（直接刷新页面更可靠）
     articlesEl.querySelectorAll('[data-move]').forEach(b => {
       b.onclick = async () => {
         const i = parseInt(b.dataset.move);
         const dir = parseInt(b.dataset.dir);
         const j = i + dir;
         if(j<0 || j>=itemList.length) return;
-        // 交换
-        const temp = itemList[i];
-        itemList[i] = itemList[j];
-        itemList[j] = temp;
-        // 更新 DB
+        // 交换 sort_order
+        const a = itemList[i], b = itemList[j];
         if(sb){
-          await sb.from('essays').update({sort_order:i}).eq('id', itemList[i].id).catch(()=>{});
-          await sb.from('essays').update({sort_order:j}).eq('id', itemList[j].id).catch(()=>{});
+          await sb.from('essays').update({sort_order:j}).eq('id', a.id).catch(()=>{});
+          await sb.from('essays').update({sort_order:i}).eq('id', b.id).catch(()=>{});
         }
-        renderArticlesInCat(catId);
+        // 重新渲染
+        renderEssayTab();
         if(window.reloadFromSupabase) setTimeout(window.reloadFromSupabase, 2000);
       };
     });
