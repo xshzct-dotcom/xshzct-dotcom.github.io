@@ -238,14 +238,9 @@ function openEssayModal(essay, catOnly){
   const curIdx = pool.findIndex(t => t.title === essay.title);
   const hasPrev = curIdx >= 0 && curIdx > 0;
   const hasNext = curIdx >= 0 && curIdx < pool.length - 1;
-  // 存当前分类 ID 到 window，供按钮查找
-  window._essayCatId = essay.catId;
-  window._essayTitle = essay.title;
-  window.essayNavTo = function(offset){
-    const p = window._timelineItems.filter(t => t.catId === window._essayCatId);
-    const i = p.findIndex(t => t.title === window._essayTitle) + offset;
-    if(i>=0 && i<p.length) openEssayModal(p[i], true);
-  };
+  // 存数据和函数到 window，供按钮回调
+  window._essayPool = pool;
+  window._essayIdx = curIdx;
   function fmtBody(b){
     if(!b) return '';
     return b.split('\n').filter(l=>l.trim()).map(l=>`<p>${esc(l)}</p>`).join('');
@@ -256,11 +251,18 @@ function openEssayModal(essay, catOnly){
     <div class="modal-essay-date">${essay.date||''} · <span style="color:var(--cat-${essay.catId})">● ${esc(essay.cat||'')}</span></div>
     <div class="modal-essay-body">${fmtBody(essay.body)}</div>
     <div class="modal-nav">
-      <button class="editor-btn editor-btn-secondary" ${hasPrev?'':'disabled'} onclick="${hasPrev?'essayNavTo(-1)':'void 0'}">← 上一篇</button>
+      <button class="editor-btn editor-btn-secondary essay-prev" ${hasPrev?'':'disabled'}>← 上一篇</button>
       <span style="color:var(--text-muted);font-size:.85rem">${curIdx+1}/${pool.length}</span>
-      <button class="editor-btn editor-btn-secondary" ${hasNext?'':'disabled'} onclick="${hasNext?'essayNavTo(1)':'void 0'}">下一篇 →</button>
+      <button class="editor-btn editor-btn-secondary essay-next" ${hasNext?'':'disabled'}>下一篇 →</button>
     </div>
   `;
+  // 用 dom 监听代替 onclick
+  var prevBtn = content.querySelector('.essay-prev');
+  var nextBtn = content.querySelector('.essay-next');
+  if(prevBtn && hasPrev) prevBtn.onclick = function(){ window.goPrevEssay(); };
+  if(nextBtn && hasNext) nextBtn.onclick = function(){ window.goNextEssay(); };
+  window.goPrevEssay = function(){ if(window._essayIdx>0) openEssayModal(window._essayPool[window._essayIdx-1], true); };
+  window.goNextEssay = function(){ if(window._essayIdx<window._essayPool.length-1) openEssayModal(window._essayPool[window._essayIdx+1], true); };
   overlay.classList.add('active');
   document.body.style.overflow='hidden';
 }
