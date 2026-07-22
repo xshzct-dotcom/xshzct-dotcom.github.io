@@ -87,9 +87,15 @@ const preloader = new Preloader();
 // ==================== 数据 ====================
 const playlist = [
   { name: '那个夏天（あの夏へ）', url: CDN.music + '/' + encodeURIComponent('那个夏天（あの夏へ）.mp3') },
+  { name: 'Cookies - Forever Friends', url: CDN.music + '/' + encodeURIComponent('Cookies - Forever Friends.mp3') },
+  { name: 'Cookies - 最后一块', url: CDN.music + '/' + encodeURIComponent('Cookies - 最后一块.mp3') },
+  { name: 'Cookies - 眼浅', url: CDN.music + '/' + encodeURIComponent('Cookies - 眼浅.mp3') },
+  { name: '五月天 - 干杯', url: CDN.music + '/' + encodeURIComponent('五月天 - 干杯.mp3') },
+  { name: '杨千嬅 - 小飞侠', url: CDN.music + '/' + encodeURIComponent('杨千嬅 - 小飞侠.mp3') },
   { name: '旅行的意义', url: CDN.music + '/' + encodeURIComponent('旅行的意义.mp3') },
   { name: '太聪明', url: CDN.music + '/' + encodeURIComponent('太聪明.mp3') },
-  { name: '海芋恋', url: CDN.music + '/' + encodeURIComponent('海芋恋.mp3') }
+  { name: '海芋恋', url: CDN.music + '/' + encodeURIComponent('海芋恋.mp3') },
+  { name: '陈绮贞 - 告诉我', url: CDN.music + '/' + encodeURIComponent('陈绮贞 - 告诉我.mp3') }
 ];
 
 // 随笔区背景音乐（童年篇专属）
