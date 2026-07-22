@@ -1239,8 +1239,8 @@ async function loadFromSupabase(){
       if(typeof playlist !== 'undefined'){
         playlist.splice(0, playlist.length, ...newPlaylist);
       }
-      // 更新播放器
-      switchPlaylist(newPlaylist);
+      // 更新播放器列表但不播放（编辑器拖拽排序后不中断当前歌）
+      window._currentSongs = newPlaylist;
     }
 
     console.log('[memories] loadFromSupabase done');
@@ -1274,17 +1274,11 @@ function init(){
   // 同步 data.js → Supabase（让编辑器有真实数据）— 暴露 promise 给 editor 共享
   window.MemoriesReady = ensureSync();
 
-  // 拉 DB 歌单 + 立刻播第一首
+  // 拉 DB 歌单 + 播放第一首
   ensureSync().then(() => loadFromSupabase()).then(() => {
-    // DB 没有歌时用 data.js 兜底
-    if(!window._currentSongs || window._currentSongs.length === 0){
-      if(typeof playlist !== 'undefined' && Array.isArray(playlist) && playlist.length > 0){
-        const newPlaylist = playlist.map(m => ({
-          name: m.name||m.title, title: m.name||m.title,
-          artist: m.artist||'', url: m.url||'', storage_path: m.url||'',
-        }));
-        switchPlaylist(newPlaylist);
-      }
+    // 用 DB 歌单替换并播放（DB 有歌就用 DB，否则 data.js 已在 initMusic 中设置）
+    if(window._currentSongs && window._currentSongs.length > 0){
+      switchPlaylist(window._currentSongs);
     }
   }).catch(e => console.warn('[memories] init playlist failed:', e));
 
