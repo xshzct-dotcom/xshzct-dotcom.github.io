@@ -937,8 +937,10 @@ function openAlbumLightbox(albumId){
 }
 
 // ===== 音乐播放器 + 可视化 =====
-let currentPlaylistId=null, currentSongIdx=0, isPlaying=false, bgMusic=null;
-let audioCtx=null, analyser=null, audioSource=null, visBars;
+// 设计：不用 WebAudio API，HTML5 <audio> 直接播保证有声音
+// 频谱条用算法模拟（基于歌曲进度 + 多频正弦波混合）
+let currentSongIdx=0, isPlaying=false, bgMusic=null, visBars;
+let _visPhase=0;
 
 function initMusic(){
   bgMusic=$('#bgMusic');
@@ -950,68 +952,44 @@ function initMusic(){
     }
   });
   bgMusic.addEventListener('ended',nextSong);
-  bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';visStart();});
-  bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';visStop();});
+  bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';$('#playerVisualizer').classList.add('active');});
+  bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';$('#playerVisualizer').classList.remove('active');});
   let _errGuard=false;
   bgMusic.addEventListener('error',()=>{
     if(_errGuard) return;
     _errGuard=true;
     setTimeout(()=>{_errGuard=false;},1200);
-    console.warn('[player] error, skip to next');
     nextSong();
   });
 
   visBars = $$('#playerVisualizer span');
 
-  // 初始化 Web Audio API 真实频谱分析
-  // 在 audio 被 play() 之前创建 MediaElementSource，保证路由正常
-  try {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 64;
-    audioSource = audioCtx.createMediaElementSource(bgMusic);
-    audioSource.connect(analyser);
-    analyser.connect(audioCtx.destination);
-  } catch(e) {
-    console.warn('[player] WebAudio init failed:', e);
-    audioCtx = null;
-  }
-
-  // 频谱 tick 常驻循环（requestAnimationFrame 一直跑，isPlaying false 时跳过）
+  // 模拟频谱动画（HTML5 audio 正常播，动画独立不影响声音）
   (function tick(){
-    if(audioCtx && analyser && isPlaying && visBars){
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(data);
-      const len = data.length;
-      const seg = Math.floor(len/4);
+    if(isPlaying && visBars && bgMusic.duration){
+      _visPhase += 0.04;
+      const pct = bgMusic.currentTime / bgMusic.duration; // 0~1 歌曲进度
+      const freqs = [1.8, 3.2, 5.5, 7.0];
       for(let i=0;i<4;i++){
-        let sum=0;
-        for(let j=0;j<seg;j++) sum += data[i*seg+j];
-        const v = sum/seg/255;
-        if(visBars[i]) visBars[i].style.height = (4 + v*14)+'px';
+        const v1 = (Math.sin(_visPhase * freqs[i] * 1.3 + pct * 3) * 0.5 + 0.5) * 0.7;
+        const v2 = (Math.sin(_visPhase * freqs[i] * 0.6 + pct * 1.5) * 0.4 + 0.4) * 0.3;
+        const v = Math.min(1, v1 + v2 + 0.15);
+        if(visBars[i]) visBars[i].style.height = (4 + v * 14) + 'px';
       }
     }
     requestAnimationFrame(tick);
   })();
 
-  // 一次用户交互：恢复 AudioContext（浏览器默认 suspended）+ 播放
+  // 首次点击：重试 play（浏览器 autoplay 拦截后的标准做法）
   const kickStart = ()=>{
     if(window._userStarted) return;
-    if(!bgMusic.src) return; // 等 playlist 就绪
+    if(!bgMusic.src) return;
     window._userStarted = true;
-    if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
     bgMusic.play().catch(()=>{});
   };
   document.addEventListener('click', kickStart);
   document.addEventListener('keydown', kickStart);
   document.addEventListener('touchstart', kickStart);
-}
-
-function visStart(){
-  $('#playerVisualizer').classList.add('active');
-}
-function visStop(){
-  $('#playerVisualizer').classList.remove('active');
 }
 
 function switchPlaylist(songs){
