@@ -233,7 +233,6 @@ function openEssayModal(essay){
   const content=$('#essayModalContent');
   if(!overlay||!content) return;
   const curIdx = _timelineItems.findIndex(t => t.title === essay.title);
-  console.log('[essay] curIdx:', curIdx, 'total:', _timelineItems.length, 'title:', essay.title, 'cat:', essay.cat);
   const hasPrev = curIdx >= 0 && curIdx > 0;
   const hasNext = curIdx >= 0 && curIdx < _timelineItems.length - 1;
   function fmtBody(b){
@@ -246,9 +245,9 @@ function openEssayModal(essay){
     <div class="modal-essay-date">${essay.date||''} · <span style="color:var(--cat-${essay.catId})">● ${esc(essay.cat||'')}</span></div>
     <div class="modal-essay-body">${fmtBody(essay.body)}</div>
     <div class="modal-nav">
-      <button class="editor-btn editor-btn-secondary" ${hasPrev?'':'disabled'} onclick="${hasPrev?'openEssayModal(_timelineItems['+ (curIdx-1) +'])':'void 0'}">← 上一篇</button>
+      <button class="editor-btn editor-btn-secondary" ${hasPrev?'':'disabled'} onclick="${hasPrev?'openEssayModal(window._timelineItems['+ (curIdx-1) +'])':'void 0'}">← 上一篇</button>
       <span style="color:var(--text-muted);font-size:.85rem">${curIdx+1}/${_timelineItems.length}</span>
-      <button class="editor-btn editor-btn-secondary" ${hasNext?'':'disabled'} onclick="${hasNext?'openEssayModal(_timelineItems['+ (curIdx+1) +'])':'void 0'}">下一篇 →</button>
+      <button class="editor-btn editor-btn-secondary" ${hasNext?'':'disabled'} onclick="${hasNext?'openEssayModal(window._timelineItems['+ (curIdx+1) +'])':'void 0'}">下一篇 →</button>
     </div>
   `;
   overlay.classList.add('active');
@@ -930,6 +929,7 @@ function observeFadeUps(){
 // ===== 时间线索引填充 =====
 function fillTimelineIndex(){
   _timelineItems=[];
+  window._timelineItems=_timelineItems;
   if(typeof essayCategories !== 'undefined'){
     essayCategories.forEach(cat => (cat.articles||[]).forEach(art => _timelineItems.push({...art, cat:cat.title, catId:cat.id})));
   }
