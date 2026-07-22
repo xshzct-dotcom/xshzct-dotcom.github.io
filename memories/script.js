@@ -952,19 +952,45 @@ function initMusic(){
   bgMusic.addEventListener('ended',nextSong);
   bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';visStart();});
   bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';visStop();});
+  bgMusic.addEventListener('waiting',()=>{$('#playerTitle').textContent='加载中…';});
+  bgMusic.addEventListener('canplay',()=>{
+    if(window._currentSongs&&window._currentSongs[currentSongIdx]){
+      $('#playerTitle').textContent=window._currentSongs[currentSongIdx].name||window._currentSongs[currentSongIdx].title||'未知';
+    }
+  });
   let _errGuard=false;
   bgMusic.addEventListener('error',()=>{
     if(_errGuard) return;
     _errGuard=true;
     setTimeout(()=>{_errGuard=false;},1200);
+    console.warn('[player] error, skip to next');
     nextSong();
   });
 
   visBars = $$('#playerVisualizer span');
 
-  if(typeof playlist!=='undefined'&&Array.isArray(playlist)&&playlist.length>0){
-    switchPlaylist(playlist);
-  }
+  // 不在这里用 data.js 初始化 playlist — 等 loadFromSupabase 从 DB 拉
+  // 这样删歌后刷新不会出现"data.js 旧歌 + DB 新歌"两个不同步的状态
+  window._currentSongs = window._currentSongs || [];
+  currentSongIdx = 0;
+  // 加载中提示，避免显示 HTML 默认的旧标题误导用户
+  const pt = $('#playerTitle');
+  if(pt) pt.textContent = '加载播放列表…';
+  // 任何一次用户交互都启动音乐（避开浏览器 autoplay 拦截）
+  // playlist 还没就绪就继续等，不要设 _userStarted
+  const kickStart = ()=>{
+    const songs = window._currentSongs;
+    if(!songs || songs.length === 0) return; // 等 DB 拉完
+    document.removeEventListener('click', kickStart);
+    document.removeEventListener('keydown', kickStart);
+    document.removeEventListener('touchstart', kickStart);
+    if(window._userStarted) return;
+    window._userStarted = true;
+    playSong(currentSongIdx || 0);
+  };
+  document.addEventListener('click', kickStart);
+  document.addEventListener('keydown', kickStart);
+  document.addEventListener('touchstart', kickStart);
 }
 
 function setupAudioAnalyser(){
@@ -1009,7 +1035,6 @@ function switchPlaylist(songs){
   window._currentSongs=songs;
   currentSongIdx=0;
   if(songs&&songs.length){
-    // 只设 src 不自动播放（避免浏览器拦截），等用户点 ▶
     const s=songs[0];
     const sp=(s.storage_path||s.url||'').trim();
     let url;
@@ -1017,7 +1042,18 @@ function switchPlaylist(songs){
     else if(sp.startsWith('music/')) url=MUSIC_BASE+sp.slice(6);
     else if(sp) url='https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/'+sp;
     else url=MUSIC_BASE+(s.name||s.title||'')+'.mp3';
-    if(bgMusic){ bgMusic.src=url; bgMusic.load(); }
+    if(bgMusic){
+      // 如果当前 src 就是这首歌的 URL，跳过 reload 避免中断播放
+      const isSame = bgMusic.src && bgMusic.src.endsWith(url.substring(url.lastIndexOf('/')+1));
+      if(!isSame){
+        bgMusic.src=url;
+        bgMusic.load();
+        // 用户已交互过就直接播；否则只设 src 等用户点 ▶
+        if(window._userStarted){
+          bgMusic.play().catch(()=>{});
+        }
+      }
+    }
     $('#playerTitle').textContent=s.name||s.title||'未知';
   }
 }
