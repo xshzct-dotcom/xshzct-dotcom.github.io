@@ -841,20 +841,27 @@ function initMusic(){
   bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';});
   bgMusic.addEventListener('error',()=>{ setTimeout(nextSong,1200); });
 
-  // 立即用 data.js 初始化（不等 DB）
+  // 立即用 data.js 初始化（不预加载 bgMusic.src，避免放错歌）
   if(typeof playlist!=='undefined' && playlist.length>0){
-    const p=playlist[0];
-    bgMusic.src = (p.url||'').startsWith('http') ? p.url : MUSIC_BASE+(p.name||'')+'.mp3';
-    bgMusic.load();
-    $('#playerTitle').textContent = p.name||'未知';
     window._currentSongs = playlist.map(m=>({
       name:m.name,title:m.name,artist:m.artist||'',url:m.url||'',storage_path:m.url||''
     }));
     currentSongIdx = 0;
+    $('#playerTitle').textContent = playlist[0].name||'未知';
   }
 
   // 首次点击 → 播放（手势）
-  const _c=()=>{if(!window._userStarted&&bgMusic.src){window._userStarted=true;bgMusic.play().catch(()=>{});}};
+  const _c=()=>{
+    if(window._userStarted) return;
+    window._userStarted=true;
+    // 用 _currentSongs 里的第一首（保证跟最终歌单一致）
+    const s=window._currentSongs;
+    if(s&&s.length>0){
+      playSong(0);
+    } else if(bgMusic.src){
+      bgMusic.play().catch(()=>{});
+    }
+  };
   document.addEventListener('click',_c); document.addEventListener('keydown',_c); document.addEventListener('touchstart',_c);
 }
 
@@ -1192,8 +1199,8 @@ function init(){
 
   // 拉 DB 歌单 + 播放第一首
   ensureSync().then(() => loadFromSupabase()).then(() => {
-    // 用 DB 歌单替换并播放（DB 有歌就用 DB，否则 data.js 已在 initMusic 中设置）
-    if(window._currentSongs && window._currentSongs.length > 0){
+    // 用 DB 歌单替换（仅在用户还没开始播放时，避免中断）
+    if(window._currentSongs && window._currentSongs.length > 0 && !window._userStarted){
       switchPlaylist(window._currentSongs);
     }
   }).catch(e => console.warn('[memories] init playlist failed:', e));
