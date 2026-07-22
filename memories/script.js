@@ -1210,8 +1210,10 @@ function dbQ(){
 // 把 data.js 现有内容灌到 Supabase（完整版：表空时 bulk insert，否则 per-item merge）
 async function ensureSync(){
   if(!SB) return;
+  // 用 localStorage 记录是否已经做过首次同步，避免每次刷新又把删的歌补回来
+  if(localStorage.getItem('memories.didFirstSync') === '1') return;
   try{
-    // === 1. 文章：表空 bulk insert，否则 merge ===
+    // === 1. 文章：表空 bulk insert，否则不动 ===
     const {count:essaysCount} = await SB.from('essays').select('*', {count:'exact', head:true});
     const allEssays = [];
     if(typeof essayCategories !== 'undefined'){
@@ -1233,21 +1235,13 @@ async function ensureSync(){
       });
     }
     if(!essaysCount || essaysCount === 0){
-      // 空表 → 批量插入
       for(let i=0; i<allEssays.length; i+=50){
         await SB.from('essays').insert(allEssays.slice(i, i+50));
       }
-    } else {
-      // 有数据 → merge：每条检查并补缺
-      for(const e of allEssays){
-        const {data:exist} = await SB.from('essays').select('id').eq('title', e.title).eq('category', e.category).limit(1);
-        if(!exist || exist.length === 0){
-          await SB.from('essays').insert(e);
-        }
-      }
     }
+    // 有数据 → 不再补缺（用户删了就是删了，DB 是 source of truth）
 
-    // === 2. 相册 ===
+    // === 2. 相册：表空 bulk insert，否则不动 ===
     if(Array.isArray(albums)){
       const {count:albumsCount} = await SB.from('albums').select('*', {count:'exact', head:true});
       console.log('[memories] albums count before sync:', albumsCount);
@@ -1263,21 +1257,11 @@ async function ensureSync(){
         } catch(e){
           console.warn('[memories] albums insert error:', e.message, e.details);
         }
-      } else {
-        for(let i=0; i<allAlbums.length; i++){
-          const a = allAlbums[i];
-          if(!a || !a.title) continue;
-          const {data:exist} = await SB.from('albums').select('id').eq('title', a.title).limit(1);
-          if(!exist || exist.length === 0){
-            await SB.from('albums').insert(a);
-          } else {
-            await SB.from('albums').update({cover: a.cover, sort_order: i}).eq('id', exist[0].id);
-          }
-        }
       }
+      // 有数据 → 不再补缺，DB 是 source of truth
     }
 
-    // === 3. 音乐 ===
+    // === 3. 音乐：表空 bulk insert，否则不动 ===
     if(typeof playlist !== 'undefined' && Array.isArray(playlist)){
       const {count:musicCount} = await SB.from('music').select('*', {count:'exact', head:true});
       const allMusic = playlist.map((m, i) => ({
@@ -1289,15 +1273,11 @@ async function ensureSync(){
       if(allMusic.length === 0) return;
       if(!musicCount || musicCount === 0){
         await SB.from('music').insert(allMusic);
-      } else {
-        for(const m of allMusic){
-          const {data:exist} = await SB.from('music').select('id').eq('title', m.title).is('album_id', null).limit(1);
-          if(!exist || exist.length === 0){
-            await SB.from('music').insert(m);
-          }
-        }
       }
+      // 有数据 → 不再补缺，DB 是 source of truth
     }
+    // 标记已完成首次同步，以后不再跑同步逻辑
+    try{ localStorage.setItem('memories.didFirstSync', '1'); }catch(e){}
     console.log('[memories] ensureSync done');
   } catch(e){
     console.warn('[memories] ensureSync failed:', e);
