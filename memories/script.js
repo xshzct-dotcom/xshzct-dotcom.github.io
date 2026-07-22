@@ -245,7 +245,6 @@ function openEssayModal(essay, catOnly){
     const i = p.findIndex(t => t.title === essay.title) + offset;
     if(i>=0 && i<p.length) openEssayModal(p[i], true);
   }
-  content.innerHTML = `
   function fmtBody(b){
     if(!b) return '';
     return b.split('\n').filter(l=>l.trim()).map(l=>`<p>${esc(l)}</p>`).join('');
