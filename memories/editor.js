@@ -268,11 +268,13 @@ async function renderEssayTab(){
     document.querySelector('[data-ee-new]').onclick = () => editEssay(null, catId);
     const articlesEl = document.getElementById('eeArticles');
     articlesEl.innerHTML = items.map((a,i) => `
-      <div class="ee-list-item" draggable="true" data-idx="${i}" data-sid="${a.id}">
-        <span class="ee-drag">⠿</span>
+      <div class="ee-list-item" data-idx="${i}" data-sid="${a.id}">
+        <span class="ee-drag" style="cursor:default">📄</span>
         <span class="e-title">${esc(a.title)}</span>
         <span class="e-meta">${a.date||''}</span>
         <div class="ee-actions">
+          <button class="ee-btn" data-move="${i}" data-dir="-1" ${i===0?'disabled':''}>▲</button>
+          <button class="ee-btn" data-move="${i}" data-dir="1" ${i===items.length-1?'disabled':''}>▼</button>
           <button class="ee-btn" data-edit="${i}">✎</button>
           <button class="ee-btn del" data-del="${i}">🗑</button>
         </div>
@@ -281,10 +283,25 @@ async function renderEssayTab(){
     const itemList = items;
     articlesEl.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => editEssay(itemList[parseInt(b.dataset.edit)]));
     articlesEl.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delEssay(itemList[parseInt(b.dataset.del)]));
-    // 拖拽排序（复用已有的 bindDragSort）
-    bindDragSort(articlesEl, itemList, 'essays', 'sort_order', () => {
-      renderArticlesInCat(catId);
-      if(window.reloadFromSupabase) setTimeout(window.reloadFromSupabase, 2000);
+    // 上下移动
+    articlesEl.querySelectorAll('[data-move]').forEach(b => {
+      b.onclick = async () => {
+        const i = parseInt(b.dataset.move);
+        const dir = parseInt(b.dataset.dir);
+        const j = i + dir;
+        if(j<0 || j>=itemList.length) return;
+        // 交换
+        const temp = itemList[i];
+        itemList[i] = itemList[j];
+        itemList[j] = temp;
+        // 更新 DB
+        if(sb){
+          await sb.from('essays').update({sort_order:i}).eq('id', itemList[i].id).catch(()=>{});
+          await sb.from('essays').update({sort_order:j}).eq('id', itemList[j].id).catch(()=>{});
+        }
+        renderArticlesInCat(catId);
+        if(window.reloadFromSupabase) setTimeout(window.reloadFromSupabase, 2000);
+      };
     });
   }
 
