@@ -884,7 +884,23 @@ function togglePlay(){
 }
 function prevSong(){ const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx-1; if(i<0)i=s.length-1; playSong(i); }
 function nextSong(){ const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx+1; if(i>=s.length)i=0; playSong(i); }
-function seek(e){ const b=$('#playerBar'); if(!b||!bgMusic.duration) return; const r=b.getBoundingClientRect(); bgMusic.currentTime=((e.clientX-r.left)/r.width)*bgMusic.duration; }
+function seek(e){
+  const bg=window.bgMusic; if(!bg) return;
+  const b=document.getElementById('playerBar'); if(!b) return;
+  // 如果 duration 还没拿到（歌没加载完），先加载再跳转
+  if(!bg.duration || isNaN(bg.duration) || bg.readyState===0){
+    const loadSeek=()=>{
+      bg.removeEventListener('loadedmetadata', loadSeek);
+      setTimeout(()=>{ seek(e); },100);
+    };
+    bg.addEventListener('loadedmetadata', loadSeek);
+    bg.load();
+    return;
+  }
+  const r=b.getBoundingClientRect();
+  bg.currentTime=((e.clientX-r.left)/r.width)*bg.duration;
+}
+window.seek=seek;
 function togglePlayer(){ $('#player').classList.toggle('collapsed'); }
 window.togglePlay=togglePlay; window.prevSong=prevSong; window.nextSong=nextSong;
 window.togglePlayer=togglePlayer;
@@ -1023,6 +1039,22 @@ async function ensureSync(){
         }
       }
       // 有数据 → 不再补缺，DB 是 source of truth
+      // 同步相册照片到 album_photos（仅首次）
+      if(albums.some(a=>a.photos&&a.photos.length>0)){
+        const {count:pc}=await SB.from('album_photos').select('*',{count:'exact',head:true});
+        if(!pc||pc===0){
+          const {data:ea}=await SB.from('albums').select('id,title');
+          if(ea){
+            const am={}; ea.forEach(a=>{am[a.title]=a.id;});
+            const ap=[];
+            albums.forEach(a=>{
+              const aid=am[a.title];
+              if(aid&&a.photos) a.photos.forEach((p,i)=>ap.push({album_id:aid,storage_path:p,sort_order:i}));
+            });
+            if(ap.length>0){ for(let i=0;i<ap.length;i+=50) await SB.from('album_photos').insert(ap.slice(i,i+50)).catch(e=>console.warn('[sync] photo:',e.message)); }
+          }
+        }
+      }
     }
 
     // === 3. 音乐：表空 bulk insert，否则不动 ===
