@@ -112,7 +112,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .cat-travel .timeline-dot{background:var(--cat-travel);box-shadow:0 0 0 4px var(--bg),0 0 16px rgba(6,182,212,.25)}
 .timeline-card{width:calc(50% - 40px);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;cursor:pointer;transition:transform .3s var(--ease),border-color .3s,box-shadow .3s}
 .timeline-card:hover{transform:translateY(-4px);border-color:var(--border-hover);box-shadow:var(--shadow-md)}
-.timeline-card .tl-date{font-size:.78rem;color:var(--accent);margin-bottom:8px;font-weight:500;letter-spacing:.8px;text-transform:uppercase}
+.timeline-card .tl-date{font-size:.78rem;color:var(--text-dim);margin-bottom:8px;font-weight:500;letter-spacing:.8px;text-transform:uppercase}
 .timeline-card .tl-title{font-family:var(--font-display);font-size:1.2rem;font-weight:600;margin-bottom:10px;color:var(--text);line-height:1.3}
 .timeline-card .tl-excerpt{font-size:.9rem;color:var(--text-dim);line-height:1.7;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .timeline-card .tl-cat{font-size:.72rem;color:var(--text-muted);margin-top:12px;display:inline-block;padding:3px 10px;border:1px solid var(--border);border-radius:20px;letter-spacing:.5px}
