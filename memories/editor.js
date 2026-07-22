@@ -325,13 +325,12 @@ async function renderAlbumTab(){
       }
       renderPhotos();
 
-      // Upload - 用 service key（RLS 已配置）
+      // Upload - 用 anon key（RLS 已允许）
       $('#aeUpload').onchange=async (e)=>{
         const files=e.target.files;
-        const svc = supabase.createClient(SB_URL, _svcKey());
         for(const f of files){
           const fname=Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-          const {error:upErr}=await svc.storage.from('photos').upload(fname, f, {upsert:true});
+          const {error:upErr}=await sb.storage.from('photos').upload(fname, f, {upsert:true});
           if(!upErr){
             await db().from('album_photos').insert({album_id:album.id,storage_path:fname,sort_order:Date.now()});
           }
@@ -402,8 +401,8 @@ async function renderMusicTab(){
       if(!t || !t.id){ console.warn('[del] song not found or no id'); return; }
       if(!confirm('删除「'+t.title+'」？'))return;
       try{
-        const svcDel = supabase.createClient(SB_URL, _svcKey());
-        const {error} = await svcDel.from('music').delete().eq('id', t.id);
+        // 用 anon key 直接删（RLS 已允许）
+        const {error} = await sb.from('music').delete().eq('id', t.id);
         if(error){
           console.error('[del] delete failed:', error.message);
           alert('删除失败：' + error.message);
@@ -411,7 +410,7 @@ async function renderMusicTab(){
         }
         // 同时删 Supabase Storage 里的文件
         if(t.storage_path){
-          svcDel.storage.from('photos').remove([t.storage_path]).catch(()=>{});
+          sb.storage.from('photos').remove([t.storage_path]).catch(()=>{});
         }
         renderMusicTab();
         if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 500);
@@ -435,8 +434,8 @@ async function renderMusicTab(){
       for(const f of files){
         const fname = 'music_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
         try{
-          const svc = supabase.createClient(SB_URL, _svcKey());
-          const {error:upErr} = await svc.storage.from('photos').upload(fname, f, {upsert:true});
+          // 用 anon key 上传（RLS 已允许）
+          const {error:upErr} = await sb.storage.from('photos').upload(fname, f, {upsert:true});
           if(!upErr){
             await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order:-Date.now(), album_id:null});
             okCount++;
