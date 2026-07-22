@@ -252,8 +252,8 @@ async function renderEssayTab(){
   function renderArticlesInCat(catId){
     const g = groups[catId];
     if(!g) return;
-    // 按日期降序
-    const items = [...g.items].sort((a,b) => (b.date||'').localeCompare(a.date||''));
+    // 按 sort_order 排序（用户拖拽/箭头调整的顺序），同 sort_order 再按日期
+    const items = [...g.items].sort((a,b) => (a.sort_order||0) - (b.sort_order||0) || (b.date||'').localeCompare(a.date||''));
     const list=$('#eeList');
     const col = `var(--cat-${catId}, var(--cat-default))`;
     list.innerHTML = `
