@@ -569,9 +569,11 @@ function openLightbox(idx, kenBurns){
       showLbLoader(false, 100, '');
     };
     img.onerror = function(){
-      img.style.opacity = '1';
-      showLbLoader(false, 0, '✕ 加载失败');
-      setTimeout(() => showLbLoader(false, 0, ''), 1500);
+      img.style.opacity = '0.3';
+      img.style.filter = 'grayscale(1) blur(8px)';
+      img.alt = '原图已丢失：' + (img.src.split('/').pop() || '');
+      showLbLoader(false, 0, '✕ 原图不存在');
+      setTimeout(() => showLbLoader(false, 0, ''), 2000);
     };
     img.src = url;
   });
