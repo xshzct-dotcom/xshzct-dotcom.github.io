@@ -218,13 +218,13 @@ function buildTimeline(){
   let html = '';
   catIds.forEach((k,gi) => {
     const g = groups[k];
-    // 组内按日期降序（童年篇反过来，从旧到新）
+    // 组内按日期降序（童年篇按 sort_order 升序=旧到新）
     g.items.sort((a,b)=>{
       const da=a.date||'', db=b.date||'';
       if(da>db) return -1; if(da<db) return 1;
+      if(k==='childhood') return (a.sort_order||0)-(b.sort_order||0);
       return (b.sort_order||0)-(a.sort_order||0);
     });
-    if(k==='childhood') g.items.reverse();
     const isFirst = gi === 0;
     html += `<div class="tl-group cat-${g.catId}">
       <div class="tl-group-header" data-target="${k}">
