@@ -21,7 +21,7 @@
   const DEFAULT_CATS = [
     { id: 'childhood', title: '童年篇' },
     { id: 'firstlove', title: '初恋篇' },
-    { id: 'thoughts', title: '所思所想' },
+    { id: 'thoughts', title: '日记' },
     { id: 'travel', title: '旅行见闻' },
   ];
 
