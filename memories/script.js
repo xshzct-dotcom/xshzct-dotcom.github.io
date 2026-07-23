@@ -225,14 +225,14 @@ function buildTimeline(){
       if(k==='childhood') return (a.sort_order||0)-(b.sort_order||0);
       return (b.sort_order||0)-(a.sort_order||0);
     });
-    const isFirst = gi === 0;
+    // 全部默认折叠，用户自己点开
     html += `<div class="tl-group cat-${g.catId}">
       <div class="tl-group-header" data-target="${k}">
-        <span class="tl-group-icon">${isFirst?'▾':'▸'}</span>
+        <span class="tl-group-icon">▸</span>
         <span class="tl-group-title">● ${esc(g.title)}</span>
         <span class="tl-group-count">${g.items.length} 篇</span>
       </div>
-      <div class="tl-group-body"${isFirst?'':' style="display:none"'}>`;
+      <div class="tl-group-body" style="display:none">`;
     g.items.forEach((item,i) => {
       const idx = g.items.indexOf(item); // 用于点击弹出
       html += `<div class="timeline-item fade-up cat-${g.catId}" data-idx="${i}">
