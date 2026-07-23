@@ -238,7 +238,10 @@
   }).then(function(r){ return r.json(); }).then(function(data){
     if(data && data[0] && data[0].id){
       var visitId = data[0].id;
-      function leave(){
+      var sent = false;
+      function send(){
+        if(sent) return;
+        sent = true;
         var dur = Math.round((Date.now() - entered) / 1000);
         fetch(base+'?id=eq.'+visitId, {
           method: 'PATCH',
@@ -246,8 +249,17 @@
           body: JSON.stringify({left_at: new Date().toISOString(), duration: dur})
         }).catch(function(){});
       }
-      window.addEventListener('beforeunload', leave);
-      document.addEventListener('visibilitychange', function(){ if(document.hidden) leave(); });
+      window.addEventListener('beforeunload', send);
+      document.addEventListener('visibilitychange', function(){ if(document.hidden) send(); });
+      // 每 30 秒心跳一次（页面没关也能记录停留）
+      setInterval(function(){ if(!sent) {
+        var dur = Math.round((Date.now() - entered) / 1000);
+        fetch(base+'?id=eq.'+visitId, {
+          method: 'PATCH',
+          headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+          body: JSON.stringify({duration: dur})
+        }).catch(function(){});
+      }}, 30000);
     }
   }).catch(function(){});
 })();
