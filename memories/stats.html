@@ -79,7 +79,8 @@ const KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb',BASE='https://mvzbkuh
       var h=local.getUTCHours(); if(!isNaN(h)&&h>=0&&h<24) hourly[h]++;
       if(d.path) pageMap[d.path]=(pageMap[d.path]||0)+1;
       if(d.ref&&d.ref!='') refMap[d.ref]=(refMap[d.ref]||0)+1;
-      if(d.duration){durSum+=d.duration; durN++;}
+      // 停留时长只算当天
+      if(d.duration && day===todayS){durSum+=d.duration; durN++;}
     });
     var avgDur=durN?Math.round(durSum/durN):0;
     // 日曲线（全部数据）
