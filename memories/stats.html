@@ -5,116 +5,145 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>访问统计 - 向天游</title>
 <style>
-body{background:#0E1116;color:#E8E4DA;font-family:system-ui,sans-serif;margin:0;padding:30px 16px;max-width:640px;margin:0 auto}
-h1{font-size:1.4rem;margin-bottom:4px;text-align:center}
-h1 em{font-style:italic;color:#7C9B7E}
-.sub{text-align:center;color:rgba(232,228,218,.4);font-size:.8rem;margin-bottom:28px}
-.card{background:rgba(232,228,218,.04);border:1px solid rgba(232,228,218,.08);border-radius:12px;padding:20px;margin-bottom:16px}
-.row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(232,228,218,.06)}
-.row:last-child{border-bottom:none}
-.num{font-size:2.6rem;font-weight:700;text-align:center;line-height:1.2}
-.num small{font-size:.9rem;font-weight:400;color:rgba(232,228,218,.45)}
-.label{color:rgba(232,228,218,.5);font-size:.78rem;text-transform:uppercase;letter-spacing:.5px}
-.val{color:#E8E4DA;font-weight:600}
-.bar-wrap{display:flex;align-items:center;gap:6px;padding:3px 0}
-.bar{height:6px;border-radius:3px;background:rgba(124,155,126,.7);min-width:2px;transition:width .6s}
-.bar-label{font-size:.75rem;color:rgba(232,228,218,.45);width:28px;flex-shrink:0;text-align:right}
-.bar-date{font-size:.75rem;color:rgba(232,228,218,.45);width:54px;flex-shrink:0}
-.msg{text-align:center;color:rgba(232,228,218,.3);padding:40px 0;font-size:.9rem}
-.loading{text-align:center;color:rgba(232,228,218,.3);padding:40px 0}
-h2{font-size:.95rem;color:rgba(232,228,218,.5);margin:0 0 12px 0;font-weight:500}
-.triple{display:flex;gap:12px}
-.triple>div{flex:1;text-align:center;padding:14px 0;background:rgba(232,228,218,.03);border-radius:10px}
-.triple .n{font-size:1.6rem;font-weight:700;line-height:1.3}
-.triple .l{font-size:.72rem;color:rgba(232,228,218,.4);margin-top:2px}
+*{box-sizing:border-box}
+body{background:#0E1116;color:#E8E4DA;font-family:system-ui,sans-serif;margin:0;padding:30px 16px;max-width:720px;margin:0 auto;min-height:100vh}
+h1{font-size:1.3rem;font-weight:600;text-align:center;margin:0 0 4px;letter-spacing:.5px}
+h1 em{font-style:italic;color:#7C9B7E;font-weight:400}
+.sub{text-align:center;color:rgba(232,228,218,.35);font-size:.8rem;margin-bottom:24px;letter-spacing:.3px}
+.overview{display:flex;gap:10px;margin-bottom:20px}
+.overview>div{flex:1;background:rgba(232,228,218,.03);border:1px solid rgba(232,228,218,.07);border-radius:10px;padding:14px 8px;text-align:center;position:relative;overflow:hidden}
+.overview .n{font-size:1.8rem;font-weight:700;line-height:1.2}
+.overview .l{font-size:.72rem;margin-top:3px;color:rgba(232,228,218,.4);text-transform:uppercase;letter-spacing:.5px}
+.section{background:rgba(232,228,218,.03);border:1px solid rgba(232,228,218,.07);border-radius:12px;padding:18px;margin-bottom:14px}
+.section h2{font-size:.85rem;color:rgba(232,228,218,.4);margin:0 0 14px;font-weight:500;letter-spacing:.5px;text-transform:uppercase}
+.bar-row{display:flex;align-items:center;gap:6px;margin:3px 0;padding:2px 0}
+.bar-row .dt{font-size:.75rem;color:rgba(232,228,218,.35);width:50px;flex-shrink:0}
+.bar-row .bar{height:7px;border-radius:4px;background:#7C9B7E;min-width:3px;transition:width .5s;opacity:.8}
+.bar-row .cnt{font-size:.78rem;color:rgba(232,228,218,.5);min-width:18px;text-align:right}
+.list-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(232,228,218,.05);font-size:.85rem}
+.list-item:last-child{border-bottom:none}
+.list-item .p{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(232,228,218,.7)}
+.list-item .c{color:rgba(232,228,218,.5);font-weight:600;min-width:20px;text-align:right}
+.hour-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px}
+.hour-cell{text-align:center;padding:8px 0;border-radius:6px;background:rgba(232,228,218,.04);font-size:.75rem;color:rgba(232,228,218,.45);position:relative}
+.hour-cell .hc{font-size:.95rem;font-weight:600;color:#E8E4DA;display:block;margin-bottom:1px}
+.hour-cell.hot{background:rgba(124,155,126,.2)}
+.hour-cell.warm{background:rgba(124,155,126,.1)}
+
+/* 访客列表表格 */
+.scroll{overflow-x:auto;margin-top:6px}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+thead th{text-align:left;padding:6px 8px;color:rgba(232,228,218,.35);font-weight:500;border-bottom:1px solid rgba(232,228,218,.08);white-space:nowrap}
+tbody td{padding:5px 8px;border-bottom:1px solid rgba(232,228,218,.04);white-space:nowrap;color:rgba(232,228,218,.65)}
+tbody tr:hover td{background:rgba(232,228,218,.03)}
+tbody .p{max-width:160px;overflow:hidden;text-overflow:ellipsis}
+tbody .r{max-width:120px;overflow:hidden;text-overflow:ellipsis;color:rgba(232,228,218,.4)}
+.tag{display:inline-block;padding:1px 10px;border-radius:10px;font-size:.72rem;background:rgba(124,155,126,.15);color:rgba(124,155,126,.8);margin-left:4px}
+.ref{max-width:120px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle}
+
+.msg{text-align:center;color:rgba(232,228,218,.25);padding:50px 0;font-size:.9rem}
+.msg.ld{color:rgba(232,228,218,.15);font-size:.8rem}
 </style>
 </head>
 <body>
 <h1>访<em>问</em>统计</h1>
-<p class="sub">后台记录 · 不被拦截</p>
-<div id="content"><div class="loading">加载中···</div></div>
+<p class="sub">后台记录 · 所有数据永久保存</p>
+<div id="content"><div class="msg ld">加载中···</div></div>
 <script>
-const KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
-const BASE = 'https://mvzbkuhwapdqcdkekczh.supabase.co';
-function h(hdrs){ var o={}; hdrs.forEach(function(h){var p=h.indexOf(':'); o[h.slice(0,p).trim().toLowerCase()]=h.slice(p+2).trim();}); return o; }
-
+const KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb',BASE='https://mvzbkuhwapdqcdkekczh.supabase.co';
 (async function(){
-  try {
-    // 总访问 / 今日 / 平均时长 — 用 count=exact 头
-    var totalR = await fetch(BASE+'/rest/v1/visits?select=id&limit=0', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact'}});
-    var total = parseInt(totalR.headers.get('content-range')?.split('/')[1]||0);
-    var todayStr = new Date().toISOString().slice(0,10);
-    var todayR = await fetch(BASE+'/rest/v1/visits?select=id&visited_at=gte.'+todayStr+'&limit=0', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact'}});
-    var today = parseInt(todayR.headers.get('content-range')?.split('/')[1]||0);
-    // 拉全部数据（最多 5000 条，够用了）来算日均/页面排行
-    var allR = await fetch(BASE+'/rest/v1/visits?select=path,visited_at,duration&limit=5000', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
-    var all = await allR.json();
-    var dayMap = {}, pageMap = {}, durSum = 0, durN = 0, hourly = new Array(24).fill(0);
-    (all||[]).forEach(function(d){
-      if(!d.visited_at) return;
-      var day = d.visited_at.slice(0,10);
-      dayMap[day] = (dayMap[day]||0) + 1;
-      var h = parseInt(d.visited_at.slice(11,13));
-      if(!isNaN(h)&&h>=0&&h<24) hourly[h]++;
-      if(d.path) pageMap[d.path] = (pageMap[d.path]||0) + 1;
-      if(d.duration){ durSum+=d.duration; durN++; }
-    });
-    var avgDur = durN ? Math.round(durSum/durN) : 0;
-    // 最近 14 天
-    var days = Object.keys(dayMap).sort().reverse().slice(0,14).reverse();
-    var maxDay = days.length ? Math.max.apply(null, days.map(function(d){return dayMap[d];})) : 1;
-    // 热门页面
-    var pages = Object.keys(pageMap).sort(function(a,b){return pageMap[b]-pageMap[a];}).slice(0,10);
-    var maxPage = pages.length ? Math.max.apply(null, pages.map(function(p){return pageMap[p];})) : 1;
-
-    var html = '';
-    // 三列概览
-    html += '<div class="triple"><div><div class="n">'+(total||0)+'</div><div class="l">总访问</div></div>';
-    html += '<div><div class="n">'+(today||0)+'</div><div class="l">今日</div></div>';
-    html += '<div><div class="n">'+(avgDur?fmt(avgDur):'--')+'</div><div class="l">平均停留</div></div></div>';
-
-    // 每日曲线（最近 14 天）
-    html += '<div class="card"><h2>📅 最近 14 天</h2>';
-    if(days.length){
-      days.forEach(function(d){
-        var c = dayMap[d]||0;
-        html += '<div class="bar-wrap"><span class="bar-date">'+(d.slice(5))+'</span><div class="bar" style="width:'+Math.round(c/maxDay*100)+'%"></div><span style="font-size:.8rem;color:rgba(232,228,218,.6);min-width:20px">'+c+'</span></div>';
-      });
-    } else {
-      html += '<div class="msg">暂无数据</div>';
+  try{
+    // 总计数
+    var totalR=await fetch(BASE+'/rest/v1/visits?select=id&limit=0',{headers:{apikey:KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact'}});
+    var total=parseInt(totalR.headers.get('content-range')?.split('/')[1]||0);
+    var todayS=new Date().toISOString().slice(0,10);
+    var todayR=await fetch(BASE+'/rest/v1/visits?select=id&visited_at=gte.'+todayS+'&limit=0',{headers:{apikey:KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact'}});
+    var today=parseInt(todayR.headers.get('content-range')?.split('/')[1]||0);
+    // 拉所有数据
+    var all=[]; var page=0, bs=500;
+    while(1){
+      var r=await fetch(BASE+'/rest/v1/visits?select=id,path,ref,visited_at,left_at,duration&limit='+bs+'&offset='+(page*bs)+'&order=visited_at.desc',{headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
+      var d=await r.json(); if(!d||!d.length) break;
+      all=all.concat(d); page++; if(d.length<bs) break;
     }
-    html += '</div>';
+    // 分析
+    var dayMap={},pageMap={},hourly=new Array(24).fill(0),durSum=0,durN=0,refMap={};
+    all.forEach(function(d){
+      if(!d.visited_at) return;
+      var day=d.visited_at.slice(0,10);
+      dayMap[day]=(dayMap[day]||0)+1;
+      var h=parseInt(d.visited_at.slice(11,13)); if(!isNaN(h)&&h>=0&&h<24) hourly[h]++;
+      if(d.path) pageMap[d.path]=(pageMap[d.path]||0)+1;
+      if(d.ref&&d.ref!='') refMap[d.ref]=(refMap[d.ref]||0)+1;
+      if(d.duration){durSum+=d.duration; durN++;}
+    });
+    var avgDur=durN?Math.round(durSum/durN):0;
+    // 日曲线（全部数据）
+    var days=Object.keys(dayMap).sort();
+    var maxDay=days.length?Math.max.apply(null,days.map(function(d){return dayMap[d];})):1;
+    var pages=Object.keys(pageMap).sort(function(a,b){return pageMap[b]-pageMap[a];}).slice(0,15);
+    var maxPage=pages.length?Math.max.apply(null,pages.map(function(p){return pageMap[p];})):1;
+    var maxH=Math.max.apply(null,hourly)||1;
+
+    var html='';
+    // 概览
+    html+='<div class="overview"><div><div class="n">'+(total||0)+'</div><div class="l">总访问</div></div>';
+    html+='<div><div class="n">'+(today||0)+'</div><div class="l">今日</div></div>';
+    html+='<div><div class="n">'+(avgDur?fmt(avgDur):'--')+'</div><div class="l">平均停留</div></div></div>';
+
+    // 每日曲线
+    html+='<div class="section"><h2>📅 每日访问</h2>';
+    if(days.length){
+      days.slice(-90).forEach(function(d){
+        var c=dayMap[d]||0;
+        html+='<div class="bar-row"><span class="dt">'+(d.slice(5))+'</span><div class="bar" style="width:'+Math.max(3,c/maxDay*100)+'%"></div><span class="cnt">'+c+'</span></div>';
+      });
+    }else{html+='<div class="msg">暂无数据</div>';}
+    html+='</div>';
 
     // 时段分布
-    html += '<div class="card"><h2>🕐 时段分布</h2>';
-    var maxH = Math.max.apply(null, hourly);
-    for(var i=0;i<24;i+=2){
-      var label = (i<10?'0':'')+i+':00';
-      var c = hourly[i]+hourly[i+1];
-      html += '<div class="bar-wrap"><span class="bar-label">'+label+'</span><div class="bar" style="width:'+Math.round((c||0)/maxH*100)+'%"></div><span style="font-size:.8rem;color:rgba(232,228,218,.6);min-width:20px">'+(c||0)+'</span></div>';
+    html+='<div class="section"><h2>🕐 时段分布</h2><div class="hour-grid">';
+    for(var i=0;i<24;i++){
+      var pct=hourly[i]/maxH;
+      html+='<div class="hour-cell'+(pct>.6?' hot':pct>.3?' warm':'')+'"><span class="hc">'+(hourly[i]||0)+'</span>'+(i<10?'0':'')+i+':00</div>';
     }
-    html += '</div>';
+    html+='</div></div>';
 
     // 页面排名
-    html += '<div class="card"><h2>📄 页面排名</h2>';
+    html+='<div class="section"><h2>📄 页面排名</h2>';
     if(pages.length){
       pages.forEach(function(p){
-        html += '<div class="row"><span class="val" style="font-size:.85rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p+'</span><span style="color:rgba(232,228,218,.6);font-size:.85rem;min-width:24px;text-align:right">'+pageMap[p]+'</span></div>';
+        html+='<div class="list-item"><span class="p">'+p+'</span><span class="c">'+pageMap[p]+'</span></div>';
       });
-    } else {
-      html += '<div class="msg">暂无数据</div>';
-    }
-    html += '</div>';
+    }else{html+='<div class="msg">暂无数据</div>';}
+    html+='</div>';
 
-    document.getElementById('content').innerHTML = html;
-  } catch(e){
-    document.getElementById('content').innerHTML = '<div class="msg">加载失败</div>';
+    // 来源排名
+    var refs=Object.keys(refMap).sort(function(a,b){return refMap[b]-refMap[a];}).slice(0,10);
+    if(refs.length){
+      html+='<div class="section"><h2>🔗 来源排名</h2>';
+      refs.forEach(function(r){
+        html+='<div class="list-item"><span class="p" style="font-size:.8rem;color:rgba(232,228,218,.5)">'+r+'</span><span class="c">'+refMap[r]+'</span></div>';
+      });
+      html+='</div>';
+    }
+
+    // 全部访客明细表格
+    html+='<div class="section"><h2>📋 全部访客明细（最新100条）</h2><div class="scroll"><table><thead><tr><th>时间</th><th>页面</th><th>停留</th><th>来源</th></tr></thead><tbody>';
+    all.slice(0,100).forEach(function(d){
+      if(!d.visited_at) return;
+      var time=d.visited_at.slice(0,16).replace('T',' ');
+      var dur=d.duration?fmt(d.duration):'--';
+      html+='<tr><td style="color:rgba(232,228,218,.4);font-size:.75rem">'+time+'</td><td class="p">'+esc(d.path||'/')+'</td><td style="font-size:.78rem;color:'+(d.duration?'rgba(124,155,126,.7)':'rgba(232,228,218,.2)')+'">'+dur+'</td><td class="r">'+(d.ref?esc(d.ref):'--')+'</td></tr>';
+    });
+    html+='</tbody></table></div></div>';
+
+    document.getElementById('content').innerHTML=html;
+  }catch(e){
+    document.getElementById('content').innerHTML='<div class="msg">加载失败</div>';
   }
-  function fmt(s){
-    if(s<60) return s+'秒';
-    var m=Math.floor(s/60);
-    return m+'分'+(s%60)+'秒';
-  }
+  function fmt(s){ if(!s||s<0) return '--'; if(s<60) return s+'秒'; var m=Math.floor(s/60); var r=s%60; return m+'分'+r+'秒'; }
+  function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 })();
 </script>
 </body>
