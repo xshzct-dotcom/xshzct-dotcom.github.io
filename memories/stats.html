@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>访问统计 - 向天游</title>
+<style>
+body{background:#0E1116;color:#E8E4DA;font-family:system-ui,sans-serif;margin:0;padding:40px 20px;max-width:600px;margin:0 auto}
+h1{font-size:1.5rem;margin-bottom:8px;text-align:center}
+h1 em{font-style:italic;color:#7C9B7E}
+.sub{text-align:center;color:rgba(232,228,218,.5);font-size:.85rem;margin-bottom:32px}
+.num{font-size:3rem;font-weight:700;color:#E8E4DA;text-align:center;margin:16px 0}
+.num small{font-size:1rem;font-weight:400;color:rgba(232,228,218,.5)}
+.row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(232,228,218,.08);font-size:.9rem}
+.row .path{color:rgba(232,228,218,.7)}
+.row .cnt{color:#E8E4DA;font-weight:600}
+.msg{text-align:center;color:rgba(232,228,218,.3);padding:40px 0}
+.loading{text-align:center;color:rgba(232,228,218,.3);padding:40px 0}
+</style>
+</head>
+<body>
+<h1>访<em>问</em>统计</h1>
+<p class="sub">记录你的网站被打开的次数</p>
+<div id="content"><div class="loading">加载中···</div></div>
+<script>
+const KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
+const BASE = 'https://mvzbkuhwapdqcdkekczh.supabase.co';
+(async function(){
+  try {
+    // 总访问量
+    var total = await fetch(BASE+'/rest/v1/visits?select=id&limit=0', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}})
+      .then(r=>parseInt(r.headers.get('content-range')?.split('/')[1]||'0'));
+    // 今日
+    var today = await fetch(BASE+'/rest/v1/visits?select=id&visited_at=gte.'+new Date().toISOString().slice(0,10), {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}})
+      .then(r=>parseInt(r.headers.get('content-range')?.split('/')[1]||'0'));
+    // 各页面
+    var pages = await fetch(BASE+'/rest/v1/visits?select=path,count&order=count.desc&group=path&limit=20', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}})
+      .then(r=>r.json());
+    var html = '';
+    html += '<div class="num">'+(total||0)+'<small> 总访问</small></div>';
+    html += '<div class="num" style="font-size:1.8rem">'+(today||0)+'<small> 今日</small></div>';
+    html += '<h2 style="margin-top:32px;font-size:1rem;color:rgba(232,228,218,.5)">页面排名</h2>';
+    if(pages && pages.length){
+      pages.forEach(function(p){ html += '<div class="row"><span class="path">'+(p.path||'/')+'</span><span class="cnt">'+p.count+'</span></div>'; });
+    } else {
+      html += '<div class="msg">暂无数据（有人访问后显示）</div>';
+    }
+    document.getElementById('content').innerHTML = html;
+  } catch(e){
+    document.getElementById('content').innerHTML = '<div class="msg">加载失败</div>';
+  }
+})();
+</script>
+</body>
+</html>
