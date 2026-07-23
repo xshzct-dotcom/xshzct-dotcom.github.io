@@ -888,9 +888,10 @@ function playSong(idx){
   currentSongIdx=idx;
   const t=s[idx];
   const sp=(t.storage_path||t.url||'').trim();
+  const SUPABASE_STORAGE = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/';
   let url = sp.startsWith('http') ? sp
           : sp.startsWith('music/') ? MUSIC_BASE+sp.slice(6)
-          : sp ? 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/'+sp
+          : sp ? SUPABASE_STORAGE+sp
           : MUSIC_BASE+(t.name||t.title||'')+'.mp3';
   bgMusic.src=url; bgMusic.load();
   // 用户已点过页面（授权手势）→ play；否则等用户点
@@ -1198,10 +1199,11 @@ async function loadFromSupabase(){
       }
     }
 
-    // 3. 音乐 — 从 music 表加载排序
+    // 3. 音乐 — 从 music 表加载排序（只取主页音乐，排除相册专属）
     const {data:tracks} = await SB.from('music').select('*').order('sort_order', {ascending:true});
-    if(tracks && tracks.length > 0){
-      const newPlaylist = tracks.map(t => ({
+    const mainTracks = (tracks||[]).filter(t => !t.album_id);
+    if(mainTracks.length > 0){
+      const newPlaylist = mainTracks.map(t => ({
         name: t.title, title: t.title, artist: t.artist||'',
         url: t.storage_path||'', storage_path: t.storage_path||'',
       }));
