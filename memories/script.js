@@ -229,11 +229,11 @@ function buildTimeline(){
 // 文章阅读弹窗
 let _timelineItems = [];
 window._timelineItems = _timelineItems;
-function openEssayModal(essay, catOnly){
+function openEssayModal(essay, catOnly=true){
   const overlay=$('#essayModal');
   const content=$('#essayModalContent');
   if(!overlay||!content) return;
-  // 如果 catOnly 为 true，只在同分类内导航
+  // 默认按分类隔离导航（不跨分类跳转）
   const pool = catOnly ? window._timelineItems.filter(t => t.catId === essay.catId) : window._timelineItems;
   const curIdx = pool.findIndex(t => t.title === essay.title);
   const hasPrev = curIdx >= 0 && curIdx > 0;

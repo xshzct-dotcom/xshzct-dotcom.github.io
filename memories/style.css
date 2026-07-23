@@ -325,11 +325,11 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 /* --- Responsive --- */
 @media(max-width:1024px){
   .masonry-item{width:calc((100% - 18px) / 2)}
-  .timeline::before{left:20px}
+  .timeline::before{left:14px;opacity:.5}
   .timeline-item:nth-child(odd),.timeline-item:nth-child(even){flex-direction:row}
-  .timeline-dot{left:20px}
-  .timeline-card{width:calc(100% - 60px);margin-left:50px}
-  .timeline-item:nth-child(even) .timeline-card{margin-left:50px;margin-right:0}
+  .timeline-dot{left:14px;width:10px;height:10px;top:18px}
+  .timeline-card{width:calc(100% - 38px);margin-left:32px}
+  .timeline-item:nth-child(even) .timeline-card{margin-left:32px;margin-right:0}
 }
 @media(max-width:768px){
   .nav{padding:0 12px;gap:8px}
