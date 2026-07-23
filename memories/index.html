@@ -13,7 +13,6 @@
 <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
 <link rel="stylesheet" href="style.css?v=20260723-3">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script data-goatcounter="https://xshzct.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 <style>body{font-family:'Inter','Noto Serif SC',system-ui,sans-serif;background:#0E1116;color:#E8E4DA;margin:0}
 /* 灯箱核心 CSS — 内联!important 确保 SW 缓存旧版 style.css 也不影响 */
 .lightbox{position:fixed;inset:0;z-index:200;background:#000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;overflow:hidden}
@@ -226,5 +225,15 @@
 </script>
 <script src="script.js?v=20260723-2"></script>
 <script src="editor.js?v=20260722-18"></script>
+<script>
+// 访客统计（Supabase，不依赖任何外部脚本，不被 adblock 拦截）
+(function(){
+  var key = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
+  var body = JSON.stringify({path: location.pathname, ref: document.referrer || ''});
+  fetch('https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1/visits', {
+    method: 'POST', headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=minimal'}, body: body
+  }).catch(function(){});
+})();
+</script>
 </body>
 </html>
