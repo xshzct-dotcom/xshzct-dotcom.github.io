@@ -82,8 +82,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 /* --- Hero --- */
 .hero{position:relative;height:100vh;min-height:600px;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .hero-bg{position:absolute;inset:0;background:url('../images/hero_bg.jpg') center/cover no-repeat;transform:translateZ(0);will-change:transform}
-.hero-bg::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,17,22,.4) 0%,rgba(14,17,22,.65) 40%,var(--bg) 100%)}
-#heroStars{position:absolute;inset:0;z-index:1;pointer-events:none}
+#heroStars{display:none}
 .hero-content{position:relative;z-index:2;text-align:center;padding:0 24px}
 .hero-title{font-family:var(--font-display);font-size:clamp(2.5rem,6vw,5rem);font-weight:700;line-height:1.1;letter-spacing:-1px;margin-bottom:16px;opacity:0;transform:translateY(30px);animation:heroIn .8s var(--ease-out) .3s forwards}
 .hero-title em{font-style:italic;color:var(--accent);font-weight:400}
