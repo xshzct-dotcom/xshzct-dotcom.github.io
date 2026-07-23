@@ -5,70 +5,107 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>访问统计 - 向天游</title>
 <style>
-body{background:#0E1116;color:#E8E4DA;font-family:system-ui,sans-serif;margin:0;padding:40px 20px;max-width:600px;margin:0 auto}
-h1{font-size:1.5rem;margin-bottom:8px;text-align:center}
+body{background:#0E1116;color:#E8E4DA;font-family:system-ui,sans-serif;margin:0;padding:30px 16px;max-width:640px;margin:0 auto}
+h1{font-size:1.4rem;margin-bottom:4px;text-align:center}
 h1 em{font-style:italic;color:#7C9B7E}
-.sub{text-align:center;color:rgba(232,228,218,.5);font-size:.85rem;margin-bottom:32px}
-.num{font-size:3rem;font-weight:700;color:#E8E4DA;text-align:center;margin:16px 0}
-.num small{font-size:1rem;font-weight:400;color:rgba(232,228,218,.5)}
-.row{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid rgba(232,228,218,.08);font-size:.9rem}
-.row .path{color:rgba(232,228,218,.7)}
-.row .cnt{color:#E8E4DA;font-weight:600}
-.msg{text-align:center;color:rgba(232,228,218,.3);padding:40px 0}
+.sub{text-align:center;color:rgba(232,228,218,.4);font-size:.8rem;margin-bottom:28px}
+.card{background:rgba(232,228,218,.04);border:1px solid rgba(232,228,218,.08);border-radius:12px;padding:20px;margin-bottom:16px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(232,228,218,.06)}
+.row:last-child{border-bottom:none}
+.num{font-size:2.6rem;font-weight:700;text-align:center;line-height:1.2}
+.num small{font-size:.9rem;font-weight:400;color:rgba(232,228,218,.45)}
+.label{color:rgba(232,228,218,.5);font-size:.78rem;text-transform:uppercase;letter-spacing:.5px}
+.val{color:#E8E4DA;font-weight:600}
+.bar-wrap{display:flex;align-items:center;gap:6px;padding:3px 0}
+.bar{height:6px;border-radius:3px;background:rgba(124,155,126,.7);min-width:2px;transition:width .6s}
+.bar-label{font-size:.75rem;color:rgba(232,228,218,.45);width:28px;flex-shrink:0;text-align:right}
+.bar-date{font-size:.75rem;color:rgba(232,228,218,.45);width:54px;flex-shrink:0}
+.msg{text-align:center;color:rgba(232,228,218,.3);padding:40px 0;font-size:.9rem}
 .loading{text-align:center;color:rgba(232,228,218,.3);padding:40px 0}
+h2{font-size:.95rem;color:rgba(232,228,218,.5);margin:0 0 12px 0;font-weight:500}
+.triple{display:flex;gap:12px}
+.triple>div{flex:1;text-align:center;padding:14px 0;background:rgba(232,228,218,.03);border-radius:10px}
+.triple .n{font-size:1.6rem;font-weight:700;line-height:1.3}
+.triple .l{font-size:.72rem;color:rgba(232,228,218,.4);margin-top:2px}
 </style>
 </head>
 <body>
 <h1>访<em>问</em>统计</h1>
-<p class="sub">后台记录，不在页面上显示</p>
+<p class="sub">后台记录 · 不被拦截</p>
 <div id="content"><div class="loading">加载中···</div></div>
 <script>
 const KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
 const BASE = 'https://mvzbkuhwapdqcdkekczh.supabase.co';
+function h(hdrs){ var o={}; hdrs.forEach(function(h){var p=h.indexOf(':'); o[h.slice(0,p).trim().toLowerCase()]=h.slice(p+2).trim();}); return o; }
+
 (async function(){
   try {
-    // 用 Supabase SQL API 查统计数据
-    var stats = await fetch(BASE+'/rest/v1/rpc/get_visits_stats', {
-      method: 'POST',
-      headers: {'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'}
-    }).then(function(r){
-      if(!r.ok) throw new Error('No RPC');
-      return r.json();
-    }).catch(async function(){
-      // RPC 不存在，用多个简单查询凑
-      var totalR = await fetch(BASE+'/rest/v1/visits?select=id&limit=0', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
-      var total = parseInt(totalR.headers.get('content-range')?.split('/')[1]||'0');
-      var todayStr = new Date().toISOString().slice(0,10);
-      var todayR = await fetch(BASE+'/rest/v1/visits?select=id&entered_at=gte.'+todayStr, {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
-      var today = parseInt(todayR.headers.get('content-range')?.split('/')[1]||'0');
-      var avgR = await fetch(BASE+'/rest/v1/visits?select=duration&duration=not.is.null&limit=1000', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
-      var avgData = await avgR.json();
-      var avgDur = 0;
-      if(avgData && avgData.length){
-        var sum = 0, n = 0;
-        avgData.forEach(function(d){ if(d.duration){ sum+=d.duration; n++; } });
-        avgDur = n ? Math.round(sum/n) : 0;
-      }
-      // 最热页面
-      var all = await fetch(BASE+'/rest/v1/visits?select=path,entered_at&limit=2000', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
-      var allData = await all.json();
-      var pageCount = {};
-      if(allData && allData.length){
-        allData.forEach(function(d){ pageCount[d.path] = (pageCount[d.path]||0)+1; });
-      }
-      var sortedPages = Object.keys(pageCount).sort(function(a,b){ return pageCount[b]-pageCount[a]; }).slice(0,10);
-      return {total:total, today:today, avgDur:avgDur, pages:sortedPages, counts:pageCount};
+    // 总访问 / 今日 / 平均时长 — 用 count=exact 头
+    var totalR = await fetch(BASE+'/rest/v1/visits?select=id&limit=0', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact'}});
+    var total = parseInt(totalR.headers.get('content-range')?.split('/')[1]||0);
+    var todayStr = new Date().toISOString().slice(0,10);
+    var todayR = await fetch(BASE+'/rest/v1/visits?select=id&visited_at=gte.'+todayStr+'&limit=0', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact'}});
+    var today = parseInt(todayR.headers.get('content-range')?.split('/')[1]||0);
+    // 拉全部数据（最多 5000 条，够用了）来算日均/页面排行
+    var allR = await fetch(BASE+'/rest/v1/visits?select=path,visited_at,duration&limit=5000', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
+    var all = await allR.json();
+    var dayMap = {}, pageMap = {}, durSum = 0, durN = 0, hourly = new Array(24).fill(0);
+    (all||[]).forEach(function(d){
+      if(!d.visited_at) return;
+      var day = d.visited_at.slice(0,10);
+      dayMap[day] = (dayMap[day]||0) + 1;
+      var h = parseInt(d.visited_at.slice(11,13));
+      if(!isNaN(h)&&h>=0&&h<24) hourly[h]++;
+      if(d.path) pageMap[d.path] = (pageMap[d.path]||0) + 1;
+      if(d.duration){ durSum+=d.duration; durN++; }
     });
+    var avgDur = durN ? Math.round(durSum/durN) : 0;
+    // 最近 14 天
+    var days = Object.keys(dayMap).sort().reverse().slice(0,14).reverse();
+    var maxDay = days.length ? Math.max.apply(null, days.map(function(d){return dayMap[d];})) : 1;
+    // 热门页面
+    var pages = Object.keys(pageMap).sort(function(a,b){return pageMap[b]-pageMap[a];}).slice(0,10);
+    var maxPage = pages.length ? Math.max.apply(null, pages.map(function(p){return pageMap[p];})) : 1;
+
     var html = '';
-    html += '<div class="num">'+(stats.total||0)+'<small> 总访问</small></div>';
-    html += '<div class="num" style="font-size:1.8rem">'+(stats.today||0)+'<small> 今日</small></div>';
-    html += '<div class="num" style="font-size:1.4rem;color:rgba(232,228,218,.7)">'+(stats.avgDur ? fmt(stats.avgDur) : '--')+'<small> 平均停留</small></div>';
-    html += '<h2 style="margin-top:32px;font-size:1rem;color:rgba(232,228,218,.5)">页面排名</h2>';
-    if(stats.pages && stats.pages.length){
-      stats.pages.forEach(function(p){ html += '<div class="row"><span class="path">'+(p||'/')+'</span><span class="cnt">'+(stats.counts[p]||0)+'</span></div>'; });
+    // 三列概览
+    html += '<div class="triple"><div><div class="n">'+(total||0)+'</div><div class="l">总访问</div></div>';
+    html += '<div><div class="n">'+(today||0)+'</div><div class="l">今日</div></div>';
+    html += '<div><div class="n">'+(avgDur?fmt(avgDur):'--')+'</div><div class="l">平均停留</div></div></div>';
+
+    // 每日曲线（最近 14 天）
+    html += '<div class="card"><h2>📅 最近 14 天</h2>';
+    if(days.length){
+      days.forEach(function(d){
+        var c = dayMap[d]||0;
+        html += '<div class="bar-wrap"><span class="bar-date">'+(d.slice(5))+'</span><div class="bar" style="width:'+Math.round(c/maxDay*100)+'%"></div><span style="font-size:.8rem;color:rgba(232,228,218,.6);min-width:20px">'+c+'</span></div>';
+      });
     } else {
-      html += '<div class="msg">暂无数据（有人访问后显示）</div>';
+      html += '<div class="msg">暂无数据</div>';
     }
+    html += '</div>';
+
+    // 时段分布
+    html += '<div class="card"><h2>🕐 时段分布</h2>';
+    var maxH = Math.max.apply(null, hourly);
+    for(var i=0;i<24;i+=2){
+      var label = (i<10?'0':'')+i+':00';
+      var c = hourly[i]+hourly[i+1];
+      html += '<div class="bar-wrap"><span class="bar-label">'+label+'</span><div class="bar" style="width:'+Math.round((c||0)/maxH*100)+'%"></div><span style="font-size:.8rem;color:rgba(232,228,218,.6);min-width:20px">'+(c||0)+'</span></div>';
+    }
+    html += '</div>';
+
+    // 页面排名
+    html += '<div class="card"><h2>📄 页面排名</h2>';
+    if(pages.length){
+      pages.forEach(function(p){
+        html += '<div class="row"><span class="val" style="font-size:.85rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p+'</span><span style="color:rgba(232,228,218,.6);font-size:.85rem;min-width:24px;text-align:right">'+pageMap[p]+'</span></div>';
+      });
+    } else {
+      html += '<div class="msg">暂无数据</div>';
+    }
+    html += '</div>';
+
     document.getElementById('content').innerHTML = html;
   } catch(e){
     document.getElementById('content').innerHTML = '<div class="msg">加载失败</div>';

@@ -230,23 +230,20 @@
 (function(){
   var key = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
   var base = 'https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1/visits';
-  var now = new Date().toISOString();
   var entered = Date.now();
   fetch(base, {
     method: 'POST',
     headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=representation'},
-    body: JSON.stringify({path: location.pathname, ref: document.referrer || '', entered_at: now})
+    body: JSON.stringify({path: location.pathname, ref: document.referrer || '', visited_at: new Date().toISOString()})
   }).then(function(r){ return r.json(); }).then(function(data){
     if(data && data[0] && data[0].id){
       var visitId = data[0].id;
-      // 离开页面时记录离开时间和停留时长
       function leave(){
-        var left = new Date().toISOString();
         var dur = Math.round((Date.now() - entered) / 1000);
         fetch(base+'?id=eq.'+visitId, {
           method: 'PATCH',
           headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
-          body: JSON.stringify({left_at: left, duration: dur})
+          body: JSON.stringify({left_at: new Date().toISOString(), duration: dur})
         }).catch(function(){});
       }
       window.addEventListener('beforeunload', leave);
