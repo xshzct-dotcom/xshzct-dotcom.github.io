@@ -56,7 +56,9 @@ const KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb',BASE='https://mvzbkuh
     // 总计数
     var totalR=await fetch(BASE+'/rest/v1/visits?select=id&limit=0',{headers:{apikey:KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact'}});
     var total=parseInt(totalR.headers.get('content-range')?.split('/')[1]||0);
-    var todayS=new Date().toISOString().slice(0,10);
+    var _n=new Date();
+    var _local=new Date(_n.getTime()-_n.getTimezoneOffset()*60000);
+    var todayS=_local.toISOString().slice(0,10);
     var todayR=await fetch(BASE+'/rest/v1/visits?select=id&visited_at=gte.'+todayS+'&limit=0',{headers:{apikey:KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact'}});
     var today=parseInt(todayR.headers.get('content-range')?.split('/')[1]||0);
     // 拉所有数据
@@ -66,13 +68,15 @@ const KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb',BASE='https://mvzbkuh
       var d=await r.json(); if(!d||!d.length) break;
       all=all.concat(d); page++; if(d.length<bs) break;
     }
-    // 分析
+    // 分析（统一转本地时区）
     var dayMap={},pageMap={},hourly=new Array(24).fill(0),durSum=0,durN=0,refMap={};
     all.forEach(function(d){
       if(!d.visited_at) return;
-      var day=d.visited_at.slice(0,10);
+      var dt=new Date(d.visited_at);
+      var local=new Date(dt.getTime()-dt.getTimezoneOffset()*60000);
+      var day=local.toISOString().slice(0,10);
       dayMap[day]=(dayMap[day]||0)+1;
-      var h=parseInt(d.visited_at.slice(11,13)); if(!isNaN(h)&&h>=0&&h<24) hourly[h]++;
+      var h=local.getUTCHours(); if(!isNaN(h)&&h>=0&&h<24) hourly[h]++;
       if(d.path) pageMap[d.path]=(pageMap[d.path]||0)+1;
       if(d.ref&&d.ref!='') refMap[d.ref]=(refMap[d.ref]||0)+1;
       if(d.duration){durSum+=d.duration; durN++;}
@@ -96,7 +100,7 @@ const KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb',BASE='https://mvzbkuh
     if(days.length){
       days.slice(-90).forEach(function(d){
         var c=dayMap[d]||0;
-        html+='<div class="bar-row"><span class="dt">'+(d.slice(5))+'</span><div class="bar" style="width:'+Math.max(3,c/maxDay*100)+'%"></div><span class="cnt">'+c+'</span></div>';
+        html+='<div class="bar-row"><span class="dt">'+d.slice(5)+'</span><div class="bar" style="width:'+Math.max(3,c/maxDay*100)+'%"></div><span class="cnt">'+c+'</span></div>';
       });
     }else{html+='<div class="msg">暂无数据</div>';}
     html+='</div>';
@@ -132,7 +136,9 @@ const KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb',BASE='https://mvzbkuh
     html+='<div class="section"><h2>📋 全部访客明细（最新100条）</h2><div class="scroll"><table><thead><tr><th>时间</th><th>页面</th><th>停留</th><th>来源</th></tr></thead><tbody>';
     all.slice(0,100).forEach(function(d){
       if(!d.visited_at) return;
-      var time=d.visited_at.slice(0,16).replace('T',' ');
+      var dt=new Date(d.visited_at);
+      var local=new Date(dt.getTime()-dt.getTimezoneOffset()*60000);
+      var time=local.toISOString().slice(0,16).replace('T',' ');
       var dur=d.duration?fmt(d.duration):'--';
       html+='<tr><td style="color:rgba(232,228,218,.4);font-size:.75rem">'+time+'</td><td class="p">'+esc(d.path||'/')+'</td><td style="font-size:.78rem;color:'+(d.duration?'rgba(124,155,126,.7)':'rgba(232,228,218,.2)')+'">'+dur+'</td><td class="r">'+(d.ref?esc(d.ref):'--')+'</td></tr>';
     });
