@@ -202,6 +202,8 @@ function buildTimeline(){
       groups['travel'].items.push({...art, cat:'旅行见闻', catId:'travel'});
     });
   }
+  // 去掉没有文章的组
+  Object.keys(groups).forEach(k => { if(groups[k].items.length===0) delete groups[k]; });
   const catIds = Object.keys(groups);
   if(catIds.length===0){
     timeline.innerHTML = '<div class="timeline-empty"># 暂无文章 #</div>';
