@@ -185,42 +185,97 @@ function initDailyQuote(){
 function buildTimeline(){
   const timeline=$('#timeline');
   if(!timeline) return;
-  const items=[];
+  // 按分类分组
+  const groups={};
   if(typeof essayCategories !== 'undefined'){
-    essayCategories.forEach(cat => (cat.articles||[]).forEach(art => items.push({...art, cat:cat.title, catId:cat.id})));
+    essayCategories.forEach(cat => {
+      (cat.articles||[]).forEach(art => {
+        const k = cat.id;
+        if(!groups[k]) groups[k] = {title: cat.title, catId: cat.id, items: []};
+        groups[k].items.push({...art, cat: cat.title, catId: cat.id});
+      });
+    });
   }
   if(typeof travels !== 'undefined'){
-    travels.forEach(art => items.push({...art, cat:'旅行见闻', catId:'travel'}));
+    travels.forEach(art => {
+      if(!groups['travel']) groups['travel'] = {title:'旅行见闻', catId:'travel', items:[]};
+      groups['travel'].items.push({...art, cat:'旅行见闻', catId:'travel'});
+    });
   }
-  items.sort((a,b)=>{
-    const da=a.date||'', db=b.date||'';
-    if(da>db) return -1; if(da<db) return 1;
-    return (b.sort_order||0)-(a.sort_order||0);
-  });
-  if(items.length===0){
+  const catIds = Object.keys(groups);
+  if(catIds.length===0){
     timeline.innerHTML = '<div class="timeline-empty"># 暂无文章 #</div>';
     return;
   }
+  // 每个分类的组作为折叠块
   function excerpt(body,len){
     if(!body) return '';
     const t = body.replace(/<[^>]+>/g,'').replace(/\s+/g,' ').trim();
     return t.length>len ? t.slice(0,len)+'…' : t;
   }
-  timeline.innerHTML = items.map((item,i) => `
-    <div class="timeline-item fade-up cat-${item.catId}" data-idx="${i}">
-      <div class="timeline-dot"></div>
-      <div class="timeline-card" data-idx="${i}">
-        <div class="tl-date">${item.date||''}</div>
-        <div class="tl-title">${esc(item.title)}</div>
-        <div class="tl-excerpt">${esc(excerpt(item.body,120))}</div>
-        <span class="tl-cat" style="color:var(--cat-${item.catId})">● ${item.cat}</span>
+  let html = '';
+  catIds.forEach((k,gi) => {
+    const g = groups[k];
+    // 组内按日期降序
+    g.items.sort((a,b)=>{
+      const da=a.date||'', db=b.date||'';
+      if(da>db) return -1; if(da<db) return 1;
+      return (b.sort_order||0)-(a.sort_order||0);
+    });
+    const isFirst = gi === 0;
+    html += `<div class="tl-group cat-${g.catId}">
+      <div class="tl-group-header" data-target="${k}">
+        <span class="tl-group-icon">${isFirst?'▾':'▸'}</span>
+        <span class="tl-group-title">● ${esc(g.title)}</span>
+        <span class="tl-group-count">${g.items.length} 篇</span>
       </div>
-    </div>
-  `).join('');
+      <div class="tl-group-body"${isFirst?'':' style="display:none"'}>`;
+    g.items.forEach((item,i) => {
+      const idx = g.items.indexOf(item); // 用于点击弹出
+      html += `<div class="timeline-item fade-up cat-${g.catId}" data-idx="${i}">
+        <div class="timeline-dot"></div>
+        <div class="timeline-card" data-idx="${i}">
+          <div class="tl-date">${item.date||''}</div>
+          <div class="tl-title">${esc(item.title)}</div>
+          <div class="tl-excerpt">${esc(excerpt(item.body,120))}</div>
+          <span class="tl-cat" style="color:var(--cat-${g.catId})">● ${esc(g.title)}</span>
+        </div>
+      </div>`;
+    });
+    html += '</div></div>';
+  });
+  timeline.innerHTML = html;
+
+  // 折叠交互
+  $$('.tl-group-header').forEach(h => {
+    h.onclick = () => {
+      const body = h.nextElementSibling;
+      const icon = h.querySelector('.tl-group-icon');
+      if(body.style.display==='none'){
+        body.style.display = '';
+        icon.textContent = '▾';
+      } else {
+        body.style.display = 'none';
+        icon.textContent = '▸';
+      }
+    };
+  });
+
+  // 卡片点击打开弹窗（只在展开的组里查）
   $$('.timeline-card').forEach(card => {
     card.onclick = () => {
-      const idx = parseInt(card.dataset.idx);
-      if(!isNaN(idx)) openEssayModal(items[idx]);
+      const itemIdx = parseInt(card.dataset.idx);
+      // 找到对应分类的 items
+      const grp = catIds.reduce((found,k)=>{
+        if(found) return found;
+        const p = card.closest('.tl-group');
+        if(p && p.classList.contains('cat-'+k)) return groups[k];
+        return found;
+      }, null);
+      if(!grp) return;
+      const globalIdx = _timelineItems.indexOf(grp.items[itemIdx]);
+      if(globalIdx>=0) openEssayModal(_timelineItems[globalIdx]);
+      else openEssayModal(grp.items[itemIdx]);
     };
   });
   observeFadeUps();
