@@ -193,7 +193,7 @@ $$('#editorTabs .editor-tab').forEach(tab=>{
 // ===== 文章编辑 =====
 async function renderEssayTab(){
   const body=$('#editorBody');
-  const cats=['童年篇','初恋篇','所思所想','旅行见闻'];
+  const cats=['童年篇','初恋篇','日记','旅行见闻'];
   const catIds=['childhood','firstlove','thoughts','travel'];
   const {data:essays}=await db().from('essays').select('*').order('sort_order',{ascending:true});
   const all=essays||[];
