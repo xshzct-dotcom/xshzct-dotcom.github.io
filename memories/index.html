@@ -42,7 +42,6 @@
     <span></span><span></span><span></span>
   </div>
   <div class="nav-right">
-    <a href="stats.html" class="nav-icon-btn" style="font-size:.75rem;text-decoration:none;font-weight:500;color:var(--text-dim);letter-spacing:.3px;width:auto;padding:0 8px" title="访问统计">📊</a>
     <button class="nav-icon-btn nav-gear" id="navGear" title="管理菜单" aria-label="管理菜单">⚙️</button>
   </div>
 </nav>
@@ -227,12 +226,32 @@
 <script src="script.js?v=20260723-2"></script>
 <script src="editor.js?v=20260722-18"></script>
 <script>
-// 访客统计（Supabase，不依赖任何外部脚本，不被 adblock 拦截）
+// 访客统计（Supabase，后台记录，不在页面上显示，不被 adblock 拦截）
 (function(){
   var key = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
-  var body = JSON.stringify({path: location.pathname, ref: document.referrer || ''});
-  fetch('https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1/visits', {
-    method: 'POST', headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=minimal'}, body: body
+  var base = 'https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1/visits';
+  var now = new Date().toISOString();
+  var entered = Date.now();
+  fetch(base, {
+    method: 'POST',
+    headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=representation'},
+    body: JSON.stringify({path: location.pathname, ref: document.referrer || '', entered_at: now})
+  }).then(function(r){ return r.json(); }).then(function(data){
+    if(data && data[0] && data[0].id){
+      var visitId = data[0].id;
+      // 离开页面时记录离开时间和停留时长
+      function leave(){
+        var left = new Date().toISOString();
+        var dur = Math.round((Date.now() - entered) / 1000);
+        fetch(base+'?id=eq.'+visitId, {
+          method: 'PATCH',
+          headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+          body: JSON.stringify({left_at: left, duration: dur})
+        }).catch(function(){});
+      }
+      window.addEventListener('beforeunload', leave);
+      document.addEventListener('visibilitychange', function(){ if(document.hidden) leave(); });
+    }
   }).catch(function(){});
 })();
 </script>

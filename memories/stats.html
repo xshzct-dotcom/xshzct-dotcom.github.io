@@ -20,34 +20,63 @@ h1 em{font-style:italic;color:#7C9B7E}
 </head>
 <body>
 <h1>访<em>问</em>统计</h1>
-<p class="sub">记录你的网站被打开的次数</p>
+<p class="sub">后台记录，不在页面上显示</p>
 <div id="content"><div class="loading">加载中···</div></div>
 <script>
 const KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
 const BASE = 'https://mvzbkuhwapdqcdkekczh.supabase.co';
 (async function(){
   try {
-    // 总访问量
-    var total = await fetch(BASE+'/rest/v1/visits?select=id&limit=0', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}})
-      .then(r=>parseInt(r.headers.get('content-range')?.split('/')[1]||'0'));
-    // 今日
-    var today = await fetch(BASE+'/rest/v1/visits?select=id&visited_at=gte.'+new Date().toISOString().slice(0,10), {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}})
-      .then(r=>parseInt(r.headers.get('content-range')?.split('/')[1]||'0'));
-    // 各页面
-    var pages = await fetch(BASE+'/rest/v1/visits?select=path,count&order=count.desc&group=path&limit=20', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}})
-      .then(r=>r.json());
+    // 用 Supabase SQL API 查统计数据
+    var stats = await fetch(BASE+'/rest/v1/rpc/get_visits_stats', {
+      method: 'POST',
+      headers: {'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'}
+    }).then(function(r){
+      if(!r.ok) throw new Error('No RPC');
+      return r.json();
+    }).catch(async function(){
+      // RPC 不存在，用多个简单查询凑
+      var totalR = await fetch(BASE+'/rest/v1/visits?select=id&limit=0', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
+      var total = parseInt(totalR.headers.get('content-range')?.split('/')[1]||'0');
+      var todayStr = new Date().toISOString().slice(0,10);
+      var todayR = await fetch(BASE+'/rest/v1/visits?select=id&entered_at=gte.'+todayStr, {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
+      var today = parseInt(todayR.headers.get('content-range')?.split('/')[1]||'0');
+      var avgR = await fetch(BASE+'/rest/v1/visits?select=duration&duration=not.is.null&limit=1000', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
+      var avgData = await avgR.json();
+      var avgDur = 0;
+      if(avgData && avgData.length){
+        var sum = 0, n = 0;
+        avgData.forEach(function(d){ if(d.duration){ sum+=d.duration; n++; } });
+        avgDur = n ? Math.round(sum/n) : 0;
+      }
+      // 最热页面
+      var all = await fetch(BASE+'/rest/v1/visits?select=path,entered_at&limit=2000', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
+      var allData = await all.json();
+      var pageCount = {};
+      if(allData && allData.length){
+        allData.forEach(function(d){ pageCount[d.path] = (pageCount[d.path]||0)+1; });
+      }
+      var sortedPages = Object.keys(pageCount).sort(function(a,b){ return pageCount[b]-pageCount[a]; }).slice(0,10);
+      return {total:total, today:today, avgDur:avgDur, pages:sortedPages, counts:pageCount};
+    });
     var html = '';
-    html += '<div class="num">'+(total||0)+'<small> 总访问</small></div>';
-    html += '<div class="num" style="font-size:1.8rem">'+(today||0)+'<small> 今日</small></div>';
+    html += '<div class="num">'+(stats.total||0)+'<small> 总访问</small></div>';
+    html += '<div class="num" style="font-size:1.8rem">'+(stats.today||0)+'<small> 今日</small></div>';
+    html += '<div class="num" style="font-size:1.4rem;color:rgba(232,228,218,.7)">'+(stats.avgDur ? fmt(stats.avgDur) : '--')+'<small> 平均停留</small></div>';
     html += '<h2 style="margin-top:32px;font-size:1rem;color:rgba(232,228,218,.5)">页面排名</h2>';
-    if(pages && pages.length){
-      pages.forEach(function(p){ html += '<div class="row"><span class="path">'+(p.path||'/')+'</span><span class="cnt">'+p.count+'</span></div>'; });
+    if(stats.pages && stats.pages.length){
+      stats.pages.forEach(function(p){ html += '<div class="row"><span class="path">'+(p||'/')+'</span><span class="cnt">'+(stats.counts[p]||0)+'</span></div>'; });
     } else {
       html += '<div class="msg">暂无数据（有人访问后显示）</div>';
     }
     document.getElementById('content').innerHTML = html;
   } catch(e){
     document.getElementById('content').innerHTML = '<div class="msg">加载失败</div>';
+  }
+  function fmt(s){
+    if(s<60) return s+'秒';
+    var m=Math.floor(s/60);
+    return m+'分'+(s%60)+'秒';
   }
 })();
 </script>
