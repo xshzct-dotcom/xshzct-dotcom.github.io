@@ -259,7 +259,7 @@
           headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
           body: JSON.stringify({duration: dur})
         }).catch(function(){});
-      }}, 30000);
+      }}, 10000);
     }
   }).catch(function(){});
 })();
