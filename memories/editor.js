@@ -732,15 +732,17 @@ async function renderMusicTab(){
       const idx = parseInt(b.dataset.mePlay);
       const t = list[idx];
       if(!t){ console.warn('[play] song not found at idx', idx); return; }
-      // 把编辑器当前列表同步到网页播放器，然后播放选中歌曲
-      const newPlaylist = list.map(tr => ({
-        name: tr.title, title: tr.title, artist: tr.artist||'',
-        url: tr.storage_path||'', storage_path: tr.storage_path||'',
-      }));
-      if(window.setPlaylistTo){
-        window.setPlaylistTo(newPlaylist, idx);
+      // 不替换玩家现有播放列表（保持 ASC），通过 storage_path 找出这首歌在玩家列表的索引
+      if(window.playSongByPath){
+        window.playSongByPath(t.storage_path);
+      }else if(window.setPlaylistTo){
+        // 回退：用编辑器的列表（但仅在用户手动点击时短暂使用）
+        const newPlaylist = list.map(tr => ({
+          name: tr.title, title: tr.title, artist: tr.artist||'',
+          url: tr.storage_path||'', storage_path: tr.storage_path||'',
+        }));
+        window.setPlaylistTo(newPlaylist, 0);
       } else {
-        // 回退 — 控制台警告
         console.warn('[play] 网页播放器未就绪，请刷新页面');
       }
     });

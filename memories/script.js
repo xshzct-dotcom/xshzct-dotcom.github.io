@@ -1011,7 +1011,34 @@ window.seek=seek;
 function togglePlayer(){ $('#player').classList.toggle('collapsed'); }
 window.togglePlay=togglePlay; window.prevSong=prevSong; window.nextSong=nextSong;
 window.togglePlayer=togglePlayer;
-window.setPlaylistTo=function(s,i){ window._currentSongs=s; currentSongIdx=i>=0?i:0; playSong(currentSongIdx); };
+window.setPlaylistTo=function(songs, idxOrId){
+  window._currentSongs = songs || [];
+  let idx = -1;
+  if(typeof idxOrId === 'string' || (typeof idxOrId === 'number' && idxOrId > 1000)){
+    // 当成 ID：找出 id 匹配的索引
+    for(let i = 0; i < window._currentSongs.length; i++){
+      if(String(window._currentSongs[i].id) === String(idxOrId)){
+        idx = i; break;
+      }
+    }
+  }else{
+    idx = typeof idxOrId === 'number' ? idxOrId : 0;
+  }
+  currentSongIdx = (idx >= 0 && idx < window._currentSongs.length) ? idx : 0;
+  playSong(currentSongIdx);
+};
+// 通过 storage_path 找出歌曲并在当前列表中播放（不替换列表）
+window.playSongByPath = function(storagePath){
+  if(!window._currentSongs || !storagePath) return;
+  for(let i = 0; i < window._currentSongs.length; i++){
+    if(window._currentSongs[i].storage_path === storagePath || window._currentSongs[i].url === storagePath){
+      playSong(i);
+      return;
+    }
+  }
+  // 找不到：临时插入到当前列表末尾播放（这种情况不应该发生）
+  console.warn('[player] song not found in playlist:', storagePath);
+};
 
 // ===== 滚动观察器 =====
 function observeFadeUps(){
