@@ -422,11 +422,21 @@ async function renderAlbumTab(){
   function renderAlbumPhotos(album){
     db().from('album_photos').select('*').eq('album_id',album.id).order('sort_order',{ascending:true}).then(({data:photos})=>{
       const plist=photos||[];
+      window._aeCurrentList = plist;
+      window._aeSelected = null;
       body.innerHTML=`
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
           <button class="editor-btn editor-btn-secondary" onclick="renderAlbumTab()">← 返回</button>
           <span style="color:var(--text);flex:1">📸 ${esc(album.title)} (${plist.length}张)</span>
           <label class="editor-btn editor-btn-primary" style="cursor:pointer">上传照片<input type="file" accept="image/*" multiple style="display:none" id="aeUpload"></label>
+        </div>
+        <div id="aePhotoToolbar" style="display:none;background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:8px;padding:10px;margin-bottom:12px;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="color:var(--text-dim);font-size:.82rem" id="aeSelectedInfo">选中：第 ${'-'} 张</span>
+          <div style="flex:1"></div>
+          <button class="editor-btn" id="aeMoveUpBtn" title="上移">▲ 上移</button>
+          <button class="editor-btn" id="aeMoveDownBtn" title="下移">▼ 下移</button>
+          <button class="editor-btn" id="aeDeleteBtn" title="删除" style="background:rgba(220,38,38,.7);border-color:rgba(220,38,38,.5);color:#fff">🗑 删除</button>
+          <button class="editor-btn editor-btn-secondary" id="aeCancelSelBtn" title="取消">✕ 取消</button>
         </div>
         <div id="aePhotoList"></div>
       `;
@@ -436,117 +446,131 @@ async function renderAlbumTab(){
         el.style.display = 'grid';
         el.style.gridTemplateColumns = 'repeat(auto-fill, minmax(140px, 1fr))';
         el.style.gap = '10px';
-        el.style.padding = '10px 0';
+        el.style.padding = '10px 0 60px';
         el.innerHTML = plist.map((p,i) => {
-          // storage_path 可能是：
-          // - "images/oldworld/..." 仓库里的全图
-          // - "music_xxx.mp3" 上传到 Supabase Storage 的
-          // 缩略图直接用全图（浏览器自动缩放显示）
           const sp = p.storage_path || p.filename || '';
           const isStorage = !sp.startsWith('images/') && !sp.startsWith('thumbs/');
           const imgUrl = isStorage
             ? (STORAGE_URL + '/' + sp)
             : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
-          const fname = (p.filename || sp.split('/').pop() || '').replace(/\.[^.]+$/, '');
-          return `
-          <div class="ae-photo-card" data-idx="${i}" data-i="${i}" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:8px;overflow:hidden;cursor:pointer;transition:all .2s">
+          return `<div class="ae-photo-card" data-idx="${i}" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:2px solid transparent;border-radius:8px;overflow:hidden;cursor:pointer;transition:all .15s">
             <img src="${imgUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;background:#1a1d2e" onerror="this.style.opacity=.2" />
-            <div class="ae-photo-overlay" style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.85) 0%,rgba(0,0,0,.2) 60%,rgba(0,0,0,0) 100%);opacity:0;transition:opacity .2s;display:flex;flex-direction:column;justify-content:flex-end;padding:8px">
-              <div style="font-size:.7rem;color:#fff;line-height:1.3;max-height:2.6em;overflow:hidden;text-overflow:ellipsis;word-break:break-all">${esc(fname)}</div>
-              <div style="display:flex;gap:3px;margin-top:6px" onclick="event.stopPropagation()">
-                <button data-ae-move="${i}" data-dir="-1" ${i===0?'disabled':''} style="flex:1;padding:4px;background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.7rem" title="上移">▲</button>
-                <button data-ae-move="${i}" data-dir="1" ${i===plist.length-1?'disabled':''} style="flex:1;padding:4px;background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.7rem" title="下移">▼</button>
-                <button data-ae-pdel="${i}" style="flex:1;padding:4px;background:rgba(220,38,38,.7);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.7rem" title="删除">🗑</button>
-              </div>
-            </div>
             <div style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;font-size:.65rem;padding:2px 6px;border-radius:3px;pointer-events:none">${i+1}</div>
-          </div>
-          `;
+          </div>`;
         }).join('') || '<div class="editor-empty" style="grid-column:1/-1">暂无照片，上传一些吧</div>';
 
-        // Hover 显示操作
-        el.querySelectorAll('.ae-photo-card').forEach(card => {
-          const overlay = card.querySelector('.ae-photo-overlay');
-          card.addEventListener('mouseenter', () => { overlay.style.opacity = '1'; });
-          card.addEventListener('mouseleave', () => { overlay.style.opacity = '0'; });
+        // 点击：长按=选中  / 单击=预览（电脑端单击=选中）
+        el.querySelectorAll('.ae-photo-card').forEach((card, idx) => {
+          card.addEventListener('click', e => {
+            window._aeSelected = idx;
+            renderPhotos();
+            updateSelectionUI();
+            openPhotoPreview(idx, plist);
+          });
         });
-        // 点击照片卡片预览
-        el.querySelectorAll('.ae-photo-card').forEach(card => {
-          card.onclick = e => {
-            if(e.target.closest('button')) return;
-            const idx = parseInt(card.dataset.idx);
-            if(!isNaN(idx)) openPhotoPreview(idx, plist);
-          };
-        });
-        el.querySelectorAll('[data-ae-pdel]').forEach(b => {
-          b.onclick = e => {
-            e.stopPropagation();
-            const p = plist[parseInt(b.dataset.aePdel)];
-            if (!confirm('删除该照片？')) return;
-            db().from('album_photos').delete().eq('id', p.id).then(() => renderAlbumPhotos(album));
-            if (p.storage_path) db().storage.from('photos').remove([p.storage_path]).catch(() => {});
-          };
-        });
-        // 上下移动
-        el.querySelectorAll('[data-ae-move]').forEach(b => {
-          b.onclick = async e => {
-            e.stopPropagation();
-            const i = parseInt(b.dataset.aeMove);
-            const dir = parseInt(b.dataset.dir);
-            const j = i + dir;
-            if(j<0 || j>=plist.length) return;
-            const a = plist[i], c = plist[j];
-            if(!a || !c) return;
-            try {
-              if(sb){
-                await sb.from('album_photos').update({sort_order:j}).eq('id', a.id);
-                await sb.from('album_photos').update({sort_order:i}).eq('id', c.id);
-              }
-              const tmp = plist[i]; plist[i] = plist[j]; plist[j] = tmp;
-              renderPhotos();
-              if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 1000);
-            } catch(err){ console.warn('[photo move]', err); }
-          };
-        });
+        updateSelectionUI();
+      }
 
-        // 照片预览灯箱
-        var _prvList = plist, _prvIdx = 0;
-        function openPhotoPreview(idx, list) {
-          _prvList = list; _prvIdx = idx;
-          var old = document.getElementById('aePhotoPreview');
-          if (old) old.parentNode.removeChild(old);
-          var p = list[idx];
-          if (!p) return;
-          var sp = p.storage_path || p.filename || '';
-          var isStorage = !sp.startsWith('images/');
-          var src = isStorage ? (STORAGE_URL + '/' + sp) : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
-          var total = list.length;
-          var ov = document.createElement('div');
-          ov.id = 'aePhotoPreview';
-          ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10004;display:flex;align-items:center;justify-content:center';
-          var html = '';
-          html += '<div style="position:fixed;top:18px;right:24px;color:rgba(255,255,255,.5);font-size:1.5rem;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;z-index:1" id="aePrvClose">\u2715</div>';
-          html += '<img src="'+src+'" style="max-width:90%;max-height:88%;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.4)">';
-          if (total > 1) {
-            html += '<div style="position:fixed;top:50%;left:12px;transform:translateY(-50%);font-size:1.8rem;color:rgba(255,255,255,.4);cursor:pointer;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:50%;z-index:1" id="aePrvPrev">\u2039</div>';
-            html += '<div style="position:fixed;top:50%;right:12px;transform:translateY(-50%);font-size:1.8rem;color:rgba(255,255,255,.4);cursor:pointer;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:50%;z-index:1" id="aePrvNext">\u203A</div>';
-            html += '<div style="position:fixed;bottom:28px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.45);font-size:.82rem;background:rgba(0,0,0,.4);padding:4px 14px;border-radius:12px">'+(idx+1)+' / '+total+'</div>';
+      function updateSelectionUI(){
+        const sel = window._aeSelected;
+        const cards = document.querySelectorAll('.ae-photo-card');
+        cards.forEach((c,idx)=>{
+          c.style.border = (sel === idx) ? '2px solid var(--accent,#7C9B7E)' : '2px solid transparent';
+        });
+        const tb = $('#aePhotoToolbar');
+        const info = $('#aeSelectedInfo');
+        if(tb && info){
+          if(sel !== null && plist[sel]){
+            tb.style.display = 'flex';
+            info.textContent = '选中：第 '+(sel+1)+' 张';
+            const upBtn = $('#aeMoveUpBtn');
+            const downBtn = $('#aeMoveDownBtn');
+            if(upBtn) upBtn.disabled = (sel === 0);
+            if(downBtn) downBtn.disabled = (sel === plist.length-1);
+          }else{
+            tb.style.display = 'none';
           }
-          ov.innerHTML = html;
-          ov.onclick = function(e) {
-            if (e.target === ov || e.target.id === 'aePrvClose') {
-              ov.parentNode.removeChild(ov);
-            } else if (e.target.id === 'aePrvPrev' && total > 1) {
-              _prvIdx = (_prvIdx - 1 + total) % total;
-              openPhotoPreview(_prvIdx, _prvList);
-            } else if (e.target.id === 'aePrvNext' && total > 1) {
-              _prvIdx = (_prvIdx + 1) % total;
-              openPhotoPreview(_prvIdx, _prvList);
-            }
-          };
-          document.body.appendChild(ov);
         }
       }
+
+      // 工具栏按钮
+      async function moveSel(dir){
+        const sel = window._aeSelected;
+        if(sel === null) return;
+        const j = sel + dir;
+        if(j<0 || j>=plist.length) return;
+        const a = plist[sel], c = plist[j];
+        if(!a || !c) return;
+        try{
+          if(sb){
+            await sb.from('album_photos').update({sort_order:j}).eq('id', a.id);
+            await sb.from('album_photos').update({sort_order:i || sel}).eq('id', c.id);
+          }
+        }catch(err){ console.warn(err); }
+        const tmp = plist[sel]; plist[sel] = plist[j]; plist[j] = tmp;
+        window._aeSelected = j;
+        renderPhotos();
+        if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 1000);
+      }
+      async function delSel(){
+        const sel = window._aeSelected;
+        if(sel === null) return;
+        const p = plist[sel];
+        if(!confirm('删除第 '+(sel+1)+' 张？')) return;
+        await db().from('album_photos').delete().eq('id', p.id);
+        if(p.storage_path) db().storage.from('photos').remove([p.storage_path]).catch(()=>{});
+        window._aeSelected = null;
+        renderAlbumPhotos(album);
+      }
+      setTimeout(()=>{
+        const upBtn = $('#aeMoveUpBtn');
+        const downBtn = $('#aeMoveDownBtn');
+        const delBtn = $('#aeDeleteBtn');
+        const cancelBtn = $('#aeCancelSelBtn');
+        if(upBtn) upBtn.onclick = ()=>moveSel(-1);
+        if(downBtn) downBtn.onclick = ()=>moveSel(1);
+        if(delBtn) delBtn.onclick = delSel;
+        if(cancelBtn) cancelBtn.onclick = ()=>{ window._aeSelected=null; renderPhotos(); };
+      }, 0);
+
+      // 照片预览灯箱
+      var _prvList = plist, _prvIdx = 0;
+      function openPhotoPreview(idx, list) {
+        _prvList = list; _prvIdx = idx;
+        var old = document.getElementById('aePhotoPreview');
+        if (old) old.parentNode.removeChild(old);
+        var p = list[idx];
+        if (!p) return;
+        var sp = p.storage_path || p.filename || '';
+        var isStorage = !sp.startsWith('images/');
+        var src = isStorage ? (STORAGE_URL + '/' + sp) : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
+        var total = list.length;
+        var ov = document.createElement('div');
+        ov.id = 'aePhotoPreview';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10004;display:flex;align-items:center;justify-content:center';
+        var html = '';
+        html += '<div style="position:fixed;top:18px;right:24px;color:rgba(255,255,255,.5);font-size:1.5rem;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;z-index:1" id="aePrvClose">\u2715</div>';
+        html += '<img src="'+src+'" style="max-width:90%;max-height:88%;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.4)">';
+        if (total > 1) {
+          html += '<div style="position:fixed;top:50%;left:12px;transform:translateY(-50%);font-size:1.8rem;color:rgba(255,255,255,.4);cursor:pointer;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:50%;z-index:1" id="aePrvPrev">\u2039</div>';
+          html += '<div style="position:fixed;top:50%;right:12px;transform:translateY(-50%);font-size:1.8rem;color:rgba(255,255,255,.4);cursor:pointer;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:50%;z-index:1" id="aePrvNext">\u203A</div>';
+          html += '<div style="position:fixed;bottom:28px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.45);font-size:.82rem;background:rgba(0,0,0,.4);padding:4px 14px;border-radius:12px">'+(idx+1)+' / '+total+'</div>';
+        }
+        ov.innerHTML = html;
+        ov.onclick = function(e) {
+          if (e.target === ov || e.target.id === 'aePrvClose') {
+            ov.parentNode.removeChild(ov);
+          } else if (e.target.id === 'aePrvPrev' && total > 1) {
+            _prvIdx = (_prvIdx - 1 + total) % total;
+            openPhotoPreview(_prvIdx, _prvList);
+          } else if (e.target.id === 'aePrvNext' && total > 1) {
+            _prvIdx = (_prvIdx + 1) % total;
+            openPhotoPreview(_prvIdx, _prvList);
+          }
+        };
+        document.body.appendChild(ov);
+      }
+
       renderPhotos();
 
       // Upload - 用 anon key（RLS 已允许）
