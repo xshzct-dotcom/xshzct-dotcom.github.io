@@ -1273,6 +1273,9 @@ async function loadFromSupabase(){
     }
 
     console.log('[memories] loadFromSupabase done');
+    // 重新渲染相册 chips 和极地（DB sort_order 已同步）
+    if(typeof buildRiverFilters === 'function') buildRiverFilters();
+    if(typeof renderRiver === 'function') renderRiver();
     window._testReady = true;
   } catch(e){
     console.warn('[memories] loadFromSupabase failed:', e);
