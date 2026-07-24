@@ -539,7 +539,7 @@ const albums = [
 
 
 
-  { id: 'firstlove-2017-2025', title: '2017.11.5——2025.6.6', cover: 'images/oldworld/初恋宇宙/2017-2025/IMG_20260525_115819.jpg', photos: [
+  { id: 'firstlove-2017-2025', title: '初恋 2017.11.5——2025.6.6', cover: 'images/oldworld/初恋宇宙/2017-2025/IMG_20260525_115819.jpg', photos: [
         'images/oldworld/初恋宇宙/2017-2025/IMG_20260525_115428.jpg',
         'images/oldworld/初恋宇宙/2017-2025/IMG_20260525_115819.jpg',
         'images/oldworld/初恋宇宙/2017-2025/IMG_20260524_222406.jpg',
@@ -1541,7 +1541,7 @@ const albums = [
         'images/oldworld/初恋宇宙/2017-2025/retouch_20201102222452.jpg',
         'images/oldworld/初恋宇宙/2017-2025/retouch_2021081200382764.jpg',
     ] },
-  { id: 'friends-2017-2026', title: '2017.9.2——2026.5.3', cover: 'images/oldworld/朋友宇宙&自己/2017-2026/IMG_20260621_063513.jpg', photos: [
+  { id: 'friends-2017-2026', title: '我的青春期 2017.9.2——2026.5.3', cover: 'images/oldworld/朋友宇宙&自己/2017-2026/IMG_20260621_063513.jpg', photos: [
         'images/oldworld/朋友宇宙&自己/2017-2026/IMG_20260621_063344.jpg',
         'images/oldworld/朋友宇宙&自己/2017-2026/IMG_20260621_063513.jpg',
         'images/oldworld/朋友宇宙&自己/2017-2026/IMG_20260612_091705.jpg',
@@ -2595,7 +2595,7 @@ const albums = [
       { name: 'Cookies - 眼浅', url: CDN.music + '/' + encodeURIComponent('Cookies - 眼浅.mp3') }
     ],
     children: [
-      { type: 'album', ref: 'friends-2017-2026', title: '2017.9.2——2026.5.3' },
+      { type: 'album', ref: 'friends-2017-2026', title: '我的青春期 2017.9.2——2026.5.3' },
       { type: 'album', ref: 'life', title: '生活' }
     ]
   }
