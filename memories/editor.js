@@ -521,6 +521,18 @@ async function renderAlbumTab(){
             if(window.reloadFromSupabase) setTimeout(function(){ window.reloadFromSupabase(); }, 1000);
           });
         });
+        // 容器拖拽边缘自动滚动
+        var _scrollTimer = null;
+        el.addEventListener('dragover', function(e){
+          if(_dragIdx === null) return;
+          var rect = el.getBoundingClientRect();
+          var margin = 60;
+          if(e.clientY - rect.top < margin){
+            el.scrollTop -= 8;
+          }else if(rect.bottom - e.clientY < margin){
+            el.scrollTop += 8;
+          }
+        });
         updateSelectionUI();
       }
 
