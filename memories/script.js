@@ -249,12 +249,25 @@ function buildTimeline(){
   });
   timeline.innerHTML = html;
 
-  // 折叠交互
+  // 折叠交互（手风琴：开一个自动关其他）
   $$('.tl-group-header').forEach(h => {
     h.onclick = () => {
       const body = h.nextElementSibling;
       const icon = h.querySelector('.tl-group-icon');
-      if(body.style.display==='none'){
+      const wasOpen = body.style.display !== 'none';
+      // 先关掉所有其他分组
+      $$('.tl-group-header').forEach(function(o){
+        if(o !== h){
+          var ob = o.nextElementSibling;
+          if(ob.style.display !== 'none'){
+            ob.style.display = 'none';
+            var oi = o.querySelector('.tl-group-icon');
+            if(oi) oi.textContent = '▸';
+          }
+        }
+      });
+      // 再切换当前
+      if(!wasOpen){
         body.style.display = '';
         icon.textContent = '▾';
       } else {
