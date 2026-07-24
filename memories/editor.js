@@ -440,11 +440,12 @@ async function renderAlbumTab(){
       `;
       function renderPhotos(){
         const el=$('#aePhotoList');
-        // 用 grid 布局展示缩略图
         el.style.display = 'grid';
         el.style.gridTemplateColumns = 'repeat(auto-fill, minmax(140px, 1fr))';
         el.style.gap = '10px';
         el.style.padding = '10px 0 60px';
+        el.style.overflowY = 'auto';
+        el.style.maxHeight = 'calc(100vh - 400px)';
         el.innerHTML = plist.map((p,i) => {
           const sp = p.storage_path || p.filename || '';
           const isStorage = !sp.startsWith('images/') && !sp.startsWith('thumbs/');
@@ -458,9 +459,8 @@ async function renderAlbumTab(){
         }).join('') || '<div class="editor-empty" style="grid-column:1/-1">暂无照片，上传一些吧</div>';
 
         // 拖拽排序
-        var _dragIdx = null;
+        var _dragFrom = null;
         el.querySelectorAll('.ae-photo-card').forEach(function(card){
-          // 点击：选中+预览
           card.addEventListener('click', function(e){
             var idx = parseInt(this.dataset.idx);
             if(isNaN(idx)) return;
@@ -469,68 +469,77 @@ async function renderAlbumTab(){
             updateSelectionUI();
             openPhotoPreview(idx, plist);
           });
-          // 拖拽
           card.addEventListener('dragstart', function(e){
-            _dragIdx = parseInt(this.dataset.idx);
-            this.style.opacity = '0.4';
-            this.style.borderColor = 'var(--accent,#7C9B7E)';
+            _dragFrom = parseInt(this.dataset.idx);
+            this.style.opacity = '0.3';
             e.dataTransfer.effectAllowed = 'move';
-            // 对手机触摸拖拽也支持
-            try{ e.dataTransfer.setData('text/plain', _dragIdx); }catch(ex){}
+            try{ e.dataTransfer.setData('text/plain', 'x'); }catch(ex){}
           });
           card.addEventListener('dragend', function(e){
             this.style.opacity = '';
-            this.style.borderColor = '';
-            _dragIdx = null;
+            _dragFrom = null;
           });
           card.addEventListener('dragover', function(e){
             e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            if(_dragIdx === null) return;
-            var targetIdx = parseInt(this.dataset.idx);
-            if(targetIdx === _dragIdx) return;
-            this.style.borderColor = 'var(--accent,#7C9B7E)';
-            // 在 grid 中交换会闪烁，用插入排序：move item to target
-            this.style.transform = _dragIdx < targetIdx ? 'translateY(4px)' : 'translateY(-4px)';
+            var from = _dragFrom;
+            var to = parseInt(this.dataset.idx);
+            if(from === null || isNaN(to) || from === to) return;
+            // 视觉指示
+            var dir = from < to ? 'down' : 'up';
+            el.querySelectorAll('.ae-photo-card').forEach(function(c){
+              c.style.borderColor = '';
+              var ci = parseInt(c.dataset.idx);
+              if(dir === 'down' && ci > from && ci <= to){
+                c.style.borderBottomColor = 'var(--accent,#7C9B7E)';
+              }else if(dir === 'up' && ci >= to && ci < from){
+                c.style.borderTopColor = 'var(--accent,#7C9B7E)';
+              }
+            });
           });
           card.addEventListener('dragleave', function(e){
-            this.style.borderColor = '';
-            this.style.transform = '';
+            if(!this.contains(e.relatedTarget)){
+              this.style.borderColor = '';
+            }
           });
           card.addEventListener('drop', async function(e){
             e.preventDefault();
-            this.style.borderColor = '';
-            this.style.transform = '';
-            var fromIdx = _dragIdx;
+            el.querySelectorAll('.ae-photo-card').forEach(function(c){ c.style.borderColor = ''; });
+            var fromIdx = _dragFrom;
             var toIdx = parseInt(this.dataset.idx);
             if(fromIdx === null || isNaN(toIdx) || fromIdx === toIdx) return;
-            // 移动元素
+
+            // 在数组里移动
             var item = plist.splice(fromIdx, 1)[0];
             plist.splice(toIdx, 0, item);
-            // 更新 DB sort_order
+
+            // 更新 DB
             try{
               if(sb){
+                var updates = [];
                 for(var j=0;j<plist.length;j++){
-                  await sb.from('album_photos').update({sort_order:j}).eq('id', plist[j].id);
+                  updates.push(sb.from('album_photos').update({sort_order:j}).eq('id', plist[j].id));
                 }
+                await Promise.all(updates);
               }
             }catch(err){ console.warn('[photo drag]', err); }
             window._aeSelected = toIdx;
+            _dragFrom = null;
             renderPhotos();
             updateSelectionUI();
             if(window.reloadFromSupabase) setTimeout(function(){ window.reloadFromSupabase(); }, 1000);
           });
         });
-        // 容器拖拽边缘自动滚动
-        var _scrollTimer = null;
+
+        // 拖拽时自动滚动边缘检测（用编辑器body，它是可滚动的父容器）
+        var _scrollBody = document.getElementById('editorBody');
         el.addEventListener('dragover', function(e){
-          if(_dragIdx === null) return;
-          var rect = el.getBoundingClientRect();
+          if(_dragFrom === null) return;
+          var rect = _scrollBody.getBoundingClientRect();
           var margin = 60;
           if(e.clientY - rect.top < margin){
-            el.scrollTop -= 8;
+            _scrollBody.scrollTop -= 10;
           }else if(rect.bottom - e.clientY < margin){
-            el.scrollTop += 8;
+            _scrollBody.scrollTop += 10;
           }
         });
         updateSelectionUI();
