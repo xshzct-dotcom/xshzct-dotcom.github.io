@@ -432,13 +432,12 @@ async function renderAlbumTab(){
             : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
           const fname = (p.filename || sp.split('/').pop() || '').replace(/\.[^.]+$/, '');
           return `
-          <div class="ae-photo-card" data-i="${i}" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:8px;overflow:hidden;cursor:pointer;transition:all .2s" draggable="true">
+          <div class="ae-photo-card" data-idx="${i}" data-i="${i}" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:8px;overflow:hidden;cursor:pointer;transition:all .2s" draggable="true">
             <img src="${imgUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;background:#1a1d2e" onerror="this.style.opacity=.2" />
             <div class="ae-photo-overlay" style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.8) 0%,rgba(0,0,0,0) 50%);opacity:0;transition:opacity .2s;display:flex;flex-direction:column;justify-content:flex-end;padding:8px">
               <div style="font-size:.7rem;color:#fff;line-height:1.3;max-height:2.6em;overflow:hidden;text-overflow:ellipsis;word-break:break-all">${esc(fname)}</div>
               <div style="display:flex;gap:4px;margin-top:6px">
-                <button data-ae-preview="${i}" style="flex:1;padding:4px;background:rgba(255,255,255,.2);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.75rem" title="预览">👁 预览</button>
-                <button data-ae-pdel="${i}" style="flex:1;padding:4px;background:rgba(220,38,38,.7);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.75rem" title="删除">🗑 删除</button>
+                <button data-ae-pdel="${i}" style="flex:1;padding:4px;background:rgba(220,38,38,.7);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.75rem" title="删除">🗑</button>
               </div>
             </div>
             <div style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;font-size:.65rem;padding:2px 6px;border-radius:3px;pointer-events:none">${i+1}</div>
@@ -453,14 +452,12 @@ async function renderAlbumTab(){
           card.addEventListener('mouseenter', () => { overlay.style.opacity = '1'; });
           card.addEventListener('mouseleave', () => { overlay.style.opacity = '0'; });
         });
-        el.querySelectorAll('[data-ae-preview]').forEach(b => {
-          b.onclick = e => {
-            e.stopPropagation();
-            const p = plist[parseInt(b.dataset.aePreview)];
-            const sp = p.storage_path || p.filename || '';
-            const isStorage = !sp.startsWith('images/');
-            const src = isStorage ? (STORAGE_URL + '/' + sp) : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
-            window.open(src);
+        // 点击照片卡片预览
+        el.querySelectorAll('.ae-photo-card').forEach(card => {
+          card.onclick = e => {
+            if(e.target.closest('[data-ae-pdel]')) return;
+            const idx = parseInt(card.dataset.idx);
+            if(!isNaN(idx)) openPhotoPreview(idx, plist);
           };
         });
         el.querySelectorAll('[data-ae-pdel]').forEach(b => {
@@ -474,6 +471,44 @@ async function renderAlbumTab(){
         });
         // 拖拽排序
         bindPhotoDragSort(el, plist, album);
+
+        // 照片预览灯箱
+        var _prvList = plist, _prvIdx = 0;
+        function openPhotoPreview(idx, list) {
+          _prvList = list; _prvIdx = idx;
+          var old = document.getElementById('aePhotoPreview');
+          if (old) old.parentNode.removeChild(old);
+          var p = list[idx];
+          if (!p) return;
+          var sp = p.storage_path || p.filename || '';
+          var isStorage = !sp.startsWith('images/');
+          var src = isStorage ? (STORAGE_URL + '/' + sp) : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
+          var total = list.length;
+          var ov = document.createElement('div');
+          ov.id = 'aePhotoPreview';
+          ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10004;display:flex;align-items:center;justify-content:center';
+          var html = '';
+          html += '<div style="position:fixed;top:18px;right:24px;color:rgba(255,255,255,.5);font-size:1.5rem;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;z-index:1" id="aePrvClose">\u2715</div>';
+          html += '<img src="'+src+'" style="max-width:90%;max-height:88%;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.4)">';
+          if (total > 1) {
+            html += '<div style="position:fixed;top:50%;left:12px;transform:translateY(-50%);font-size:1.8rem;color:rgba(255,255,255,.4);cursor:pointer;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:50%;z-index:1" id="aePrvPrev">\u2039</div>';
+            html += '<div style="position:fixed;top:50%;right:12px;transform:translateY(-50%);font-size:1.8rem;color:rgba(255,255,255,.4);cursor:pointer;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:50%;z-index:1" id="aePrvNext">\u203A</div>';
+            html += '<div style="position:fixed;bottom:28px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.45);font-size:.82rem;background:rgba(0,0,0,.4);padding:4px 14px;border-radius:12px">'+(idx+1)+' / '+total+'</div>';
+          }
+          ov.innerHTML = html;
+          ov.onclick = function(e) {
+            if (e.target === ov || e.target.id === 'aePrvClose') {
+              ov.parentNode.removeChild(ov);
+            } else if (e.target.id === 'aePrvPrev' && total > 1) {
+              _prvIdx = (_prvIdx - 1 + total) % total;
+              openPhotoPreview(_prvIdx, _prvList);
+            } else if (e.target.id === 'aePrvNext' && total > 1) {
+              _prvIdx = (_prvIdx + 1) % total;
+              openPhotoPreview(_prvIdx, _prvList);
+            }
+          };
+          document.body.appendChild(ov);
+        }
       }
       renderPhotos();
 
