@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>记忆碎片 · v3</title>
+<meta name="description" content="散落的记忆，等待重新拼合">
+<meta name="theme-color" content="#F5F0E8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⊡</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="nav" id="nav">
+  <span class="nav-logo">记忆<em>碎片</em></span>
+  <div class="nav-links">
+    <a href="#wall" class="active">碎片墙</a>
+    <a href="#photos">底片</a>
+    <a href="#about">关于</a>
+  </div>
+  <div class="nav-right">
+    <button class="nav-icon-btn" id="navGear" title="管理">⚙</button>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <h1 class="hero-title">记忆<em>碎片</em></h1>
+  <p class="hero-sub">散落的过往，等待被重新拼合</p>
+  <p class="hero-hint">点击碎片 · 拼凑完整</p>
+</section>
+
+<!-- Fragment Wall -->
+<section class="section" id="wall">
+  <h2 class="section-title">碎<em>片</em>墙</h2>
+  <div class="frag-filters" id="fragFilters"></div>
+  <div class="fragment-wall grid-mode" id="fragWall"></div>
+</section>
+
+<!-- Photos -->
+<section class="section" id="photos">
+  <h2 class="section-title">底<em>片</em>匣</h2>
+  <div class="frag-filters" id="photoFilters"></div>
+  <div class="fragment-wall grid-mode" id="photoWall"></div>
+</section>
+
+<!-- About -->
+<section class="section about" id="about">
+  <h2 class="section-title">关<em>于</em></h2>
+  <p>创建于2026年5月</p>
+  <p>散落的记忆碎片，等待被重新拼合</p>
+</section>
+
+<!-- Music Player -->
+<div class="player" id="player">
+  <button class="player-btn" id="playBtn">▶</button>
+  <span class="player-info" id="playerTitle">—</span>
+  <div class="player-bar" id="playerBar">
+    <div class="player-progress" id="playerProgress"></div>
+  </div>
+  <button class="player-btn" id="nextBtn">→</button>
+</div>
+
+<audio id="bgMusic" preload="auto"></audio>
+
+<!-- Modal -->
+<div class="modal-overlay" id="essayModal">
+  <div class="modal-box" id="essayModalContent"></div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" id="lbClose">✕</button>
+  <button class="lb-nav lb-prev" id="lbPrev">‹</button>
+  <img id="lbImg" src="" alt="">
+  <button class="lb-nav lb-next" id="lbNext">›</button>
+</div>
+
+<script src="../data.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="script.js?v=1"></script>
+<script src="../memories/editor.js?v=1"></script>
+</body>
+</html>
