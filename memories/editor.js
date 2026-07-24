@@ -732,8 +732,13 @@ async function renderMusicTab(){
       const idx = parseInt(b.dataset.mePlay);
       const t = list[idx];
       if(!t){ console.warn('[play] song not found at idx', idx); return; }
+      // 编辑器与播放器现在都是 ASC 排序，直接同步播放
+      const newPlaylist = list.map(function(tr){ return {
+        name: tr.title, title: tr.title, artist: tr.artist||'',
+        url: tr.storage_path||'', storage_path: tr.storage_path||'',
+      };});
       if(window.setPlaylistTo){
-        window.setPlaylistTo(newPlaylist, null, t.storage_path);
+        window.setPlaylistTo(newPlaylist, idx);
       } else {
         console.warn('[play] 网页播放器未就绪，请刷新页面');
       }
