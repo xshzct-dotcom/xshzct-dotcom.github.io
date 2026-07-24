@@ -440,11 +440,18 @@ async function renderAlbumTab(){
       const aeGrid = document.createElement('div');
       aeGrid.id = 'aeLightbox';
       aeGrid.style.cssText = 'display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.94);align-items:center;justify-content:center;flex-direction:column';
+      // 移除已有的重复灯箱
+      var oldGrid = document.getElementById('aeLightbox');
+      if(oldGrid) oldGrid.parentNode.removeChild(oldGrid);
       document.body.appendChild(aeGrid);
+      // 同样清理旧照片弹窗（编辑器旧版本残留）
+      var oldPrv = document.getElementById('aePhotoPreview');
+      if(oldPrv) oldPrv.parentNode.removeChild(oldPrv);
 
       let _pressTimer = null;
       let _pressCard = null;
       let _pressMoved = false;
+      let _longPressFired = false;
       const _selSet = new Set();
       let _selectMode = false;
       let _prvIdx = 0;
@@ -542,6 +549,7 @@ async function renderAlbumTab(){
                 if(!_pressMoved && _pressCard === card){
                   _selectMode = true;
                   _selSet.add(i);
+                  _longPressFired = true;
                   updateSelUI();
                 }
               }, 500);
@@ -559,6 +567,11 @@ async function renderAlbumTab(){
             card.addEventListener('click', function(e){
               e.stopPropagation();
               cancelPress();
+              // 长按已经触发了选择，这次点击不再切换，也不打开预览
+              if(_longPressFired){
+                _longPressFired = false;
+                return;
+              }
               if(_selectMode || _selSet.size > 0){
                 if(_selSet.has(i)) _selSet.delete(i); else _selSet.add(i);
                 if(_selSet.size === 0){ _selectMode = false; }
