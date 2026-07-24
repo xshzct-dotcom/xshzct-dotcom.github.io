@@ -523,7 +523,7 @@ async function renderAlbumTab(){
       function renderGrid(){
         var el = document.getElementById('aePhotoList');
         if(!el) return;
-        el.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:0 0 60px;overflow-y:auto;max-height:calc(100vh - 380px);align-content:start';
+        el.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:0 0 30px;align-content:start';
         var html = '';
         for(var i=0;i<plist.length;i++){
           var sp = plist[i].storage_path || '';
