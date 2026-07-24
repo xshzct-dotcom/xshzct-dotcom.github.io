@@ -360,16 +360,60 @@
     renderAlbumPhotos(currentAlbum);
   }
 
-  // ===== 照片预览（简单版） =====
+  // ===== 照片预览（像主页一样的灯箱） =====
+  let _previewIdx = 0;
   function previewPhoto(idx) {
-    const photo = currentPhotos[idx];
+    if (!currentPhotos[idx]) return;
+    _previewIdx = idx;
+    showPreview();
+  }
+
+  function showPreview() {
+    // 移除已存在的
+    const old = document.getElementById('albumPreviewOverlay');
+    if (old) old.remove();
+
+    const photo = currentPhotos[_previewIdx];
     if (!photo) return;
     const url = photoUrl(photo);
+    const total = currentPhotos.length;
+
     const ov = document.createElement('div');
-    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:10003;display:flex;align-items:center;justify-content:center;cursor:pointer';
-    ov.innerHTML = `<img src="${url}" style="max-width:95%;max-height:95%;object-fit:contain;border-radius:8px">`;
-    ov.onclick = () => ov.remove();
+    ov.id = 'albumPreviewOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10003;display:flex;align-items:center;justify-content:center;cursor:pointer';
+    ov.innerHTML = `
+      <img src="${url}" style="max-width:92%;max-height:88%;object-fit:contain;border-radius:8px;cursor:default;box-shadow:0 8px 32px rgba(0,0,0,.4)">
+      <button data-act="close" style="position:fixed;top:18px;right:24px;font-size:1.4rem;color:rgba(255,255,255,.5);cursor:pointer;border:none;background:transparent;width:36px;height:36px;border-radius:50%;transition:background .2s" onmouseover="this.style.background='rgba(255,255,255,.1)'" onmouseout="this.style.background='transparent'">✕</button>
+      ${total > 1 ? `
+      <button data-act="prev" style="position:fixed;top:50%;left:18px;transform:translateY(-50%);font-size:1.4rem;color:rgba(255,255,255,.4);cursor:pointer;border:none;background:transparent;width:42px;height:42px;border-radius:50%;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,.1)';this.style.color='rgba(255,255,255,.9)'" onmouseout="this.style.background='transparent';this.style.color='rgba(255,255,255,.4)'">‹</button>
+      <button data-act="next" style="position:fixed;top:50%;right:18px;transform:translateY(-50%);font-size:1.4rem;color:rgba(255,255,255,.4);cursor:pointer;border:none;background:transparent;width:42px;height:42px;border-radius:50%;transition:all .2s" onmouseover="this.style.background='rgba(255,255,255,.1)';this.style.color='rgba(255,255,255,.9)'" onmouseout="this.style.background='transparent';this.style.color='rgba(255,255,255,.4)'">›</button>
+      ` : ''}
+      ${total > 1 ? `<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.45);font-size:.82rem;background:rgba(0,0,0,.4);padding:4px 14px;border-radius:12px;backdrop-filter:blur(8px)">${_previewIdx+1} / ${total}</div>` : ''}
+    `;
+
+    // 点空白处关闭
+    ov.addEventListener('click', e => {
+      const act = e.target.dataset?.act;
+      if (act === 'close' || (act === undefined && e.target === ov)) {
+        ov.remove();
+      } else if (act === 'prev') {
+        _previewIdx = (_previewIdx - 1 + total) % total;
+        showPreview();
+      } else if (act === 'next') {
+        _previewIdx = (_previewIdx + 1) % total;
+        showPreview();
+      }
+    });
+
     document.body.appendChild(ov);
+
+    // 键盘左右切换 / ESC关闭
+    const keyH = e => {
+      if (e.key === 'Escape') { ov.remove(); document.removeEventListener('keydown', keyH); }
+      else if (e.key === 'ArrowLeft' && total > 1) { _previewIdx = (_previewIdx - 1 + total) % total; showPreview(); }
+      else if (e.key === 'ArrowRight' && total > 1) { _previewIdx = (_previewIdx + 1) % total; showPreview(); }
+    };
+    document.addEventListener('keydown', keyH);
   }
 
   // ===== 拖拽排序 =====
