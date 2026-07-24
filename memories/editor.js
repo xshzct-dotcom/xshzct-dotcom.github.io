@@ -705,7 +705,7 @@ window.renderAlbumTab=renderAlbumTab;
 // ===== 音乐编辑 =====
 async function renderMusicTab(){
   const body=$('#editorBody');
-  const {data:tracks}=await db().from('music').select('*').order('sort_order',{ascending:true});
+  const {data:tracks}=await db().from('music').select('*').order('sort_order',{ascending:false});
   const list=tracks||[];
 
   body.innerHTML=`
@@ -814,14 +814,19 @@ async function renderMusicTab(){
       for(const f of files){
         const fname = 'music_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
         try{
-          // 用 anon key 上传（RLS 已允许）
           const {error:upErr, data:upData} = await sb.storage.from('photos').upload(fname, f, {
             upsert: true,
             contentType: f.type || 'audio/mpeg',
             cacheControl: '3600'
           });
           if(!upErr){
-            const {error:dbErr} = await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order:Date.now(), album_id:null});
+            // 新音乐 sort_order 设为当前最大+1，让它在 DB 里"最新"，在 DESC 排序中显示在最上
+            var maxSo = 0;
+            try{
+              const {data:maxRows} = await sb.from('music').select('sort_order').order('sort_order',{ascending:false}).limit(1);
+              if(maxRows && maxRows.length>0 && maxRows[0].sort_order!=null) maxSo = parseInt(maxRows[0].sort_order);
+            }catch(e){ console.warn(e); }
+            const {error:dbErr} = await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order: maxSo+1, album_id:null});
             if(dbErr){
               failCount++;
               errors.push(f.name + ': DB - ' + dbErr.message);
@@ -838,7 +843,7 @@ async function renderMusicTab(){
       renderMusicTab();
       if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 2000);
       if(total > 0){
-        const msg = '上传完成：' + okCount + ' 首成功' + (failCount > 0 ? '，' + failCount + ' 首失败\n\n错误：\n' + errors.join('\n') : '');
+        const msg = '上传完成：'+okCount+' 首成功'+(failCount > 0 ? '，'+failCount+' 首失败\n\n错误：\n' + errors.join('\n') : '');
         alert(msg);
       }
     };
