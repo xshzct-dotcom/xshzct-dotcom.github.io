@@ -245,6 +245,7 @@ function buildTimeline(){
         </div>
       </div>`;
     });
+    html += '<div class="tl-group-footer" data-group="'+k+'">▴ 收起</div>';
     html += '</div></div>';
   });
   timeline.innerHTML = html;
@@ -273,6 +274,19 @@ function buildTimeline(){
       } else {
         body.style.display = 'none';
         icon.textContent = '▸';
+      }
+    };
+  });
+
+  // 底部收起按钮
+  $$('.tl-group-footer').forEach(function(ft){
+    ft.onclick = function(){
+      var k = this.dataset.group;
+      var header = document.querySelector('.tl-group-header[data-target="'+k+'"]');
+      if(header){
+        header.click();
+        // 滚动到分类头位置
+        header.scrollIntoView({behavior:'smooth', block:'start'});
       }
     };
   });

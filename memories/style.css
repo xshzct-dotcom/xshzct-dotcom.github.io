@@ -128,6 +128,8 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .tl-group-body{padding-left:0}
 .tl-group-body .timeline-item{margin-bottom:28px}
 .timeline-empty{text-align:center;color:var(--text-muted);padding:60px 0;font-size:1rem}
+.tl-group-footer{text-align:center;padding:10px 0 24px;font-size:.78rem;color:rgba(232,228,218,.2);cursor:pointer;transition:color .25s;user-select:none;position:relative;z-index:2;letter-spacing:1px}
+.tl-group-footer:hover{color:rgba(232,228,218,.45)}
 
 /* --- 记忆河流 · 散落拍立得 --- */
 .river-filters{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:20px}
