@@ -1338,6 +1338,9 @@ async function loadFromSupabase(){
 window.reloadFromSupabase = loadFromSupabase;
 function init(){
   console.log('[memories] init() start');
+  // 刷新即从头开始：禁用浏览器自动恢复滚动位置
+  if('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  window.scrollTo(0, 0);
   initHeroStars();
   initMusic();
   // 歌单同步在下面 init() 末尾统一处理（带 data.js 兜底）
