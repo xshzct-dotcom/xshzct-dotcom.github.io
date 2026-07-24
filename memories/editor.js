@@ -705,7 +705,7 @@ window.renderAlbumTab=renderAlbumTab;
 // ===== 音乐编辑 =====
 async function renderMusicTab(){
   const body=$('#editorBody');
-  const {data:tracks}=await db().from('music').select('*').order('sort_order',{ascending:false});
+  const {data:tracks}=await db().from('music').select('*').order('sort_order',{ascending:true});
   const list=tracks||[];
 
   body.innerHTML=`
@@ -732,16 +732,8 @@ async function renderMusicTab(){
       const idx = parseInt(b.dataset.mePlay);
       const t = list[idx];
       if(!t){ console.warn('[play] song not found at idx', idx); return; }
-      // 不替换玩家现有播放列表（保持 ASC），通过 storage_path 找出这首歌在玩家列表的索引
-      if(window.playSongByPath){
-        window.playSongByPath(t.storage_path);
-      }else if(window.setPlaylistTo){
-        // 回退：用编辑器的列表（但仅在用户手动点击时短暂使用）
-        const newPlaylist = list.map(tr => ({
-          name: tr.title, title: tr.title, artist: tr.artist||'',
-          url: tr.storage_path||'', storage_path: tr.storage_path||'',
-        }));
-        window.setPlaylistTo(newPlaylist, 0);
+      if(window.setPlaylistTo){
+        window.setPlaylistTo(newPlaylist, null, t.storage_path);
       } else {
         console.warn('[play] 网页播放器未就绪，请刷新页面');
       }
@@ -822,13 +814,16 @@ async function renderMusicTab(){
             cacheControl: '3600'
           });
           if(!upErr){
-            // 新音乐 sort_order 设为当前最大+1，让它在 DB 里"最新"，在 DESC 排序中显示在最上
-            var maxSo = 0;
+            // 新音乐放到最前面：全部已有 sort_order +1，新歌 = 0
             try{
-              const {data:maxRows} = await sb.from('music').select('sort_order').order('sort_order',{ascending:false}).limit(1);
-              if(maxRows && maxRows.length>0 && maxRows[0].sort_order!=null) maxSo = parseInt(maxRows[0].sort_order);
+              const {data:allMusic} = await sb.from('music').select('id, sort_order');
+              if(allMusic && allMusic.length){
+                for(var m of allMusic){
+                  if(m.sort_order != null) await sb.from('music').update({sort_order: m.sort_order + 1}).eq('id', m.id);
+                }
+              }
             }catch(e){ console.warn(e); }
-            const {error:dbErr} = await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order: maxSo+1, album_id:null});
+            const {error:dbErr} = await sb.from('music').insert({title:f.name.replace(/\.[^.]+$/,''), artist:'', storage_path:fname, sort_order:0, album_id:null});
             if(dbErr){
               failCount++;
               errors.push(f.name + ': DB - ' + dbErr.message);
