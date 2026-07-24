@@ -430,11 +430,9 @@ async function renderAlbumTab(){
           <span style="color:var(--text);flex:1">📸 ${esc(album.title)} (${plist.length}张)</span>
           <label class="editor-btn editor-btn-primary" style="cursor:pointer">上传照片<input type="file" accept="image/*" multiple style="display:none" id="aeUpload"></label>
         </div>
-        <div id="aePhotoToolbar" style="display:none;background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:8px;padding:10px;margin-bottom:12px;gap:8px;align-items:center;flex-wrap:wrap">
-          <span style="color:var(--text-dim);font-size:.82rem" id="aeSelectedInfo">选中：第 ${'-'} 张</span>
-          <div style="flex:1"></div>
-          <button class="editor-btn" id="aeMoveUpBtn" title="上移">▲ 上移</button>
-          <button class="editor-btn" id="aeMoveDownBtn" title="下移">▼ 下移</button>
+        <div id="aePhotoToolbar" style="display:none;background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:8px;padding:10px 14px;margin-bottom:12px;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="color:var(--text-dim);font-size:.82rem;flex:1" id="aeSelectedInfo">选中：第 ${'-'} 张</span>
+          <span style="color:rgba(232,228,218,.3);font-size:.72rem">拖拽照片可排序</span>
           <button class="editor-btn" id="aeDeleteBtn" title="删除" style="background:rgba(220,38,38,.7);border-color:rgba(220,38,38,.5);color:#fff">🗑 删除</button>
           <button class="editor-btn editor-btn-secondary" id="aeCancelSelBtn" title="取消">✕ 取消</button>
         </div>
@@ -453,19 +451,74 @@ async function renderAlbumTab(){
           const imgUrl = isStorage
             ? (STORAGE_URL + '/' + sp)
             : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
-          return `<div class="ae-photo-card" data-idx="${i}" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:2px solid transparent;border-radius:8px;overflow:hidden;cursor:pointer;transition:all .15s">
-            <img src="${imgUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;background:#1a1d2e" onerror="this.style.opacity=.2" />
+          return `<div class="ae-photo-card" draggable="true" data-idx="${i}" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:2px solid transparent;border-radius:8px;overflow:hidden;cursor:grab;transition:border .15s">
+            <img src="${imgUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;background:#1a1d2e;pointer-events:none;user-select:none" onerror="this.style.opacity=.2" />
             <div style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;font-size:.65rem;padding:2px 6px;border-radius:3px;pointer-events:none">${i+1}</div>
           </div>`;
         }).join('') || '<div class="editor-empty" style="grid-column:1/-1">暂无照片，上传一些吧</div>';
 
-        // 点击：长按=选中  / 单击=预览（电脑端单击=选中）
-        el.querySelectorAll('.ae-photo-card').forEach((card, idx) => {
-          card.addEventListener('click', e => {
+        // 拖拽排序
+        var _dragIdx = null;
+        el.querySelectorAll('.ae-photo-card').forEach(function(card){
+          // 点击：选中+预览
+          card.addEventListener('click', function(e){
+            var idx = parseInt(this.dataset.idx);
+            if(isNaN(idx)) return;
             window._aeSelected = idx;
             renderPhotos();
             updateSelectionUI();
             openPhotoPreview(idx, plist);
+          });
+          // 拖拽
+          card.addEventListener('dragstart', function(e){
+            _dragIdx = parseInt(this.dataset.idx);
+            this.style.opacity = '0.4';
+            this.style.borderColor = 'var(--accent,#7C9B7E)';
+            e.dataTransfer.effectAllowed = 'move';
+            // 对手机触摸拖拽也支持
+            try{ e.dataTransfer.setData('text/plain', _dragIdx); }catch(ex){}
+          });
+          card.addEventListener('dragend', function(e){
+            this.style.opacity = '';
+            this.style.borderColor = '';
+            _dragIdx = null;
+          });
+          card.addEventListener('dragover', function(e){
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            if(_dragIdx === null) return;
+            var targetIdx = parseInt(this.dataset.idx);
+            if(targetIdx === _dragIdx) return;
+            this.style.borderColor = 'var(--accent,#7C9B7E)';
+            // 在 grid 中交换会闪烁，用插入排序：move item to target
+            this.style.transform = _dragIdx < targetIdx ? 'translateY(4px)' : 'translateY(-4px)';
+          });
+          card.addEventListener('dragleave', function(e){
+            this.style.borderColor = '';
+            this.style.transform = '';
+          });
+          card.addEventListener('drop', async function(e){
+            e.preventDefault();
+            this.style.borderColor = '';
+            this.style.transform = '';
+            var fromIdx = _dragIdx;
+            var toIdx = parseInt(this.dataset.idx);
+            if(fromIdx === null || isNaN(toIdx) || fromIdx === toIdx) return;
+            // 移动元素
+            var item = plist.splice(fromIdx, 1)[0];
+            plist.splice(toIdx, 0, item);
+            // 更新 DB sort_order
+            try{
+              if(sb){
+                for(var j=0;j<plist.length;j++){
+                  await sb.from('album_photos').update({sort_order:j}).eq('id', plist[j].id);
+                }
+              }
+            }catch(err){ console.warn('[photo drag]', err); }
+            window._aeSelected = toIdx;
+            renderPhotos();
+            updateSelectionUI();
+            if(window.reloadFromSupabase) setTimeout(function(){ window.reloadFromSupabase(); }, 1000);
           });
         });
         updateSelectionUI();
@@ -483,35 +536,12 @@ async function renderAlbumTab(){
           if(sel !== null && plist[sel]){
             tb.style.display = 'flex';
             info.textContent = '选中：第 '+(sel+1)+' 张';
-            const upBtn = $('#aeMoveUpBtn');
-            const downBtn = $('#aeMoveDownBtn');
-            if(upBtn) upBtn.disabled = (sel === 0);
-            if(downBtn) downBtn.disabled = (sel === plist.length-1);
           }else{
             tb.style.display = 'none';
           }
         }
       }
 
-      // 工具栏按钮
-      async function moveSel(dir){
-        const sel = window._aeSelected;
-        if(sel === null) return;
-        const j = sel + dir;
-        if(j<0 || j>=plist.length) return;
-        const a = plist[sel], c = plist[j];
-        if(!a || !c) return;
-        try{
-          if(sb){
-            await sb.from('album_photos').update({sort_order:j}).eq('id', a.id);
-            await sb.from('album_photos').update({sort_order:i || sel}).eq('id', c.id);
-          }
-        }catch(err){ console.warn(err); }
-        const tmp = plist[sel]; plist[sel] = plist[j]; plist[j] = tmp;
-        window._aeSelected = j;
-        renderPhotos();
-        if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 1000);
-      }
       async function delSel(){
         const sel = window._aeSelected;
         if(sel === null) return;
@@ -523,12 +553,8 @@ async function renderAlbumTab(){
         renderAlbumPhotos(album);
       }
       setTimeout(()=>{
-        const upBtn = $('#aeMoveUpBtn');
-        const downBtn = $('#aeMoveDownBtn');
         const delBtn = $('#aeDeleteBtn');
         const cancelBtn = $('#aeCancelSelBtn');
-        if(upBtn) upBtn.onclick = ()=>moveSel(-1);
-        if(downBtn) downBtn.onclick = ()=>moveSel(1);
         if(delBtn) delBtn.onclick = delSel;
         if(cancelBtn) cancelBtn.onclick = ()=>{ window._aeSelected=null; renderPhotos(); };
       }, 0);
