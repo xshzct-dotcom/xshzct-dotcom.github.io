@@ -373,10 +373,11 @@ async function renderAlbumTab(){
   function renderList(){
     const el=$('#aeList');
     el.innerHTML=list.map((a,i)=>`
-      <div class="editor-list-item" draggable="true" data-idx="${i}" data-id="${a.id}">
-        <span class="editor-drag-handle">⠿</span>
+      <div class="editor-list-item" data-idx="${i}" data-id="${a.id}">
         <div class="info"><div class="title">${esc(a.title)}</div><div class="meta">${a.sort_order!==undefined?'排序:'+a.sort_order:''}</div></div>
         <div class="actions">
+          <button class="editor-btn-sm" data-ae-move="${i}" data-dir="-1" ${i===0?'disabled':''} title="上移">▲</button>
+          <button class="editor-btn-sm" data-ae-move="${i}" data-dir="1" ${i===list.length-1?'disabled':''} title="下移">▼</button>
           <button class="editor-btn-sm" data-ae-open="${i}">📂</button>
           <button class="editor-btn-sm" data-ae-rename="${i}">✎</button>
           <button class="editor-btn-sm del" data-ae-del="${i}">🗑</button>
@@ -398,8 +399,24 @@ async function renderAlbumTab(){
         if(window.reloadFromSupabase) window.reloadFromSupabase();
       });
     });
-    // 拖拽排序
-    bindDragSort(el, list, 'albums', 'sort_order', ()=>renderList());
+    // 上下移动
+    el.querySelectorAll('[data-ae-move]').forEach(b=>b.onclick=async ()=>{
+      const i = parseInt(b.dataset.aeMove);
+      const dir = parseInt(b.dataset.dir);
+      const j = i + dir;
+      if(j<0 || j>=list.length) return;
+      const a = list[i], c = list[j];
+      if(!a || !c) return;
+      try{
+        if(sb){
+          await sb.from('albums').update({sort_order:j}).eq('id', a.id);
+          await sb.from('albums').update({sort_order:i}).eq('id', c.id);
+        }
+        const tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+        renderList();
+        if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 1000);
+      } catch(err){ console.warn('[album move]', err); }
+    });
   }
 
   function renderAlbumPhotos(album){
@@ -432,16 +449,17 @@ async function renderAlbumTab(){
             : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
           const fname = (p.filename || sp.split('/').pop() || '').replace(/\.[^.]+$/, '');
           return `
-          <div class="ae-photo-card" data-idx="${i}" data-i="${i}" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:8px;overflow:hidden;cursor:pointer;transition:all .2s" draggable="true">
+          <div class="ae-photo-card" data-idx="${i}" data-i="${i}" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:8px;overflow:hidden;cursor:pointer;transition:all .2s">
             <img src="${imgUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;background:#1a1d2e" onerror="this.style.opacity=.2" />
-            <div class="ae-photo-overlay" style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.8) 0%,rgba(0,0,0,0) 50%);opacity:0;transition:opacity .2s;display:flex;flex-direction:column;justify-content:flex-end;padding:8px">
+            <div class="ae-photo-overlay" style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.85) 0%,rgba(0,0,0,.2) 60%,rgba(0,0,0,0) 100%);opacity:0;transition:opacity .2s;display:flex;flex-direction:column;justify-content:flex-end;padding:8px">
               <div style="font-size:.7rem;color:#fff;line-height:1.3;max-height:2.6em;overflow:hidden;text-overflow:ellipsis;word-break:break-all">${esc(fname)}</div>
-              <div style="display:flex;gap:4px;margin-top:6px">
-                <button data-ae-pdel="${i}" style="flex:1;padding:4px;background:rgba(220,38,38,.7);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.75rem" title="删除">🗑</button>
+              <div style="display:flex;gap:3px;margin-top:6px" onclick="event.stopPropagation()">
+                <button data-ae-move="${i}" data-dir="-1" ${i===0?'disabled':''} style="flex:1;padding:4px;background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.7rem" title="上移">▲</button>
+                <button data-ae-move="${i}" data-dir="1" ${i===plist.length-1?'disabled':''} style="flex:1;padding:4px;background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.7rem" title="下移">▼</button>
+                <button data-ae-pdel="${i}" style="flex:1;padding:4px;background:rgba(220,38,38,.7);border:0;color:#fff;border-radius:4px;cursor:pointer;font-size:.7rem" title="删除">🗑</button>
               </div>
             </div>
             <div style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;font-size:.65rem;padding:2px 6px;border-radius:3px;pointer-events:none">${i+1}</div>
-            <div style="position:absolute;top:4px;right:4px;color:rgba(255,255,255,.5);font-size:.85rem;cursor:grab;pointer-events:none">⠿</div>
           </div>
           `;
         }).join('') || '<div class="editor-empty" style="grid-column:1/-1">暂无照片，上传一些吧</div>';
@@ -455,7 +473,7 @@ async function renderAlbumTab(){
         // 点击照片卡片预览
         el.querySelectorAll('.ae-photo-card').forEach(card => {
           card.onclick = e => {
-            if(e.target.closest('[data-ae-pdel]')) return;
+            if(e.target.closest('button')) return;
             const idx = parseInt(card.dataset.idx);
             if(!isNaN(idx)) openPhotoPreview(idx, plist);
           };
@@ -469,8 +487,27 @@ async function renderAlbumTab(){
             if (p.storage_path) db().storage.from('photos').remove([p.storage_path]).catch(() => {});
           };
         });
-        // 拖拽排序
-        bindPhotoDragSort(el, plist, album);
+        // 上下移动
+        el.querySelectorAll('[data-ae-move]').forEach(b => {
+          b.onclick = async e => {
+            e.stopPropagation();
+            const i = parseInt(b.dataset.aeMove);
+            const dir = parseInt(b.dataset.dir);
+            const j = i + dir;
+            if(j<0 || j>=plist.length) return;
+            const a = plist[i], c = plist[j];
+            if(!a || !c) return;
+            try {
+              if(sb){
+                await sb.from('album_photos').update({sort_order:j}).eq('id', a.id);
+                await sb.from('album_photos').update({sort_order:i}).eq('id', c.id);
+              }
+              const tmp = plist[i]; plist[i] = plist[j]; plist[j] = tmp;
+              renderPhotos();
+              if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 1000);
+            } catch(err){ console.warn('[photo move]', err); }
+          };
+        });
 
         // 照片预览灯箱
         var _prvList = plist, _prvIdx = 0;
@@ -550,10 +587,11 @@ async function renderMusicTab(){
   function renderList(){
     const el=$('#meList');
     el.innerHTML=list.map((t,i)=>`
-      <div class="editor-list-item" draggable="true" data-idx="${i}" data-id="${t.id}">
-        <span class="editor-drag-handle">⠿</span>
+      <div class="editor-list-item" data-idx="${i}" data-id="${t.id}">
         <div class="info"><div class="title">${esc(t.title)}</div><div class="meta">${t.artist||''} · 歌单:${t.album_id||'主页'}</div></div>
         <div class="actions">
+          <button class="editor-btn-sm" data-me-move="${i}" data-dir="-1" ${i===0?'disabled':''} title="上移">▲</button>
+          <button class="editor-btn-sm" data-me-move="${i}" data-dir="1" ${i===list.length-1?'disabled':''} title="下移">▼</button>
           <button class="editor-btn-sm" data-me-play="${i}">▶</button>
           <button class="editor-btn-sm" data-me-edit="${i}">✎</button>
           <button class="editor-btn-sm del" data-me-del="${i}">🗑</button>
@@ -615,8 +653,24 @@ async function renderMusicTab(){
         alert('删除出错：' + e.message);
       }
     });
-    // 拖拽排序
-    bindDragSort(el, list, 'music', 'sort_order', ()=>renderList());
+    // 上下移动
+    el.querySelectorAll('[data-me-move]').forEach(b=>b.onclick=async ()=>{
+      const i = parseInt(b.dataset.meMove);
+      const dir = parseInt(b.dataset.dir);
+      const j = i + dir;
+      if(j<0 || j>=list.length) return;
+      const a = list[i], c = list[j];
+      if(!a || !c) return;
+      try{
+        if(sb){
+          await sb.from('music').update({sort_order:j}).eq('id', a.id);
+          await sb.from('music').update({sort_order:i}).eq('id', c.id);
+        }
+        const tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+        renderList();
+        if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 1000);
+      } catch(err){ console.warn('[music move]', err); }
+    });
   }
   renderList();
 
