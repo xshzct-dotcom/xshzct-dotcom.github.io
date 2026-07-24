@@ -422,277 +422,249 @@ async function renderAlbumTab(){
   function renderAlbumPhotos(album){
     db().from('album_photos').select('*').eq('album_id',album.id).order('sort_order',{ascending:true}).then(({data:photos})=>{
       const plist=photos||[];
-      window._aeCurrentList = plist;
-      window._aeSelected = null;
-      body.innerHTML=`
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      body.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5">
           <button class="editor-btn editor-btn-secondary" onclick="renderAlbumTab()">← 返回</button>
           <span style="color:var(--text);flex:1">📸 ${esc(album.title)} (${plist.length}张)</span>
+          <button class="editor-btn editor-btn-secondary" id="aeSelectToggle" style="font-size:.8rem">选择</button>
           <label class="editor-btn editor-btn-primary" style="cursor:pointer">上传照片<input type="file" accept="image/*" multiple style="display:none" id="aeUpload"></label>
         </div>
         <div id="aePhotoToolbar" style="display:none;background:var(--bg-secondary);border:1px solid var(--glass-border);border-radius:8px;padding:10px 14px;margin-bottom:12px;gap:8px;align-items:center;flex-wrap:wrap">
-          <span style="color:var(--text-dim);font-size:.82rem;flex:1" id="aeSelectedInfo">选中：第 ${'-'} 张</span>
-          <span style="color:rgba(232,228,218,.3);font-size:.72rem">拖拽照片可排序</span>
+          <span style="color:var(--text-dim);font-size:.82rem;flex:1" id="aeSelectedInfo">已选 0 张</span>
           <button class="editor-btn" id="aeDeleteBtn" title="删除" style="background:rgba(220,38,38,.7);border-color:rgba(220,38,38,.5);color:#fff">🗑 删除</button>
           <button class="editor-btn editor-btn-secondary" id="aeCancelSelBtn" title="取消">✕ 取消</button>
         </div>
         <div id="aePhotoList"></div>
       `;
-      function renderPhotos(){
-        const el=$('#aePhotoList');
-        el.style.display = 'grid';
-        el.style.gridTemplateColumns = 'repeat(auto-fill, minmax(140px, 1fr))';
-        el.style.gap = '10px';
-        el.style.padding = '10px 0 60px';
-        el.style.overflowY = 'auto';
-        el.style.maxHeight = 'calc(100vh - 400px)';
-        el.innerHTML = plist.map((p,i) => {
-          const sp = p.storage_path || p.filename || '';
-          const isStorage = !sp.startsWith('images/') && !sp.startsWith('thumbs/');
-          const imgUrl = isStorage
-            ? (STORAGE_URL + '/' + sp)
-            : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
-          return `<div class="ae-photo-card" draggable="true" data-idx="${i}" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:2px solid transparent;border-radius:8px;overflow:hidden;cursor:pointer;transition:border .15s;user-select:none">
-            <img src="${imgUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;background:#1a1d2e;pointer-events:none;user-select:none;-webkit-user-drag:none" onerror="this.style.opacity=.2" />
-            <div style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;font-size:.65rem;padding:2px 6px;border-radius:3px;pointer-events:none">${i+1}</div>
-            <div class="ae-check" style="display:none;position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.5);color:#fff;font-size:.85rem;align-items:center;justify-content:center;z-index:3">✓</div>
-          </div>`;
-        }).join('') || '<div class="editor-empty" style="grid-column:1/-1">暂无照片，上传一些吧</div>';
+      // 灯箱容器直接挂 body，用 inline 事件隔离脏代码
+      const aeGrid = document.createElement('div');
+      aeGrid.id = 'aeLightbox';
+      aeGrid.style.cssText = 'display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.94);align-items:center;justify-content:center;flex-direction:column';
+      document.body.appendChild(aeGrid);
 
-        // 拖拽排序 + 长按多选
-        var _dragFrom = null;
-        var _selSet = new Set();
-        var _pressTimer = null;
-        var _pressTarget = null;
-        var _pressMoved = false;
-        function clearSel(){
-          _selSet.clear();
-          updateSelectionUI();
+      let _pressTimer = null;
+      let _pressCard = null;
+      let _pressMoved = false;
+      const _selSet = new Set();
+      let _selectMode = false;
+      let _prvIdx = 0;
+      const _prvList = plist;
+
+      function imgSrc(p){
+        if(!p || !p.storage_path) return '';
+        const sp = p.storage_path;
+        return sp.startsWith('images/') ? ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//,'')) : (STORAGE_URL + '/' + sp);
+      }
+      function openLightbox(idx){
+        _prvIdx = idx;
+        const url = imgSrc(_prvList[idx]);
+        if(!url) return;
+        var ht = '<img src="'+esc(url)+'" style="max-width:90%;max-height:80vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.4)">';
+        ht += '<div data-lb="close" style="position:absolute;top:18px;right:24px;color:rgba(255,255,255,.6);font-size:1.6rem;cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center">✕</div>';
+        if(plist.length > 1){
+          ht += '<div data-lb="prev" style="position:absolute;top:50%;left:18px;transform:translateY(-50%);font-size:2rem;color:rgba(255,255,255,.5);cursor:pointer;width:50px;height:50px;display:flex;align-items:center;justify-content:center;border-radius:50%">‹</div>';
+          ht += '<div data-lb="next" style="position:absolute;top:50%;right:18px;transform:translateY(-50%);font-size:2rem;color:rgba(255,255,255,.5);cursor:pointer;width:50px;height:50px;display:flex;align-items:center;justify-content:center;border-radius:50%">›</div>';
+          ht += '<div style="position:absolute;bottom:28px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.5);font-size:.85rem;background:rgba(0,0,0,.4);padding:4px 14px;border-radius:12px">' + (idx+1) + ' / ' + plist.length + '</div>';
         }
-        function exitMulti(){
-          _selSet.clear();
-          updateSelectionUI();
+        aeGrid.innerHTML = ht;
+        aeGrid.style.display = 'flex';
+      }
+      function closeLightbox(){ aeGrid.style.display = 'none'; aeGrid.innerHTML = ''; }
+      aeGrid.onclick = function(e){
+        const act = e.target.getAttribute && e.target.getAttribute('data-lb');
+        if(act === 'close' || e.target === aeGrid) closeLightbox();
+        else if(act === 'prev') openLightbox((_prvIdx-1+plist.length)%plist.length);
+        else if(act === 'next') openLightbox((_prvIdx+1)%plist.length);
+      };
+
+      function updateSelUI(){
+        var inMulti = _selectMode || _selSet.size > 0;
+        var cards = document.querySelectorAll('.ae-photo-card');
+        for(var i=0;i<cards.length;i++){
+          var ci = parseInt(cards[i].dataset.idx);
+          var checked = _selSet.has(ci);
+          cards[i].style.border = '2px solid ' + (checked ? 'var(--accent,#7C9B7E)' : 'transparent');
+          var checkEl = cards[i].querySelector('.ae-check');
+          if(checkEl){
+            checkEl.style.display = inMulti ? 'flex' : 'none';
+            checkEl.style.background = checked ? 'var(--accent,#7C9B7E)' : 'rgba(0,0,0,.5)';
+            checkEl.style.borderColor = checked ? 'var(--accent,#7C9B7E)' : 'rgba(255,255,255,.5)';
+          }
         }
-        el.querySelectorAll('.ae-photo-card').forEach(function(card){
-          function indexOf(){
-            return parseInt(card.dataset.idx);
+        var tb = document.getElementById('aePhotoToolbar');
+        var info = document.getElementById('aeSelectedInfo');
+        var delBtn = document.getElementById('aeDeleteBtn');
+        var toggleBtn = document.getElementById('aeSelectToggle');
+        if(tb && info){
+          if(_selSet.size > 0){
+            tb.style.display = 'flex';
+            info.textContent = '已选 '+_selSet.size+' 张';
+            if(delBtn) delBtn.textContent = '🗑 删除 × '+_selSet.size;
+            if(toggleBtn) toggleBtn.textContent = '退出';
+          } else if(_selectMode){
+            tb.style.display = 'flex';
+            info.textContent = '选择模式 - 点击切换';
+            if(delBtn) delBtn.textContent = '🗑 删除';
+            if(toggleBtn) toggleBtn.textContent = '完成';
+          } else {
+            tb.style.display = 'none';
+            if(toggleBtn) toggleBtn.textContent = '选择';
           }
-          // 长按检测：开始计时（500ms）
-          function startPress(x, y){
-            _pressTarget = card;
-            _pressMoved = false;
-            _pressTimer = setTimeout(function(){
-              if(!_pressMoved && _pressTarget === card){
-                var i = indexOf();
-                if(isNaN(i)) return;
-                _selSet.add(i);
-                updateSelectionUI();
-              }
-            }, 500);
-          }
-          function cancelPress(){
-            if(_pressTimer){ clearTimeout(_pressTimer); _pressTimer=null; }
-            _pressTarget = null;
-          }
-          // 单击：未多选 = 预览；多选模式 = 切换选中
-          card.addEventListener('click', function(e){
-            cancelPress();
-            var idx = indexOf();
-            if(isNaN(idx)) return;
-            if(_selSet.size > 0){
-              // 多选模式：切换该照片
-              if(_selSet.has(idx)) _selSet.delete(idx); else _selSet.add(idx);
-              updateSelectionUI();
-              return;
+        }
+      }
+
+      function renderGrid(){
+        var el = document.getElementById('aePhotoList');
+        if(!el) return;
+        el.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;padding:0 0 60px;overflow-y:auto;max-height:calc(100vh - 380px);align-content:start';
+        var html = '';
+        for(var i=0;i<plist.length;i++){
+          var sp = plist[i].storage_path || '';
+          var imgUrl = imgSrc(plist[i]);
+          if(!imgUrl) imgUrl = '';
+          html += '<div class="ae-photo-card" data-idx="'+i+'" draggable="true" style="position:relative;aspect-ratio:1;background:var(--bg-secondary);border:2px solid '+(_selSet.has(i)?'var(--accent,#7C9B7E)':'transparent')+';border-radius:8px;overflow:hidden;cursor:pointer;transition:border .15s;user-select:none">';
+          html += '<img src="'+esc(imgUrl)+'" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;background:#1a1d2e;pointer-events:none;user-select:none;-webkit-user-drag:none" onerror="this.style.opacity=.2">';
+          html += '<div style="position:absolute;top:4px;left:4px;background:rgba(0,0,0,.6);color:#fff;font-size:.65rem;padding:2px 6px;border-radius:3px;pointer-events:none">'+(i+1)+'</div>';
+          html += '<div class="ae-check" style="display:'+((_selectMode||_selSet.size>0)?'flex':'none')+';position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:'+(_selSet.has(i)?'var(--accent,#7C9B7E)':'rgba(0,0,0,.5)')+';border:2px solid '+(_selSet.has(i)?'var(--accent,#7C9B7E)':'rgba(255,255,255,.5)')+';color:#fff;font-size:.85rem;align-items:center;justify-content:center;z-index:3">✓</div>';
+          html += '</div>';
+        }
+        if(plist.length === 0) html = '<div class="editor-empty" style="grid-column:1/-1">暂无照片</div>';
+        el.innerHTML = html;
+
+        // 给每张照片绑事件
+        var cards = el.querySelectorAll('.ae-photo-card');
+        for(var ci=0; ci<cards.length; ci++){
+          (function(card, i){
+            // 长按检测
+            function startPress(){
+              _pressCard = card; _pressMoved = false;
+              _pressTimer = setTimeout(function(){
+                if(!_pressMoved && _pressCard === card){
+                  _selectMode = true;
+                  _selSet.add(i);
+                  updateSelUI();
+                }
+              }, 500);
             }
-            // 普通模式：只预览
-            window._aeSelected = idx;
-            updateSelectionUI();
-            openPhotoPreview(idx, plist);
-          });
-          // 长按开始：触摸 + 鼠标
-          card.addEventListener('mousedown', function(e){ if(e.button===0) startPress(); });
-          card.addEventListener('touchstart', function(e){ startPress(); }, {passive:true});
-          // 移动时取消长按（避免误触）
-          card.addEventListener('mousemove', function(){ _pressMoved = true; cancelPress(); });
-          card.addEventListener('touchmove', function(){ _pressMoved = true; cancelPress(); }, {passive:true});
-          // 松开取消
-          document.addEventListener('mouseup', cancelPress, {passive:true});
-          document.addEventListener('touchend', cancelPress, {passive:true});
-          card.addEventListener('dragstart', function(e){
-            cancelPress();
-            _dragFrom = indexOf();
-            this.style.opacity = '0.3';
-            e.dataTransfer.effectAllowed = 'move';
-            try{ e.dataTransfer.setData('text/plain', 'x'); }catch(ex){}
-            // 拖拽时退出多选
-            if(_selSet.size>0) clearSel();
-          });
-          card.addEventListener('dragend', function(e){
-            this.style.opacity = '';
-            _dragFrom = null;
-          });
-          card.addEventListener('dragover', function(e){
-            e.preventDefault();
-            var from = _dragFrom;
-            var to = parseInt(this.dataset.idx);
-            if(from === null || isNaN(to) || from === to) return;
-            var dir = from < to ? 'down' : 'up';
-            el.querySelectorAll('.ae-photo-card').forEach(function(c){
-              c.style.borderColor = '';
-              var ci = parseInt(c.dataset.idx);
-              if(dir === 'down' && ci > from && ci <= to){
-                c.style.borderBottomColor = 'var(--accent,#7C9B7E)';
-              }else if(dir === 'up' && ci >= to && ci < from){
-                c.style.borderTopColor = 'var(--accent,#7C9B7E)';
+            function cancelPress(){
+              if(_pressTimer){ clearTimeout(_pressTimer); _pressTimer = null; }
+              _pressCard = null;
+            }
+            // 鼠标/触摸事件
+            card.addEventListener('mousedown', function(e){ if(e.button===0) startPress(); });
+            card.addEventListener('touchstart', function(){ startPress(); }, {passive: true});
+            card.addEventListener('mousemove', function(){ _pressMoved = true; cancelPress(); });
+            card.addEventListener('touchmove', function(){ _pressMoved = true; cancelPress(); }, {passive: true});
+            // 单击
+            card.addEventListener('click', function(e){
+              e.stopPropagation();
+              cancelPress();
+              if(_selectMode || _selSet.size > 0){
+                if(_selSet.has(i)) _selSet.delete(i); else _selSet.add(i);
+                if(_selSet.size === 0){ _selectMode = false; }
+                updateSelUI();
+                return;
+              }
+              // 普通模式：打开灯箱
+              openLightbox(i);
+            });
+            // 拖拽
+            var dragging = false;
+            card.addEventListener('dragstart', function(e){
+              cancelPress();
+              if(_selectMode || _selSet.size > 0){ e.preventDefault(); return; }
+              dragging = true;
+              card.style.opacity = '0.3';
+              card.dataset.dragIdx = i;
+              e.dataTransfer.effectAllowed = 'move';
+              try{ e.dataTransfer.setData('text/plain', 'x'); }catch(_){}
+            });
+            card.addEventListener('dragend', function(){ card.style.opacity = ''; dragging = false; delete card.dataset.dragIdx; });
+            card.addEventListener('dragover', function(e){
+              if(!dragging) return;
+              e.preventDefault();
+              var from = parseInt(card.dataset.dragIdx);
+              var to = i;
+              if(isNaN(from) || from === to) return;
+              var cards2 = el.querySelectorAll('.ae-photo-card');
+              for(var k=0;k<cards2.length;k++){
+                var idx2 = parseInt(cards2[k].dataset.idx);
+                var baseBorder = _selSet.has(idx2) ? 'var(--accent,#7C9B7E)' : 'transparent';
+                cards2[k].style.borderTopColor = '';
+                cards2[k].style.borderBottomColor = '';
+                cards2[k].style.border = '2px solid ' + baseBorder;
+                if(idx2 > from && idx2 <= to){ cards2[k].style.borderBottomColor = 'var(--accent,#7C9B7E)'; }
+                else if(idx2 >= to && idx2 < from){ cards2[k].style.borderTopColor = 'var(--accent,#7C9B7E)'; }
               }
             });
-          });
-          card.addEventListener('dragleave', function(e){
-            if(!this.contains(e.relatedTarget)) this.style.borderColor = '';
-          });
-          card.addEventListener('drop', async function(e){
-            e.preventDefault();
-            el.querySelectorAll('.ae-photo-card').forEach(function(c){ c.style.borderColor = ''; });
-            var fromIdx = _dragFrom;
-            var toIdx = parseInt(this.dataset.idx);
-            if(fromIdx === null || isNaN(toIdx) || fromIdx === toIdx) return;
-            var item = plist.splice(fromIdx, 1)[0];
-            plist.splice(toIdx, 0, item);
-            try{
-              if(sb){
-                var updates = [];
-                for(var j=0;j<plist.length;j++){
-                  updates.push(sb.from('album_photos').update({sort_order:j}).eq('id', plist[j].id));
+            card.addEventListener('drop', async function(e){
+              if(!dragging) return;
+              e.preventDefault();
+              e.stopPropagation();
+              var from = parseInt(card.dataset.dragIdx);
+              var to = i;
+              if(isNaN(from) || from === to) return;
+              var item = plist.splice(from, 1)[0];
+              plist.splice(to, 0, item);
+              try{
+                if(sb){
+                  var updates = [];
+                  for(var j=0;j<plist.length;j++) updates.push(sb.from('album_photos').update({sort_order:j}).eq('id', plist[j].id));
+                  await Promise.all(updates);
                 }
-                await Promise.all(updates);
-              }
-            }catch(err){ console.warn('[photo drag]', err); }
-            // 拖拽后清空多选
-            _selSet.clear();
-            _dragFrom = null;
-            renderPhotos();
-            updateSelectionUI();
-            if(window.reloadFromSupabase) setTimeout(function(){ window.reloadFromSupabase(); }, 1000);
-          });
-        });
-
-        // 拖拽时自动滚动边缘检测
-        var _scrollBody = document.getElementById('editorBody');
-        el.addEventListener('dragover', function(e){
-          if(_dragFrom === null) return;
-          var rect = _scrollBody.getBoundingClientRect();
-          var margin = 60;
-          if(e.clientY - rect.top < margin){
-            _scrollBody.scrollTop -= 10;
-          }else if(rect.bottom - e.clientY < margin){
-            _scrollBody.scrollTop += 10;
-          }
-        });
-        updateSelectionUI();
-      }
-
-      function updateSelectionUI(){
-        var inMulti = _selSet && _selSet.size > 0;
-        // 更新每张照片的视觉状态
-        var cards = document.querySelectorAll('.ae-photo-card');
-        cards.forEach(function(c){
-          var ci = parseInt(c.dataset.idx);
-          var checked = inMulti && _selSet.has(ci);
-          var checkEl = c.querySelector('.ae-check');
-          if(checkEl) checkEl.style.display = (inMulti ? 'flex' : 'none');
-          c.style.borderColor = checked ? 'var(--accent,#7C9B7E)' : 'transparent';
-          if(checked){
-            // 选中：填充绿色 + 实心
-            checkEl.style.background = 'var(--accent,#7C9B7E)';
-            checkEl.style.borderColor = 'var(--accent,#7C9B7E)';
-            checkEl.style.color = '#fff';
-          }else{
-            checkEl.style.background = 'rgba(0,0,0,.5)';
-            checkEl.style.borderColor = 'rgba(255,255,255,.5)';
-            checkEl.style.color = '#fff';
-          }
-        });
-        var tb = $('#aePhotoToolbar');
-        var info = $('#aeSelectedInfo');
-        if(tb && info){
-          if(inMulti){
-            tb.style.display = 'flex';
-            var arr = Array.from(_selSet).sort(function(a,b){return a-b;});
-            info.textContent = '已选 '+_selSet.size+' 张';
-            // 更新删除按钮
-            var delBtn = $('#aeDeleteBtn');
-            if(delBtn) delBtn.textContent = '🗑 删除 × '+_selSet.size;
-          }else{
-            tb.style.display = 'none';
-          }
+              }catch(err){ console.warn(err); }
+              renderGrid();
+              if(window.reloadFromSupabase) setTimeout(function(){ window.reloadFromSupabase(); }, 1000);
+            });
+          })(cards[ci], ci);
         }
+
+        // 边缘自动滚动
+        el.ondragover = function(e){
+          if(!document.querySelector('.ae-photo-card[data-drag-idx]')) return;
+          var eb = document.getElementById('editorBody');
+          if(!eb) return;
+          var rect = eb.getBoundingClientRect();
+          var m = 60;
+          if(e.clientY - rect.top < m) eb.scrollTop -= 10;
+          else if(rect.bottom - e.clientY < m) eb.scrollTop += 10;
+        };
       }
 
-      async function delSel(){
-        if(!_selSet || _selSet.size===0) return;
-        var ids = Array.from(_selSet).map(function(i){ return plist[i] && plist[i].id; }).filter(Boolean);
-        if(ids.length===0) return;
-        if(!confirm('删除选中的 '+ids.length+' 张照片？')) return;
-        var storagePaths = Array.from(_selSet).map(function(i){ return plist[i] && plist[i].storage_path; }).filter(Boolean);
-        try{
-          if(sb){
-            await sb.from('album_photos').delete().in('id', ids);
-          }
-          if(storagePaths.length && sb && sb.storage){
-            sb.storage.from('photos').remove(storagePaths).catch(function(){});
-          }
-        }catch(err){ console.warn(err); }
-        _selSet.clear();
-        renderAlbumPhotos(album);
-      }
-      setTimeout(()=>{
-        const delBtn = $('#aeDeleteBtn');
-        const cancelBtn = $('#aeCancelSelBtn');
-        if(delBtn) delBtn.onclick = delSel;
-        if(cancelBtn) cancelBtn.onclick = ()=>{ _selSet.clear(); updateSelectionUI(); };
+      renderGrid();
+
+      // 工具栏按钮（一次设置）
+      setTimeout(function(){
+        var toggleBtn = document.getElementById('aeSelectToggle');
+        var delBtn = document.getElementById('aeDeleteBtn');
+        var cancelBtn = document.getElementById('aeCancelSelBtn');
+        if(toggleBtn) toggleBtn.onclick = function(){
+          if(_selSet.size > 0){ _selSet.clear(); _selectMode = false; }
+          else { _selectMode = !_selectMode; }
+          updateSelUI();
+        };
+        if(delBtn) delBtn.onclick = async function(){
+          if(_selSet.size === 0){ alert('请先长按或点击「选择」进入多选模式，再点击照片选中'); return; }
+          if(!confirm('删除选中的 '+_selSet.size+' 张？')) return;
+          var ids = [];
+          var sps = [];
+          _selSet.forEach(function(i){ if(plist[i]){ ids.push(plist[i].id); sps.push(plist[i].storage_path); } });
+          try{
+            if(sb) await sb.from('album_photos').delete().in('id', ids);
+            if(sps.length && sb) sb.storage.from('photos').remove(sps).catch(function(){});
+          }catch(err){ console.warn(err); }
+          _selSet.clear(); _selectMode = false;
+          renderAlbumPhotos(album);
+        };
+        if(cancelBtn) cancelBtn.onclick = function(){ _selSet.clear(); _selectMode = false; updateSelUI(); };
       }, 0);
 
-      // 照片预览灯箱
-      var _prvList = plist, _prvIdx = 0;
-      function openPhotoPreview(idx, list) {
-        _prvList = list; _prvIdx = idx;
-        var old = document.getElementById('aePhotoPreview');
-        if (old) old.parentNode.removeChild(old);
-        var p = list[idx];
-        if (!p) return;
-        var sp = p.storage_path || p.filename || '';
-        var isStorage = !sp.startsWith('images/');
-        var src = isStorage ? (STORAGE_URL + '/' + sp) : ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//, ''));
-        var total = list.length;
-        var ov = document.createElement('div');
-        ov.id = 'aePhotoPreview';
-        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10004;display:flex;align-items:center;justify-content:center';
-        var html = '';
-        html += '<div style="position:fixed;top:18px;right:24px;color:rgba(255,255,255,.5);font-size:1.5rem;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center;z-index:1" id="aePrvClose">\u2715</div>';
-        html += '<img src="'+src+'" style="max-width:90%;max-height:88%;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.4)">';
-        if (total > 1) {
-          html += '<div style="position:fixed;top:50%;left:12px;transform:translateY(-50%);font-size:1.8rem;color:rgba(255,255,255,.4);cursor:pointer;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:50%;z-index:1" id="aePrvPrev">\u2039</div>';
-          html += '<div style="position:fixed;top:50%;right:12px;transform:translateY(-50%);font-size:1.8rem;color:rgba(255,255,255,.4);cursor:pointer;width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:50%;z-index:1" id="aePrvNext">\u203A</div>';
-          html += '<div style="position:fixed;bottom:28px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.45);font-size:.82rem;background:rgba(0,0,0,.4);padding:4px 14px;border-radius:12px">'+(idx+1)+' / '+total+'</div>';
-        }
-        ov.innerHTML = html;
-        ov.onclick = function(e) {
-          if (e.target === ov || e.target.id === 'aePrvClose') {
-            ov.parentNode.removeChild(ov);
-          } else if (e.target.id === 'aePrvPrev' && total > 1) {
-            _prvIdx = (_prvIdx - 1 + total) % total;
-            openPhotoPreview(_prvIdx, _prvList);
-          } else if (e.target.id === 'aePrvNext' && total > 1) {
-            _prvIdx = (_prvIdx + 1) % total;
-            openPhotoPreview(_prvIdx, _prvList);
-          }
-        };
-        document.body.appendChild(ov);
-      }
-
-      renderPhotos();
-
+      // ESC 关闭灯箱 + 退出多选
+      document.addEventListener('keydown', function(e){
+        if(e.key !== 'Escape') return;
+        if(aeGrid.style.display !== 'none'){ closeLightbox(); return; }
+        if(_selectMode || _selSet.size > 0){ _selSet.clear(); _selectMode = false; updateSelUI(); }
+      });
       // Upload - 用 anon key（RLS 已允许）
       $('#aeUpload').onchange=async (e)=>{
         const files=e.target.files;
