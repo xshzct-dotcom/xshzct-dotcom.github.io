@@ -46,6 +46,46 @@
   </div>
 </nav>
 
+<!-- PWD Gate -->
+<div id="pwdGate" style="position:fixed;inset:0;z-index:9999;background:var(--bg,#0E1116);display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center">
+  <style>
+    #pwdGate *{font-family:'Inter','Noto Serif SC',system-ui,sans-serif;box-sizing:border-box}
+    #pwdGate .fade-in{animation:fin .6s ease .3s both}
+    @keyframes fin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  </style>
+  <div class="fade-in" style="max-width:340px;padding:24px;width:100%">
+    <div style="font-size:1.6rem;margin-bottom:12px;font-family:var(--font-display,'Playfair Display',serif);font-style:italic;color:var(--accent,#7C9B7E)">✦</div>
+    <div style="font-size:.95rem;font-weight:500;color:var(--text,#E8E4DA);margin-bottom:4px">输入密码</div>
+    <div style="font-size:.78rem;color:var(--text-muted, rgba(232,228,218,.4));margin-bottom:20px">（提示：作者名字）</div>
+    <input id="pwdInput" type="password" style="width:100%;padding:12px 16px;background:rgba(232,228,218,.06);border:1px solid var(--border, rgba(232,228,218,.12));border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:center;margin-bottom:12px" placeholder="[已移除]" autocomplete="off">
+    <div id="pwdError" style="font-size:.78rem;color:#e74c3c;margin-bottom:10px;display:none">密码不对，再试试</div>
+    <button id="pwdSubmit" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent,#7C9B7E);color:#fff;font-size:.9rem;font-weight:500;cursor:pointer;transition:opacity .2s">进入</button>
+  </div>
+  <script>
+    (function(){
+      var gate = document.getElementById('pwdGate');
+      if(localStorage && localStorage.getItem('_v2pw') === '1'){
+        gate.style.display = 'none';
+        return;
+      }
+      var input = document.getElementById('pwdInput');
+      var err = document.getElementById('pwdError');
+      function check(){
+        if(input.value.trim() === '[已移除]'){
+          try{ localStorage.setItem('_v2pw','1'); }catch(e){}
+          gate.style.display = 'none';
+        } else {
+          err.style.display ='block';
+          input.focus();
+        }
+      }
+      document.getElementById('pwdSubmit').onclick = check;
+      input.onkeydown = function(e){ if(e.key==='Enter') check(); };
+      input.focus();
+    })();
+  </script>
+</div>
+
 <!-- Hero -->
 <section class="hero" id="hero">
   <div class="hero-bg" id="heroBg"></div>
