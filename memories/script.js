@@ -894,14 +894,10 @@ window.showPwdModal=showPwdModal;
 function closePwdModal(){ $('#pwdOverlay').classList.remove('active'); pwdCallback=null; }
 window.closePwdModal=closePwdModal;
 function checkPwd(){
-  var input = '';
-  var el = document.getElementById('pwdInput2');
-  if(el && el.value.trim()) input = '陈' + el.value.trim();
-  if(!input){
-    el = document.getElementById('pwdInput');
-    if(el && el.value.trim()) input = el.value.trim();
-  }
-  if(input === '陈科任'){
+  var overlay = $('#pwdOverlay');
+  var inp = overlay.classList.contains('active') ? document.getElementById('pwdInput2') : document.getElementById('pwdInput');
+  var input = inp ? inp.value.trim() : '';
+  if(input === '陈科任' || input === '科任'){
     try{localStorage.setItem('memories_oldworld','1')}catch(e){}
     closePwdModal();
     if(pwdCallback) pwdCallback();
@@ -914,6 +910,7 @@ window.checkPwd=checkPwd;
 $('#pwdInput').onkeydown=e=>{if(e.key==='Enter')checkPwd();};
 var _ovInp2 = document.getElementById('pwdInput2');
 if(_ovInp2) _ovInp2.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
+// toggleBtn 是那个齿轮灯箱的预览按钮
 
 function handleAlbumClick(albumId){
   const album = (albums||[]).find(a=>a.id===albumId);
