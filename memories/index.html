@@ -72,8 +72,11 @@
       }
 var input = document.getElementById('pwdInput');
   var err = document.getElementById('pwdError');
-  document.getElementById('pwdSubmit').onclick = checkPwd;
-  input.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
+  setTimeout(function(){
+    var btn = document.getElementById('pwdSubmit');
+    if(btn) btn.onclick = checkPwd;
+    input.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
+  }, 500);
   input.focus();
     })();
   </script>
