@@ -898,11 +898,15 @@ function checkPwd(){
   var inp = overlay.classList.contains('active') ? document.getElementById('pwdInput2') : document.getElementById('pwdInput');
   if(inp && inp.value === '科任'){
     try{localStorage.setItem('memories_oldworld','1')}catch(e){}
+    // 隐藏主页面密码门
+    var gate = document.getElementById('pwdGate');
+    if(gate) gate.style.display = 'none';
     closePwdModal();
     if(pwdCallback) pwdCallback();
     if(typeof window.openOldWorld==='function') window.openOldWorld();
   } else {
-    $('#pwdError').textContent='密码不对喔';
+    var err = overlay.classList.contains('active') ? overlay.querySelector('.pwd-error') : document.getElementById('pwdError');
+    if(err) err.textContent='密码不对喔';
   }
 }
 window.checkPwd=checkPwd;

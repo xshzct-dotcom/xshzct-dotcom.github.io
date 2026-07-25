@@ -53,7 +53,7 @@
     #pwdGate .fade-in{animation:fin .6s ease .3s both}
     @keyframes fin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   </style>
-  <div class="fade-in" style="max-width:340px;padding:24px;width:100%">
+  <div class="fade-in" id="pwdGate" style="max-width:340px;padding:24px;width:100%">
     <div style="font-size:1.6rem;margin-bottom:12px;font-family:var(--font-display,'Playfair Display',serif);font-style:italic;color:var(--accent,#7C9B7E)">✦</div>
     <div style="font-size:.95rem;font-weight:500;color:var(--text,#E8E4DA);margin-bottom:16px">输入密码</div>
     <div style="position:relative;width:100%;margin-bottom:12px">
@@ -72,18 +72,8 @@
       }
 var input = document.getElementById('pwdInput');
   var err = document.getElementById('pwdError');
-  function check(){
-    if(input.value === '科任'){
-      try{ localStorage.setItem('_v2pw2','1'); }catch(e){}
-      gate.style.display = 'none';
-    } else {
-      err.style.display ='block';
-      input.focus();
-    }
-  }
-  document.getElementById('pwdSubmit').onclick = check;
-  input.onkeydown = function(e){ if(e.key==='Enter') check(); };
-  input.onclick = function(){ input.focus(); };
+  document.getElementById('pwdSubmit').onclick = checkPwd;
+  input.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
   input.focus();
     })();
   </script>
