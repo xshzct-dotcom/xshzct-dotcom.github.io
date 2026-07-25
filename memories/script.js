@@ -1315,6 +1315,26 @@ async function loadFromSupabase(){
           allGalleryPhotos.push({path:p.path||p.src||'', src:p.src||p.path||'', _albumTitle:album.title, _albumId:album.id, _worldId:album.world||''});
         });
       });
+      // 找出哪些相册在 album_photos 表有记录 → 被编辑器管理过的相册，data.js 照片无效
+      const {data:apTitles} = await SB.from('album_photos')
+        .select('album_id');
+      var managedAlbumIds = {};
+      if(apTitles && apTitles.length > 0){
+        // 拿 album_id 对应的 title
+        apTitles.forEach(function(ap){ managedAlbumIds[ap.album_id] = true; });
+        // 查 Supabase albums 表拿到 title
+        var {data:allAlbums} = await SB.from('albums').select('id,title');
+        var managedTitles = {};
+        if(allAlbums) allAlbums.forEach(function(a){
+          if(managedAlbumIds[a.id]) managedTitles[a.title] = true;
+        });
+        // 从 allGalleryPhotos 里过滤掉这些相册的旧 data.js 照片
+        if(Object.keys(managedTitles).length > 0){
+          allGalleryPhotos = allGalleryPhotos.filter(function(p){
+            return !managedTitles[p._albumTitle];
+          });
+        }
+      }
       // 从 album_photos 表加载用户上传的照片补充到相册
       const {data:albumPhotos} = await SB.from('album_photos').select('*').order('sort_order', {ascending:true});
       if(albumPhotos && albumPhotos.length > 0){
