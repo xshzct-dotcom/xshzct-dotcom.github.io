@@ -887,23 +887,21 @@ let pwdCallback=null;
 function showPwdModal(cb){ 
   pwdCallback=cb; 
   $('#pwdOverlay').classList.add('active'); 
-  $('#pwdError').textContent=''; 
-  var inp = $('#pwdOverlay input');
-  if(inp) inp.value=''; 
-  setTimeout(function(){ if(inp) inp.focus(); }, 100); 
+  var inp2 = document.getElementById('pwdInput2');
+  if(inp2){ inp2.value=''; setTimeout(function(){ inp2.focus(); }, 100); }
 }
 window.showPwdModal=showPwdModal;
 function closePwdModal(){ $('#pwdOverlay').classList.remove('active'); pwdCallback=null; }
 window.closePwdModal=closePwdModal;
 function checkPwd(){
-  var overlay = $('#pwdOverlay');
-  var inp = overlay.classList.contains('active') ? overlay.querySelector('input') : document.getElementById('pwdInput');
-  var input = inp ? inp.value.trim() : '';
-  var target = '陈科任';
-  if(input) input = input.normalize ? input.normalize('NFKC') : input;
-  if(target) target = target.normalize ? target.normalize('NFKC') : target;
-  var pass = (input === target) || (input.length >= 2 && target.indexOf(input) >= 0);
-  if(pass){
+  var input = '';
+  var el = document.getElementById('pwdInput2');
+  if(el && el.value.trim()) input = '陈' + el.value.trim();
+  if(!input){
+    el = document.getElementById('pwdInput');
+    if(el && el.value.trim()) input = el.value.trim();
+  }
+  if(input === '陈科任'){
     try{localStorage.setItem('memories_oldworld','1')}catch(e){}
     closePwdModal();
     if(pwdCallback) pwdCallback();
@@ -914,9 +912,8 @@ function checkPwd(){
 }
 window.checkPwd=checkPwd;
 $('#pwdInput').onkeydown=e=>{if(e.key==='Enter')checkPwd();};
-// 弹窗里的输入框也要响应 Enter
-var _ovInp = $('#pwdOverlay input');
-if(_ovInp) _ovInp.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
+var _ovInp2 = document.getElementById('pwdInput2');
+if(_ovInp2) _ovInp2.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
 
 function handleAlbumClick(albumId){
   const album = (albums||[]).find(a=>a.id===albumId);
