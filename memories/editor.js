@@ -364,7 +364,7 @@ async function renderAlbumTab(){
   const body=$('#editorBody');
   const {data:albums}=await db().from('albums').select('*').order('sort_order',{ascending:true});
   const list=albums||[];
-
+  body.style.paddingTop = '';
   body.innerHTML=`
     <div style="margin-bottom:16px"><button class="editor-btn editor-btn-primary" id="aeNewBtn">+ 新建相册</button></div>
     <div id="aeList"></div>
@@ -422,6 +422,7 @@ async function renderAlbumTab(){
   function renderAlbumPhotos(album){
     db().from('album_photos').select('*').eq('album_id',album.id).order('sort_order',{ascending:true}).then(({data:photos})=>{
       const plist=photos||[];
+      body.style.paddingTop = '0';
       body.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5">
           <button class="editor-btn editor-btn-secondary" onclick="renderAlbumTab()">← 返回</button>
@@ -500,6 +501,7 @@ async function renderAlbumTab(){
           '<div id="aeLbZi" style="position:fixed;top:24px;left:24px;color:var(--text-dim);font-size:.85rem;z-index:99999;background:rgba(0,0,0,.4);padding:2px 8px;border-radius:8px;display:none">100%</div>'
         );
         aeGrid.style.display = 'flex';
+        aeGrid.onclick = function(e){ var t=e.target; if(t.classList.contains('aelb-prev')) openLightbox((_prvIdx-1+plist.length)%plist.length); else if(t.classList.contains('aelb-next')) openLightbox((_prvIdx+1)%plist.length); };
         aeBind();
       }
       function aeBind(){
