@@ -1,3 +1,5 @@
+// 旧世界密码（向天游的私人空间）
+const sitePassword = '陈科任';
 // ==================== CDN图片优化配置 ====================
 // 使用jsDelivr CDN加速GitHub内容，国内访问更快
 const CDN = {
