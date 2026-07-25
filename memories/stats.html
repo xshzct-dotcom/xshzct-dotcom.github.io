@@ -153,10 +153,32 @@ async function render(){
     // 详情
     html+='<div class="section"><h2>📋 当日访问明细</h2><div class="scroll"><table><thead><tr><th>时间</th><th>页面</th><th>停留</th><th>来源</th></tr></thead><tbody>';
     (visits||[]).forEach(function(d){
-      if(!d.visited_at) return;
-      var dt=new Date(d.visited_at);
-      var local=new Date(dt.getTime()-dt.getTimezoneOffset()*60000);
-      var time=local.toISOString().slice(11,19);
+      if(!d.visited_at && !d.visited_at_iso) return;
+      var dt;
+      // 优先用 ISO 字段（始终是 UTC 标准），避免被字符串里无 TZ 的中文格式误解析
+      if(d.visited_at_iso) {
+        dt = new Date(d.visited_at_iso);
+      } else {
+        // 旧记录只有 visited_at，可能是 "2026/7/25 11:21:36"（北京时间）或 "2026-07-25T11:21:36.000Z"（UTC）
+        var s = d.visited_at;
+        if(s.indexOf('Z')>=0 || /\+\d{2}:?\d{2}$/.test(s) || /-\d{2}:?\d{2}$/.test(s)){
+          dt = new Date(s);
+        } else {
+          // 没有 TZ 标记 → 视为北京时间（按 'YYYY/M/D HH:MM:SS' 解析）
+          var m = s.match(/(\d+)\D(\d+)\D(\d+)\D(\d+)\D(\d+)\D(\d+)/);
+          if(m){
+            // 用 Date(y, M-1, d, h, mi, s) 本地时区解析
+            dt = new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
+          } else {
+            dt = new Date(s);
+          }
+        }
+      }
+      // 显示为北京时间
+      var bjMs = dt.getTime() + (8*3600 - dt.getTimezoneOffset()*60)*1000;
+      var bj = new Date(bjMs);
+      var h = bj.getUTCHours(), mi = bj.getUTCMinutes(), s2 = bj.getUTCSeconds();
+      var time = (h<10?'0':'')+h+':'+(mi<10?'0':'')+mi+':'+(s2<10?'0':'')+s2;
       var dur=d.duration?fmt(d.duration):'--';
       html+='<tr><td style="color:rgba(232,228,218,.4);font-size:.75rem">'+time+'</td><td class="p">'+esc(d.path||'/')+'</td><td style="font-size:.78rem;color:'+(d.duration?'rgba(124,155,126,.7)':'rgba(232,228,218,.2)')+'">'+dur+'</td><td class="r">'+(d.ref?esc(d.ref):'--')+'</td></tr>';
     });
