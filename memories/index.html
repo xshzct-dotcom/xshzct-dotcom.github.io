@@ -273,7 +273,7 @@ var input = document.getElementById('pwdInput');
   fetch(base, {
     method: 'POST',
     headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=representation'},
-    body: JSON.stringify({path: location.pathname, ref: document.referrer || '', visited_at: new Date().toISOString()})
+    body: JSON.stringify({path: location.pathname, ref: document.referrer || '', visited_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}), visited_at_iso: new Date().toISOString()})
   }).then(function(r){ return r.json(); }).then(function(data){
     if(data && data[0] && data[0].id){
       var visitId = data[0].id;
@@ -285,7 +285,7 @@ var input = document.getElementById('pwdInput');
         fetch(base+'?id=eq.'+visitId, {
           method: 'PATCH',
           headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
-          body: JSON.stringify({left_at: new Date().toISOString(), duration: dur})
+          body: JSON.stringify({left_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}), duration: dur})
         }).catch(function(){});
       }
       window.addEventListener('beforeunload', send);
