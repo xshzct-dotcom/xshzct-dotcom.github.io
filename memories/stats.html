@@ -101,9 +101,10 @@ async function render(){
     // 当天数据计算
     var hourly=new Array(24).fill(0), pageMap={}, refMap={}, durSum=0, durN=0;
     (visits||[]).forEach(function(d){
+      // visited_at 来自 Supabase timestamp with time zone：ISO UTC 字符串（如 "2026-07-25T03:31:01.000Z"）
+      // 用户机器为北京时间（UTC+8），dt.getHours() 直接返回北京小时
       var dt=new Date(d.visited_at);
-      var local=new Date(dt.getTime()-dt.getTimezoneOffset()*60000);
-      var h=local.getUTCHours(); if(!isNaN(h)&&h>=0&&h<24) hourly[h]++;
+      var h=dt.getHours(); if(!isNaN(h)&&h>=0&&h<24) hourly[h]++;
       if(d.path) pageMap[d.path]=(pageMap[d.path]||0)+1;
       if(d.ref&&d.ref!='') refMap[d.ref]=(refMap[d.ref]||0)+1;
       if(d.duration){durSum+=d.duration; durN++;}
