@@ -890,8 +890,9 @@ function closePwdModal(){ $('#pwdOverlay').classList.remove('active'); pwdCallba
 window.closePwdModal=closePwdModal;
 function checkPwd(){
   const input=$('#pwdInput').value.trim();
-  const correct=(typeof sitePassword!=='undefined')?sitePassword:'郑天游';
-  if(input===correct){
+  const fullName=(typeof sitePassword!=='undefined')?sitePassword:'陈科任';
+  const shortName=fullName.length>2?fullName.slice(1):'';
+  if(input===fullName||(shortName&&input===shortName)){
     try{localStorage.setItem('memories_oldworld','1')}catch(e){}
     closePwdModal();
     if(pwdCallback) pwdCallback();
