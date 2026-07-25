@@ -153,32 +153,25 @@ async function render(){
     // 详情
     html+='<div class="section"><h2>📋 当日访问明细</h2><div class="scroll"><table><thead><tr><th>时间</th><th>页面</th><th>停留</th><th>来源</th></tr></thead><tbody>';
     (visits||[]).forEach(function(d){
-      if(!d.visited_at && !d.visited_at_iso) return;
-      var dt;
-      // 优先用 ISO 字段（始终是 UTC 标准），避免被字符串里无 TZ 的中文格式误解析
-      if(d.visited_at_iso) {
-        dt = new Date(d.visited_at_iso);
-      } else {
-        // 旧记录只有 visited_at，可能是 "2026/7/25 11:21:36"（北京时间）或 "2026-07-25T11:21:36.000Z"（UTC）
+      var time = '--';
+      // 优先用 ISO UTC 字段（始终 UTC 标准），转北京时间显示
+      if(d.visited_at_iso){
+        var dt = new Date(d.visited_at_iso);
+        // dt 是 UTC 时刻，要显示北京时间
+        time = dt.toLocaleString('zh-CN', {timeZone:'Asia/Shanghai', hour12:false}).slice(11, 19);
+      } else if(d.visited_at){
         var s = d.visited_at;
+        // 旧记录只有 visited_at：UTC ISO（带 Z 或 ±xx:xx）按 UTC 处理；其他按北京时间处理
+        var dt;
         if(s.indexOf('Z')>=0 || /\+\d{2}:?\d{2}$/.test(s) || /-\d{2}:?\d{2}$/.test(s)){
           dt = new Date(s);
+          time = dt.toLocaleString('zh-CN', {timeZone:'Asia/Shanghai', hour12:false}).slice(11, 19);
         } else {
-          // 没有 TZ 标记 → 视为北京时间（按 'YYYY/M/D HH:MM:SS' 解析）
-          var m = s.match(/(\d+)\D(\d+)\D(\d+)\D(\d+)\D(\d+)\D(\d+)/);
-          if(m){
-            // 用 Date(y, M-1, d, h, mi, s) 本地时区解析
-            dt = new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +m[6]);
-          } else {
-            dt = new Date(s);
-          }
+          // 中文格式 "YYYY/M/D HH:MM:SS" 已经是北京时间
+          var m = s.match(/(\d+):(\d+):(\d+)/);
+          if(m) time = m[1].padStart(2,'0')+':'+m[2].padStart(2,'0')+':'+m[3].padStart(2,'0');
         }
       }
-      // 显示为北京时间
-      var bjMs = dt.getTime() + (8*3600 - dt.getTimezoneOffset()*60)*1000;
-      var bj = new Date(bjMs);
-      var h = bj.getUTCHours(), mi = bj.getUTCMinutes(), s2 = bj.getUTCSeconds();
-      var time = (h<10?'0':'')+h+':'+(mi<10?'0':'')+mi+':'+(s2<10?'0':'')+s2;
       var dur=d.duration?fmt(d.duration):'--';
       html+='<tr><td style="color:rgba(232,228,218,.4);font-size:.75rem">'+time+'</td><td class="p">'+esc(d.path||'/')+'</td><td style="font-size:.78rem;color:'+(d.duration?'rgba(124,155,126,.7)':'rgba(232,228,218,.2)')+'">'+dur+'</td><td class="r">'+(d.ref?esc(d.ref):'--')+'</td></tr>';
     });
