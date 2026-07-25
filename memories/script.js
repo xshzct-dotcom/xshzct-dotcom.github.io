@@ -1342,6 +1342,12 @@ function init(){
   // 刷新即从头开始：禁用浏览器自动恢复滚动位置
   if('scrollRestoration' in history) history.scrollRestoration = 'manual';
   window.scrollTo(0, 0);
+  // ?pwd 参数：重置密码状态，重新弹出密码框
+  if(location.search.includes('pwd')){
+    try{localStorage.removeItem('memories_oldworld')}catch(e){}
+    history.replaceState(null, '', location.pathname);
+    setTimeout(function(){ showPwdModal(); }, 500);
+  }
   initHeroStars();
   initMusic();
   // 歌单同步在下面 init() 末尾统一处理（带 data.js 兜底）
