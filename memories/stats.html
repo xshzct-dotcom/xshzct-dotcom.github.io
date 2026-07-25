@@ -162,8 +162,8 @@ async function render(){
       // 所以读回来后不需要再加 8 小时，直接按字符串里的时间显示即可
       if(d.visited_at){
         var s = String(d.visited_at);
-        // 匹配 "YYYY-M-D HH:MM:SS[.fff][+ZZ]"
-        var m = s.match(/(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/);
+        // 兼容两种格式：'2026-07-25 11:31:01+00' (PostgREST) 或 ISO '2026-07-25T03:31:01+00:00'
+        var m = s.match(/(\d+)-(\d+)-(\d+)[T\s](\d+):(\d+):(\d+)/);
         if(m){
           var hh = String(m[4]).padStart(2,'0');
           var mi = String(m[5]).padStart(2,'0');
