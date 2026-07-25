@@ -267,6 +267,18 @@ var input = document.getElementById('pwdInput');
 <script>
 // 访客统计（Supabase，后台记录，不在页面上显示，不被 adblock 拦截）
 (function(){
+  // 防止短时间内重复 POST（页面快速刷新、Safari bfcache、Service Worker 重启 等都会触发多次）
+  // 用 sessionStorage 做 30 秒内去重
+  var _dedupKey = 'visit_posted_' + (location.pathname || '/');
+  try {
+    var last = parseInt(sessionStorage.getItem(_dedupKey) || '0');
+    if (Date.now() - last < 30000) {
+      // 30 秒内已 POST 过，跳过
+      return;
+    }
+    sessionStorage.setItem(_dedupKey, String(Date.now()));
+  } catch(e) { /* sessionStorage 不可用时忽略 */ }
+
   var key = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
   var base = 'https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1/visits';
   var _t0 = Date.now();
