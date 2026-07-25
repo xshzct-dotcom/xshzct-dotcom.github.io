@@ -63,23 +63,7 @@
     <div id="pwdError" style="font-size:.78rem;color:#e74c3c;margin-bottom:10px;display:none">密码不对，再试试</div>
     <button id="pwdSubmit" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent,#7C9B7E);color:#fff;font-size:.9rem;font-weight:500;cursor:pointer;transition:opacity .2s">进入</button>
   </div>
-  <script>
-    (function(){
-      var gate = document.getElementById('pwdGate');
-      if(localStorage && localStorage.getItem('_v2pw2') === '1'){
-        gate.style.display = 'none';
-        return;
-      }
-var input = document.getElementById('pwdInput');
-  var err = document.getElementById('pwdError');
-  setTimeout(function(){
-    var btn = document.getElementById('pwdSubmit');
-    if(btn) btn.onclick = checkPwd;
-    input.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
-  }, 500);
-  input.focus();
-    })();
-  </script>
+  
 </div>
 
 <!-- Hero -->

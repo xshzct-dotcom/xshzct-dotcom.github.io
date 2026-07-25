@@ -897,7 +897,7 @@ function checkPwd(){
   var overlay = $('#pwdOverlay');
   var inp = overlay.classList.contains('active') ? document.getElementById('pwdInput2') : document.getElementById('pwdInput');
   if(inp && inp.value === '科任'){
-    try{localStorage.setItem('memories_oldworld','1')}catch(e){}
+    try{localStorage.setItem('_v2pw2','1')}catch(e){}
     // 隐藏主页面密码门
     var gate = document.getElementById('pwdGate');
     if(gate) gate.style.display = 'none';
@@ -910,6 +910,26 @@ function checkPwd(){
   }
 }
 window.checkPwd=checkPwd;
+
+// 初始化密码：一次性绑定主页按钮、回车、检查 localStorage
+(function(){
+  var gate = document.getElementById('pwdGate');
+  if(gate){
+    // 已通过过密码
+    if(localStorage && localStorage.getItem('_v2pw2') === '1'){
+      gate.style.display = 'none';
+      return;
+    }
+    // 绑定按钮和回车
+    var btn = document.getElementById('pwdSubmit');
+    var inp = document.getElementById('pwdInput');
+    if(btn) btn.onclick = checkPwd;
+    if(inp){
+      inp.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
+      inp.focus();
+    }
+  }
+})();
 $('#pwdInput').onkeydown=e=>{if(e.key==='Enter')checkPwd();};
 var _ovInp2 = document.getElementById('pwdInput2');
 if(_ovInp2) _ovInp2.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
