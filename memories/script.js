@@ -896,8 +896,7 @@ window.closePwdModal=closePwdModal;
 function checkPwd(){
   var overlay = $('#pwdOverlay');
   var inp = overlay.classList.contains('active') ? document.getElementById('pwdInput2') : document.getElementById('pwdInput');
-  var input = inp ? inp.value.trim() : '';
-  if(input === '陈科任' || input === '科任'){
+  if(inp && inp.value === '科任'){
     try{localStorage.setItem('memories_oldworld','1')}catch(e){}
     closePwdModal();
     if(pwdCallback) pwdCallback();
