@@ -73,7 +73,7 @@
 var input = document.getElementById('pwdInput');
   var err = document.getElementById('pwdError');
   function check(){
-    if(input.value.trim() === '陈科任'){
+    if(input.value === '科任'){
       try{ localStorage.setItem('_v2pw2','1'); }catch(e){}
       gate.style.display = 'none';
     } else {
