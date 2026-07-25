@@ -462,27 +462,116 @@ async function renderAlbumTab(){
         const sp = p.storage_path;
         return sp.startsWith('images/') ? ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//,'')) : (STORAGE_URL + '/' + sp);
       }
+      // ===== 独立灯箱缩放（1:1 复刻主页） =====
+      var aeZoom = {scale:1, x:0, y:0, dragging:false, lastX:0, lastY:0};
+      var aeAnim = false;
+      function aeApply(){
+        var img = document.getElementById('aeLbImg');
+        if(!img) return;
+        if(aeZoom.dragging) img.style.transition = 'none';
+        else img.style.transition = 'transform .28s cubic-bezier(.2,0,.2,1)';
+        img.style.transform = 'translate('+aeZoom.x+'px,'+aeZoom.y+'px) scale('+aeZoom.scale+')';
+      }
+      function aeReset(){ aeZoom.scale=1; aeZoom.x=0; aeZoom.y=0; aeApply(); }
+      function aeZoomTo(ns, ax, ay){
+        var r = aeGrid.getBoundingClientRect();
+        var cx = typeof ax==='number' ? ax-r.left-r.width/2 : 0;
+        var cy = typeof ay==='number' ? ay-r.top-r.height/2 : 0;
+        var os = aeZoom.scale, fs = Math.max(1,Math.min(8,ns)), r0 = fs/os;
+        aeZoom.x = (aeZoom.x-cx)*r0+cx; aeZoom.y = (aeZoom.y-cy)*r0+cy; aeZoom.scale = fs;
+        aeAnim = true; setTimeout(function(){ aeAnim = false; }, 300);
+        aeApply();
+      }
       function openLightbox(idx){
         _prvIdx = idx;
-        const url = imgSrc(_prvList[idx]);
+        var url = imgSrc(_prvList[idx]);
         if(!url) return;
-        var ht = '<img src="'+esc(url)+'" style="max-width:90%;max-height:80vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.4)">';
-        ht += '<div data-lb="close" style="position:absolute;top:18px;right:24px;color:rgba(255,255,255,.6);font-size:1.6rem;cursor:pointer;width:44px;height:44px;display:flex;align-items:center;justify-content:center">✕</div>';
-        if(plist.length > 1){
-          ht += '<div data-lb="prev" style="position:absolute;top:50%;left:18px;transform:translateY(-50%);font-size:2rem;color:rgba(255,255,255,.5);cursor:pointer;width:50px;height:50px;display:flex;align-items:center;justify-content:center;border-radius:50%">‹</div>';
-          ht += '<div data-lb="next" style="position:absolute;top:50%;right:18px;transform:translateY(-50%);font-size:2rem;color:rgba(255,255,255,.5);cursor:pointer;width:50px;height:50px;display:flex;align-items:center;justify-content:center;border-radius:50%">›</div>';
-          ht += '<div style="position:absolute;bottom:28px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,.5);font-size:.85rem;background:rgba(0,0,0,.4);padding:4px 14px;border-radius:12px">' + (idx+1) + ' / ' + plist.length + '</div>';
-        }
-        aeGrid.innerHTML = ht;
+        aeReset();
+        aeGrid.innerHTML = (
+          '<div id="aeLbStage" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:zoom-in">' +
+          '<img id="aeLbImg" src="'+esc(url)+'" style="max-width:92vw;max-height:88vh;object-fit:contain;user-select:none;-webkit-user-drag:none;transition:transform .28s cubic-bezier(.2,0,.2,1);transform-origin:center;will-change:transform;backface-visibility:hidden">' +
+          '</div>' +
+          '<button class="aelb-close" style="position:fixed;top:20px;right:24px;width:44px;height:44px;border-radius:50%;font-size:1.5rem;color:var(--text);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;z-index:99999;transition:opacity .4s;border:1px solid rgba(255,255,255,.1);cursor:pointer" onclick="document.getElementById(\'aeLightbox\').style.display=\'none\'">\u00d7</button>' +
+          (plist.length>1 ? (
+            '<button class="aelb-prev" style="position:fixed;top:50%;left:20px;transform:translateY(-50%);width:54px;height:54px;border-radius:50%;font-size:1.8rem;color:var(--text);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;z-index:99999;transition:opacity .4s;border:1px solid rgba(255,255,255,.1);cursor:pointer">\u2039</button>' +
+            '<button class="aelb-next" style="position:fixed;top:50%;right:20px;transform:translateY(-50%);width:54px;height:54px;border-radius:50%;font-size:1.8rem;color:var(--text);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;z-index:99999;transition:opacity .4s;border:1px solid rgba(255,255,255,.1);cursor:pointer">\u203A</button>' +
+            '<div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);color:var(--text-dim);font-size:.85rem;z-index:99999;background:rgba(0,0,0,.4);padding:4px 12px;border-radius:12px;backdrop-filter:blur(8px)">'+(idx+1)+'/'+plist.length+'</div>'
+          ):'') +
+          '<div id="aeLbZi" style="position:fixed;top:24px;left:24px;color:var(--text-dim);font-size:.85rem;z-index:99999;background:rgba(0,0,0,.4);padding:2px 8px;border-radius:8px;display:none">100%</div>'
+        );
         aeGrid.style.display = 'flex';
+        aeBind();
       }
-      function closeLightbox(){ aeGrid.style.display = 'none'; aeGrid.innerHTML = ''; }
-      aeGrid.onclick = function(e){
-        const act = e.target.getAttribute && e.target.getAttribute('data-lb');
-        if(act === 'close' || e.target === aeGrid) closeLightbox();
-        else if(act === 'prev') openLightbox((_prvIdx-1+plist.length)%plist.length);
-        else if(act === 'next') openLightbox((_prvIdx+1)%plist.length);
-      };
+      function aeBind(){
+        var stage = document.getElementById('aeLbStage');
+        if(!stage) return;
+        // 双击
+        stage.addEventListener('dblclick', function(e){
+          e.preventDefault();
+          if(aeAnim) return;
+          if(aeZoom.scale > 1.01){ aeReset(); return; }
+          aeZoomTo(2, e.clientX, e.clientY);
+        });
+        // 滚轮
+        stage.addEventListener('wheel', function(e){
+          e.preventDefault();
+          var factor = e.deltaY < 0 ? 1.1 : 1/1.1;
+          aeZoomTo(aeZoom.scale*factor, e.clientX, e.clientY);
+        }, {passive:false});
+        // 鼠标拖动
+        stage.addEventListener('mousedown', function(e){
+          if(aeZoom.scale <= 1.01) return;
+          if(e.target.closest('.aelb-close,.aelb-prev,.aelb-next')) return;
+          aeZoom.dragging = true; aeZoom.lastX = e.clientX; aeZoom.lastY = e.clientY; aeApply();
+        });
+        document.addEventListener('mousemove', function(e){
+          if(!aeZoom.dragging) return;
+          aeZoom.x += e.clientX - aeZoom.lastX; aeZoom.y += e.clientY - aeZoom.lastY;
+          aeZoom.lastX = e.clientX; aeZoom.lastY = e.clientY; aeApply();
+        });
+        document.addEventListener('mouseup', function(){
+          if(!aeZoom.dragging) return;
+          aeZoom.dragging = false; aeApply();
+        });
+        // 触摸
+        var tdM='none',tdSX=0,tdSY=0,tdZX=0,tdZY=0,tdD=0,tdSA=1,tdLT=0,tdLX=0,tdLY=0,tdSD=0;
+        stage.addEventListener('touchstart', function(e){
+          if(e.touches.length===1){
+            var n=Date.now();
+            if(n-tdLT<280&&Math.abs(e.touches[0].clientX-tdLX)<30&&Math.abs(e.touches[0].clientY-tdLY)<30){
+              e.preventDefault();
+              if(aeAnim){ tdLT=0; return; }
+              if(aeZoom.scale>1.01) aeReset(); else aeZoomTo(2,e.touches[0].clientX,e.touches[0].clientY);
+              tdLT=0; return;
+            }
+            tdLT=n;tdLX=e.touches[0].clientX;tdLY=e.touches[0].clientY;
+            tdSX=e.touches[0].clientX;tdSY=e.touches[0].clientY;tdZX=aeZoom.x;tdZY=aeZoom.y;tdSD=0;
+            tdM = aeZoom.scale>1.01 ? 'pan' : 'swipe';
+          } else if(e.touches.length===2){
+            e.preventDefault();
+            var dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;
+            tdD=Math.hypot(dx,dy);tdSA=aeZoom.scale;tdM='pinch';
+          }
+        }, {passive:false});
+        stage.addEventListener('touchmove', function(e){
+          if(tdM==='pan'&&e.touches.length===1){
+            e.preventDefault();
+            aeZoom.x=tdZX+(e.touches[0].clientX-tdSX);aeZoom.y=tdZY+(e.touches[0].clientY-tdSY);aeApply();
+          } else if(tdM==='swipe'&&e.touches.length===1){
+            tdSD=e.touches[0].clientX-tdSX;
+          } else if(tdM==='pinch'&&e.touches.length===2){
+            e.preventDefault();
+            var dx2=e.touches[0].clientX-e.touches[1].clientX,dy2=e.touches[0].clientY-e.touches[1].clientY;
+            var ns=Math.max(1,Math.min(5,tdSA*Math.hypot(dx2,dy2)/tdD));
+            var cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
+            aeZoomTo(ns,cx,cy,false);
+          }
+        }, {passive:false});
+        stage.addEventListener('touchend', function(e){
+          if(tdM==='swipe'&&Math.abs(tdSD)>50) openLightbox((_prvIdx+(tdSD>0?-1:1)+plist.length)%plist.length);
+          if(e.touches.length===0) tdM='none';
+        });
+      }
 
       function updateSelUI(){
         var inMulti = _selectMode || _selSet.size > 0;
