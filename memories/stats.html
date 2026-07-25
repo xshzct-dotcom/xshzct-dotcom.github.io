@@ -154,22 +154,20 @@ async function render(){
     html+='<div class="section"><h2>📋 当日访问明细</h2><div class="scroll"><table><thead><tr><th>时间</th><th>页面</th><th>停留</th><th>来源</th></tr></thead><tbody>';
     (visits||[]).forEach(function(d){
       var time = '--';
-      // 优先用 ISO UTC 字段（始终 UTC 标准），转北京时间显示
-      if(d.visited_at_iso){
-        var dt = new Date(d.visited_at_iso);
-        // dt 是 UTC 时刻，要显示北京时间
-        time = dt.toLocaleString('zh-CN', {timeZone:'Asia/Shanghai', hour12:false}).slice(11, 19);
-      } else if(d.visited_at){
-        var s = d.visited_at;
-        // 旧记录只有 visited_at：UTC ISO（带 Z 或 ±xx:xx）按 UTC 处理；其他按北京时间处理
-        var dt;
-        if(s.indexOf('Z')>=0 || /\+\d{2}:?\d{2}$/.test(s) || /-\d{2}:?\d{2}$/.test(s)){
-          dt = new Date(s);
-          time = dt.toLocaleString('zh-CN', {timeZone:'Asia/Shanghai', hour12:false}).slice(11, 19);
-        } else {
-          // 中文格式 "YYYY/M/D HH:MM:SS" 已经是北京时间
-          var m = s.match(/(\d+):(\d+):(\d+)/);
-          if(m) time = m[1].padStart(2,'0')+':'+m[2].padStart(2,'0')+':'+m[3].padStart(2,'0');
+      // 数据库存的 visited_at 实际上是带 +00 的 UTC 字符串
+      // 例如 "2026-07-25 11:21:36+00" 表示 UTC 11:21:36，
+      // 但用户期望看到的是浏览器输入的北京时间（原本就是 11:21:36）
+      // 由于发送时格式 "2026/7/25 11:21:36" 没有 TZ 标记被 supabase 当 UTC 存了，
+      // 所以读回来后不需要再加 8 小时，直接按字符串里的时间显示即可
+      if(d.visited_at){
+        var s = String(d.visited_at);
+        // 匹配 "YYYY-M-D HH:MM:SS[.fff][+ZZ]"
+        var m = s.match(/(\d+)-(\d+)-(\d+)\s+(\d+):(\d+):(\d+)/);
+        if(m){
+          var hh = String(m[4]).padStart(2,'0');
+          var mi = String(m[5]).padStart(2,'0');
+          var ss = String(m[6]).padStart(2,'0');
+          time = hh+':'+mi+':'+ss;
         }
       }
       var dur=d.duration?fmt(d.duration):'--';
