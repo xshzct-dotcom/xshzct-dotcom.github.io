@@ -267,47 +267,77 @@ var input = document.getElementById('pwdInput');
 <script>
 // 访客统计（Supabase，后台记录，不在页面上显示，不被 adblock 拦截）
 (function(){
-  // 防止短时间内重复 POST（页面快速刷新、Safari bfcache、Service Worker 重启 等都会触发多次）
-  // 用 sessionStorage 做 30 秒内去重
-  var _dedupKey = 'visit_posted_' + (location.pathname || '/');
+  // 服务端去重：每个 tab/浏览器生成一个 client_id（用 localStorage 跨标签共享）
+  var clientId;
+  try {
+    clientId = localStorage.getItem('visit_client_id');
+    if(!clientId){
+      clientId = 'c-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem('visit_client_id', clientId);
+    }
+  } catch(e) {
+    clientId = 'c-tmp-' + Date.now();  // localStorage 不可用
+  }
+
+  // 30 秒内同 clientId + path 视为同一访问，跳过重复 POST
+  var _dedupKey = 'visit_posted_' + clientId + '_' + (location.pathname || '/');
   try {
     var last = parseInt(sessionStorage.getItem(_dedupKey) || '0');
     if (Date.now() - last < 30000) {
-      // 30 秒内已 POST 过，跳过
       return;
     }
     sessionStorage.setItem(_dedupKey, String(Date.now()));
-  } catch(e) { /* sessionStorage 不可用时忽略 */ }
+  } catch(e) {}
 
   var key = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
   var base = 'https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1/visits';
   var _t0 = Date.now();
   var _acc = 0;
-  fetch(base, {
-    method: 'POST',
-    headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=representation'},
-    body: JSON.stringify({path: location.pathname, ref: document.referrer || '', visited_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'})})
-  }).then(function(r){ return r.json(); }).then(function(data){
-    if(data && data[0] && data[0].id){
-      var visitId = data[0].id;
-      function patch(done){
-        var now = Date.now();
-        var seg = Math.round((now - _t0) / 1000);
-        if(seg < 0) seg = 0;
-        if(!done) seg = Math.max(seg, 1);
-        var dur = _acc + seg;
-        if(done) _acc = dur; else _acc += Math.floor((now - _t0) / 1000);
-        if(!done && !document.hidden) _t0 = now;
-        fetch(base+'?id=eq.'+visitId, {
-          method: 'PATCH',
-          headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
-          body: JSON.stringify({left_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}), duration: dur})
-        }).catch(function(){});
-      }
-      window.addEventListener('beforeunload', function(){ patch(true); });
-      document.addEventListener('visibilitychange', function(){ patch(document.hidden); });
-      setInterval(function(){ if(!document.hidden) patch(false); }, 10000);
+
+  // 先查最近 30 秒内是否已有这个 client_id+path 的访问记录，如果有就 PATCH 而不是 POST
+  var since = new Date(Date.now() - 30000).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
+  fetch(base + '?select=id,visited_at&session_id=eq.' + clientId + '&path=eq.' + encodeURIComponent(location.pathname || '/') + '&visited_at=gte.' + encodeURIComponent(since) + '&order=visited_at.desc&limit=1', {
+    headers: {'apikey':key,'Authorization':'Bearer '+key}
+  }).then(function(r){ return r.json(); }).then(function(rows){
+    if(rows && rows.length > 0){
+      // 已有最近访问，更新时间戳和 left_at
+      return fetch(base + '?id=eq.' + rows[0].id, {
+        method: 'PATCH',
+        headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+        body: JSON.stringify({visited_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}), left_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}), duration: 0})
+      }).then(function(){ rows[0].id; });
     }
+    // 没有就 POST 新记录
+    return fetch(base, {
+      method: 'POST',
+      headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=representation'},
+      body: JSON.stringify({
+        path: location.pathname,
+        ref: document.referrer || '',
+        visited_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}),
+        session_id: clientId
+      })
+    }).then(function(r){ return r.json(); });
+  }).then(function(data){
+    var visitId = data && data[0] && data[0].id;
+    if(!visitId) return;
+    function patch(done){
+      var now = Date.now();
+      var seg = Math.round((now - _t0) / 1000);
+      if(seg < 0) seg = 0;
+      if(!done) seg = Math.max(seg, 1);
+      var dur = _acc + seg;
+      if(done) _acc = dur; else _acc += Math.floor((now - _t0) / 1000);
+      if(!done && !document.hidden) _t0 = now;
+      fetch(base+'?id=eq.'+visitId, {
+        method: 'PATCH',
+        headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+        body: JSON.stringify({left_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}), duration: dur})
+      }).catch(function(){});
+    }
+    window.addEventListener('beforeunload', function(){ patch(true); });
+    document.addEventListener('visibilitychange', function(){ patch(document.hidden); });
+    setInterval(function(){ if(!document.hidden) patch(false); }, 10000);
   }).catch(function(){});
 })();
 </script>
