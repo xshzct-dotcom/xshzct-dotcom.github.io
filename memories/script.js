@@ -884,17 +884,24 @@ document.addEventListener('keydown', e => {
 
 // ===== 旧世界密码 =====
 let pwdCallback=null;
-function showPwdModal(cb){ pwdCallback=cb; $('#pwdOverlay').classList.add('active'); $('#pwdError').textContent=''; $('#pwdInput').value=''; setTimeout(()=>$('#pwdInput').focus(),100); }
+function showPwdModal(cb){ 
+  pwdCallback=cb; 
+  $('#pwdOverlay').classList.add('active'); 
+  $('#pwdError').textContent=''; 
+  var inp = $('#pwdOverlay input');
+  if(inp) inp.value=''; 
+  setTimeout(function(){ if(inp) inp.focus(); }, 100); 
+}
 window.showPwdModal=showPwdModal;
 function closePwdModal(){ $('#pwdOverlay').classList.remove('active'); pwdCallback=null; }
 window.closePwdModal=closePwdModal;
 function checkPwd(){
-  var input = $('#pwdInput').value.trim();
+  var overlay = $('#pwdOverlay');
+  var inp = overlay.classList.contains('active') ? overlay.querySelector('input') : document.getElementById('pwdInput');
+  var input = inp ? inp.value.trim() : '';
   var target = '陈科任';
-  // 统一规范化（IME 可能打出不同编码但看起来一样的字）
   if(input) input = input.normalize ? input.normalize('NFKC') : input;
   if(target) target = target.normalize ? target.normalize('NFKC') : target;
-  // 支持：全名 或 后两个字
   var pass = (input === target) || (input.length >= 2 && target.indexOf(input) >= 0);
   if(pass){
     try{localStorage.setItem('memories_oldworld','1')}catch(e){}
@@ -907,6 +914,9 @@ function checkPwd(){
 }
 window.checkPwd=checkPwd;
 $('#pwdInput').onkeydown=e=>{if(e.key==='Enter')checkPwd();};
+// 弹窗里的输入框也要响应 Enter
+var _ovInp = $('#pwdOverlay input');
+if(_ovInp) _ovInp.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
 
 function handleAlbumClick(albumId){
   const album = (albums||[]).find(a=>a.id===albumId);
