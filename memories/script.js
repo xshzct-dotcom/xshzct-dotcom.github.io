@@ -613,7 +613,7 @@ function zoomTo(newScale, anchorX, anchorY, withAnim){
   // 防止双击动画中又触发
   if(withAnim !== false){
     lbAnimating = true;
-    setTimeout(function(){ lbAnimating = false; }, 300);
+    setTimeout(function(){ lbAnimating = false; }, 150);
   }
   applyTransform();
 }
@@ -813,7 +813,6 @@ function bindLightboxInteractions(){
       // 双击检测
       if(now - tdLastTap < 280 && Math.abs(e.touches[0].clientX - tdLastX) < 30 && Math.abs(e.touches[0].clientY - tdLastY) < 30){
         e.preventDefault();
-        if(lbAnimating){ tdLastTap = 0; return; }
         if(lbZoom.scale > 1.01){
           resetZoom();
           applyTransform();
