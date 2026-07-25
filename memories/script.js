@@ -889,8 +889,14 @@ window.showPwdModal=showPwdModal;
 function closePwdModal(){ $('#pwdOverlay').classList.remove('active'); pwdCallback=null; }
 window.closePwdModal=closePwdModal;
 function checkPwd(){
-  const input=$('#pwdInput').value.trim();
-  if(input==='陈科任'||input==='科任'){
+  var input = $('#pwdInput').value.trim();
+  var target = '陈科任';
+  // 统一规范化（IME 可能打出不同编码但看起来一样的字）
+  if(input) input = input.normalize ? input.normalize('NFKC') : input;
+  if(target) target = target.normalize ? target.normalize('NFKC') : target;
+  // 支持：全名 或 后两个字
+  var pass = (input === target) || (input.length >= 2 && target.indexOf(input) >= 0);
+  if(pass){
     try{localStorage.setItem('memories_oldworld','1')}catch(e){}
     closePwdModal();
     if(pwdCallback) pwdCallback();
