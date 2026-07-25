@@ -46,7 +46,7 @@
 /* --- Reset --- */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
-body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden;-webkit-font-smoothing:antialiased;font-size:16px}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden;overscroll-behavior-x:none;-webkit-font-smoothing:antialiased;font-size:16px;touch-action:pan-y pinch-zoom}
 a{color:var(--accent);text-decoration:none;transition:color .25s}
 a:hover{color:var(--accent-2)}
 img{display:block;max-width:100%}

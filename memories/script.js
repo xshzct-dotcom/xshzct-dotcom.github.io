@@ -495,26 +495,6 @@ function renderRiver(){
   }
 
   stream.scrollLeft = 0;
-  // 滑动到末尾时自动加载下一批
-  if(!stream._aeBound){
-    stream._aeBound = true;
-    var _aeTrigger = function(){
-      if(stream.scrollLeft + stream.clientWidth >= stream.scrollWidth - 50){
-        ensureRiverQueue(allGalleryPhotos);
-        var _iv = setInterval(function(){
-          // 检查 scrollWidth 是否增加了
-          var ns = stream.scrollWidth;
-          if(ns > _lastW || stream.scrollLeft + stream.clientWidth < stream.scrollWidth - 50){
-            _lastW = ns;
-            renderRiver();
-            clearInterval(_iv);
-          }
-        }, 100);
-      }
-    };
-    var _lastW = stream.scrollWidth;
-    stream.addEventListener('scroll', _aeTrigger, {passive:true});
-  }
 }
 
 function riverScroll(dir){
@@ -524,7 +504,6 @@ function riverScroll(dir){
   if(window.SFX) window.SFX.flip();
 }
 
-window._galleryFilterChanged = function(){ renderRiver(); };
 function riverShuffle(){
   renderRiver();
   if(window.SFX) window.SFX.shutter();
@@ -634,7 +613,7 @@ function zoomTo(newScale, anchorX, anchorY, withAnim){
   // 防止双击动画中又触发
   if(withAnim !== false){
     lbAnimating = true;
-    setTimeout(function(){ lbAnimating = false; }, 150);
+    setTimeout(function(){ lbAnimating = false; }, 300);
   }
   applyTransform();
 }
@@ -834,6 +813,7 @@ function bindLightboxInteractions(){
       // 双击检测
       if(now - tdLastTap < 280 && Math.abs(e.touches[0].clientX - tdLastX) < 30 && Math.abs(e.touches[0].clientY - tdLastY) < 30){
         e.preventDefault();
+        if(lbAnimating){ tdLastTap = 0; return; }
         if(lbZoom.scale > 1.01){
           resetZoom();
           applyTransform();
@@ -1382,8 +1362,6 @@ async function loadFromSupabase(){
     // 重新渲染相册 chips 和极地（DB sort_order 已同步）
     if(typeof buildRiverFilters === 'function') buildRiverFilters();
     if(typeof renderRiver === 'function') renderRiver();
-    // 重新触发当前视图刷新
-    if(window._galleryFilterChanged) window._galleryFilterChanged();
     window._testReady = true;
   } catch(e){
     console.warn('[memories] loadFromSupabase failed:', e);
