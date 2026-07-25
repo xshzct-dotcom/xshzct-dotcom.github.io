@@ -56,7 +56,10 @@
   <div class="fade-in" style="max-width:340px;padding:24px;width:100%">
     <div style="font-size:1.6rem;margin-bottom:12px;font-family:var(--font-display,'Playfair Display',serif);font-style:italic;color:var(--accent,#7C9B7E)">✦</div>
     <div style="font-size:.95rem;font-weight:500;color:var(--text,#E8E4DA);margin-bottom:16px">输入密码</div>
-    <input id="pwdInput" type="password" placeholder="●●●●" style="width:100%;padding:12px 16px;background:rgba(232,228,218,.06);border:1px solid var(--border, rgba(232,228,218,.12));border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left;margin-bottom:12px;letter-spacing:8px" autocomplete="off">
+    <div style="position:relative;width:100%;margin-bottom:12px">
+      <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:rgba(232,228,218,.4);font-size:.95rem;pointer-events:none;z-index:1;user-select:none">陈</span>
+      <input id="pwdInput" type="text" inputmode="text" lang="zh-CN" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%;padding:12px 16px 12px 40px;background:rgba(232,228,218,.06);border:1px solid var(--border, rgba(232,228,218,.12));border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left;ime-mode:active;-webkit-text-security:disc;text-security:disc" placeholder="●●" autocomplete="off">
+    </div>
     <div id="pwdError" style="font-size:.78rem;color:#e74c3c;margin-bottom:10px;display:none">密码不对，再试试</div>
     <button id="pwdSubmit" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent,#7C9B7E);color:#fff;font-size:.9rem;font-weight:500;cursor:pointer;transition:opacity .2s">进入</button>
   </div>
@@ -176,7 +179,10 @@ var input = document.getElementById('pwdInput');
   <div class="pwd-box">
     <h3>旧世界</h3>
     <p style="margin-top:8px">作者真实姓名</p>
-    <input type="password" id="pwdInput2" placeholder="●●●●" style="width:100%;padding:10px 12px;background:rgba(232,228,218,.04);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);text-align:center;font-size:1rem;outline:none;letter-spacing:8px" autocomplete="off">
+    <div style="position:relative;max-width:300px;margin:0 auto 12px">
+      <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:rgba(232,228,218,.4);font-size:.95rem;pointer-events:none;z-index:1;user-select:none">陈</span>
+      <input type="text" id="pwdInput2" placeholder="●●" style="width:100%;padding:10px 12px 10px 36px;background:rgba(232,228,218,.04);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);text-align:left;font-size:1rem;outline:none;-webkit-text-security:disc;text-security:disc" autocomplete="off">
+    </div>
     <p class="pwd-error" id="pwdError"></p>
     <button class="pwd-btn-ok" onclick="checkPwd()">确定</button>
     <button class="pwd-btn-cancel" onclick="closePwdModal()">取消</button>
