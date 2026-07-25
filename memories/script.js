@@ -504,6 +504,7 @@ function riverScroll(dir){
   if(window.SFX) window.SFX.flip();
 }
 
+window._galleryFilterChanged = function(){ renderRiver(); };
 function riverShuffle(){
   renderRiver();
   if(window.SFX) window.SFX.shutter();
@@ -1361,6 +1362,8 @@ async function loadFromSupabase(){
     // 重新渲染相册 chips 和极地（DB sort_order 已同步）
     if(typeof buildRiverFilters === 'function') buildRiverFilters();
     if(typeof renderRiver === 'function') renderRiver();
+    // 重新触发当前视图刷新
+    if(window._galleryFilterChanged) window._galleryFilterChanged();
     window._testReady = true;
   } catch(e){
     console.warn('[memories] loadFromSupabase failed:', e);
