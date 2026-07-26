@@ -1296,7 +1296,7 @@ async function loadFromSupabase(){
   if(!SB) return;
   try {
     // 1. 文章 — 从 essays 表加载
-    const {data:essays} = await SB.from('essays').select('*').order('sort_order', {ascending:true});
+    const {data:essays} = await SB.from('essays').select('*');
     if(essays && essays.length > 0){
       // 按 category 分组，重建 essayCategories 结构
       const groups = {};
@@ -1304,6 +1304,16 @@ async function loadFromSupabase(){
         const cid = e.category || 'thoughts';
         if(!groups[cid]) groups[cid] = {id: cid, title: e.category_title||cid, articles:[]};
         groups[cid].articles.push({title:e.title, date:e.date, body:e.body, sort_order:e.sort_order});
+      });
+      // 每个分类内按日期降序（最新在前），无日期文章按sort_order排在最后
+      Object.values(groups).forEach(function(g){
+        g.articles.sort(function(a,b){
+          var ad=a.date, bd=b.date;
+          if(ad && bd) return ad>bd?-1:ad<bd?1:0;
+          if(ad) return -1;
+          if(bd) return 1;
+          return (a.sort_order||0)-(b.sort_order||0);
+        });
       });
       const cats = Object.values(groups);
       // 覆盖全局变量（用 splice 原地替换，因为 data.js 声明是 const）
