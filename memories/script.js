@@ -495,6 +495,25 @@ function renderRiver(){
   }
 
   stream.scrollLeft = 0;
+  // 滑动到末尾时自动加载下一批
+  if(!stream._aeBound){
+    stream._aeBound = true;
+    var _aeTrigger = function(){
+      if(stream.scrollLeft + stream.clientWidth >= stream.scrollWidth - 50){
+        ensureRiverQueue(allGalleryPhotos);
+        var _iv = setInterval(function(){
+          var ns = stream.scrollWidth;
+          if(ns > _lastW || stream.scrollLeft + stream.clientWidth < stream.scrollWidth - 50){
+            _lastW = ns;
+            renderRiver();
+            clearInterval(_iv);
+          }
+        }, 100);
+      }
+    };
+    var _lastW = stream.scrollWidth;
+    stream.addEventListener('scroll', _aeTrigger, {passive:true});
+  }
 }
 
 function riverScroll(dir){
@@ -508,6 +527,7 @@ function riverShuffle(){
   renderRiver();
   if(window.SFX) window.SFX.shutter();
 }
+window._galleryFilterChanged = function(){ renderRiver(); };
 
 function buildRiverFilters(){
   var container = document.getElementById('viewerFilters');
@@ -613,7 +633,7 @@ function zoomTo(newScale, anchorX, anchorY, withAnim){
   // 防止双击动画中又触发
   if(withAnim !== false){
     lbAnimating = true;
-    setTimeout(function(){ lbAnimating = false; }, 300);
+    setTimeout(function(){ lbAnimating = false; }, 100);
   }
   applyTransform();
 }
@@ -757,7 +777,6 @@ function bindLightboxInteractions(){
   lb.addEventListener('dblclick', e => {
     e.preventDefault();
     e.stopPropagation();
-    if(lbAnimating) return;
     if(lbZoom.scale > 1.01){
       resetZoom();
       applyTransform();
@@ -813,7 +832,6 @@ function bindLightboxInteractions(){
       // 双击检测
       if(now - tdLastTap < 280 && Math.abs(e.touches[0].clientX - tdLastX) < 30 && Math.abs(e.touches[0].clientY - tdLastY) < 30){
         e.preventDefault();
-        if(lbAnimating){ tdLastTap = 0; return; }
         if(lbZoom.scale > 1.01){
           resetZoom();
           applyTransform();
@@ -1290,77 +1308,81 @@ async function loadFromSupabase(){
 
     // 2. 相册 — 从 albums 表加载
     const {data:sbAlbums} = await SB.from('albums').select('*').order('sort_order', {ascending:true});
+    
+    // 以 data.js 的 albums 为基准
+    const albumMap = {};
+    if(typeof albums !== 'undefined'){
+      albums.forEach(function(a){ albumMap[a.title] = JSON.parse(JSON.stringify(a)); });
+    }
+    // 用 Supabase albums 覆盖（保留 photos 字段，记录 _dbId 用于 album_photos 匹配）
     if(sbAlbums && sbAlbums.length > 0){
-      // 覆盖全局 albums（保留 photos 从 data.js）
-      const oldMap = {};
-      if(typeof albums !== 'undefined') albums.forEach(a => { oldMap[a.title] = a; });
-      const merged = sbAlbums.map(sa => ({
-        ...(oldMap[sa.title]||{}),
-        id: sa.title === (oldMap[sa.title]||{}).title ? oldMap[sa.title].id : sa.title,
-        title: sa.title,
-        cover: sa.cover||'',
-        sort_order: sa.sort_order,
-      }));
-      // 按 sort_order 重新排序
-      merged.sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
-      if(typeof albums !== 'undefined'){
-        const mergedLen = albums.length;
-        albums.splice(0, mergedLen, ...merged);
-      }
-      // 重建 allGalleryPhotos
-      allGalleryPhotos = [];
-      merged.forEach(album => {
-        (album.photos||[]).forEach(photo => {
-          const p = typeof photo === 'string' ? {path:photo, src:photo} : photo;
-          allGalleryPhotos.push({path:p.path||p.src||'', src:p.src||p.path||'', _albumTitle:album.title, _albumId:album.id, _worldId:album.world||''});
-        });
+      sbAlbums.forEach(function(sa){
+        var existing = albumMap[sa.title];
+        if(existing){
+          existing.title = sa.title;
+          existing.cover = sa.cover || existing.cover;
+          existing.sort_order = sa.sort_order;
+          existing._dbId = sa.id;
+        } else {
+          albumMap[sa.title] = {title:sa.title, cover:sa.cover||'', sort_order:sa.sort_order, photos:[], _dbId:sa.id};
+        }
       });
-      // 找出哪些相册在 album_photos 表有记录 → 被编辑器管理过的相册，data.js 照片无效
-      const {data:apTitles} = await SB.from('album_photos')
-        .select('album_id');
-      var managedAlbumIds = {};
-      if(apTitles && apTitles.length > 0){
-        // 拿 album_id 对应的 title
-        apTitles.forEach(function(ap){ managedAlbumIds[ap.album_id] = true; });
-        // 查 Supabase albums 表拿到 title
-        var {data:allAlbums} = await SB.from('albums').select('id,title');
-        var managedTitles = {};
-        if(allAlbums) allAlbums.forEach(function(a){
-          if(managedAlbumIds[a.id]) managedTitles[a.title] = true;
+    }
+    // 转回数组按 sort_order 排序
+    var merged = Object.values(albumMap).sort(function(a,b){ return (a.sort_order||0) - (b.sort_order||0); });
+    // 替换全局 albums 数组（保留 data.js-only 相册）
+    if(typeof albums !== 'undefined'){
+      albums.splice(0, albums.length, ...merged);
+    }
+    // 重建 allGalleryPhotos
+    allGalleryPhotos = [];
+    merged.forEach(function(album){
+      (album.photos||[]).forEach(function(photo){
+        var p = typeof photo === 'string' ? {path:photo, src:photo} : photo;
+        allGalleryPhotos.push({path:p.path||p.src||'', src:p.src||p.path||'', _albumTitle:album.title, _albumId:album._dbId||album.title, _worldId:album.world||''});
+      });
+    });
+    // 找出哪些相册在 album_photos 表有记录 → 被编辑器管理过的相册，data.js 照片无效
+    const {data:apTitles} = await SB.from('album_photos').select('album_id');
+    var managedAlbumIds = {};
+    if(apTitles && apTitles.length > 0){
+      apTitles.forEach(function(ap){ managedAlbumIds[ap.album_id] = true; });
+      var {data:allAlbums} = await SB.from('albums').select('id,title');
+      var managedTitles = {};
+      if(allAlbums) allAlbums.forEach(function(a){
+        if(managedAlbumIds[a.id]) managedTitles[a.title] = true;
+      });
+      // 从 allGalleryPhotos 移除被管理相册的旧 data.js 照片
+      if(Object.keys(managedTitles).length > 0){
+        allGalleryPhotos = allGalleryPhotos.filter(function(p){
+          return !managedTitles[p._albumTitle];
         });
-        // 从 allGalleryPhotos 里过滤掉这些相册的旧 data.js 照片
-        if(Object.keys(managedTitles).length > 0){
-          allGalleryPhotos = allGalleryPhotos.filter(function(p){
-            return !managedTitles[p._albumTitle];
+      }
+    }
+    // 从 album_photos 表加载用户上传的照片补充到相册
+    const {data:albumPhotos} = await SB.from('album_photos').select('*').order('sort_order', {ascending:true});
+    if(albumPhotos && albumPhotos.length > 0){
+      var photoMap = {};
+      albumPhotos.forEach(function(ap){
+        if(!photoMap[ap.album_id]) photoMap[ap.album_id] = [];
+        photoMap[ap.album_id].push(ap);
+      });
+      // 按 _dbId 分配照片到对应相册（_dbId 是 Supabase albums.id）
+      merged.forEach(function(album){
+        var aid = album._dbId;
+        if(aid && photoMap[aid]){
+          photoMap[aid].forEach(function(ap){
+            var sp = ap.storage_path || ap.filename || '';
+            var imgUrl = sp.startsWith('images/') ? ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//,''))
+              : ('https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/' + sp);
+            if(!album.photos) album.photos = [];
+            if(!album.photos.includes(imgUrl) && !album.photos.includes(sp)){
+              album.photos.push(imgUrl || sp);
+              allGalleryPhotos.push({path:imgUrl||sp, src:imgUrl||sp, _albumTitle:album.title, _albumId:album._dbId||album.title});
+            }
           });
         }
-      }
-      // 从 album_photos 表加载用户上传的照片补充到相册
-      const {data:albumPhotos} = await SB.from('album_photos').select('*').order('sort_order', {ascending:true});
-      if(albumPhotos && albumPhotos.length > 0){
-        const photoMap = {};
-        albumPhotos.forEach(ap => {
-          if(!photoMap[ap.album_id]) photoMap[ap.album_id] = [];
-          photoMap[ap.album_id].push(ap);
-        });
-        // 按 album.id 分配照片到对应相册
-        merged.forEach(album => {
-          const aid = album.id;
-          if(aid && photoMap[aid]){
-            photoMap[aid].forEach(ap => {
-              const sp = ap.storage_path || ap.filename || '';
-              // 照片可能是在 Supabase Storage 或 images/
-              const imgUrl = sp.startsWith('images/') ? ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//,''))
-                : ('https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/' + sp);
-              if(!album.photos) album.photos = [];
-              if(!album.photos.includes(imgUrl) && !album.photos.includes(sp)){
-                album.photos.push(imgUrl || sp);
-                allGalleryPhotos.push({path:imgUrl||sp, src:imgUrl||sp, _albumTitle:album.title, _albumId:album.id});
-              }
-            });
-          }
-        });
-      }
+      });
     }
 
     // 3. 音乐 — 从 music 表加载排序（只取主页音乐，排除相册专属）
@@ -1382,6 +1404,8 @@ async function loadFromSupabase(){
     // 重新渲染相册 chips 和极地（DB sort_order 已同步）
     if(typeof buildRiverFilters === 'function') buildRiverFilters();
     if(typeof renderRiver === 'function') renderRiver();
+    // 重新触发当前视图刷新
+    if(window._galleryFilterChanged) window._galleryFilterChanged();
     window._testReady = true;
   } catch(e){
     console.warn('[memories] loadFromSupabase failed:', e);
