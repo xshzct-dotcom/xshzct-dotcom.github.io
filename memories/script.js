@@ -633,7 +633,7 @@ function zoomTo(newScale, anchorX, anchorY, withAnim){
   // 防止双击动画中又触发
   if(withAnim !== false){
     lbAnimating = true;
-    setTimeout(function(){ lbAnimating = false; }, 100);
+    setTimeout(function(){ lbAnimating = false; }, 280);
   }
   applyTransform();
 }
@@ -783,6 +783,7 @@ function bindLightboxInteractions(){
     e.stopPropagation();
     // 如果触摸触发了双击缩放，不再重复触发（手机双击会同时触 touchstart + dblclick）
     if(window._touchZoomTime && Date.now() - window._touchZoomTime < 500) return;
+    if(lbAnimating) return;
     if(lbZoom.scale > 1.01){
       resetZoom();
       applyTransform();
@@ -838,6 +839,7 @@ function bindLightboxInteractions(){
       // 双击检测
       if(now - tdLastTap < 280 && Math.abs(e.touches[0].clientX - tdLastX) < 30 && Math.abs(e.touches[0].clientY - tdLastY) < 30){
         e.preventDefault();
+        if(lbAnimating){ tdLastTap = 0; return; }
         window._touchZoomTime = Date.now();
         if(lbZoom.scale > 1.01){
           resetZoom();
