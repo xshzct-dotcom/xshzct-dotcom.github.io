@@ -810,8 +810,13 @@ async function renderAlbumTab(){
               fail++; console.warn('[upload] upload error:', result&&result.error);
               continue;
             }
-            console.log('[upload] insert album_photos', {album_id:album.id,storage_path:fname});
-            await db().from('album_photos').insert({album_id:album.id,storage_path:fname,sort_order:Date.now()});
+            console.log('[upload] insert album_photos', {album_id:album.id,filename:f.name,storage_path:fname});
+            var insResp = await db().from('album_photos').insert({album_id:album.id, filename:f.name, storage_path:fname, file_size:f.size, sort_order:Date.now()}).select();
+            console.log('[upload] insert result:', JSON.stringify(insResp));
+            if(!insResp || insResp.error || (insResp.data && insResp.data.length===0)){
+              fail++; console.warn('[upload] insert failed:', insResp&&insResp.error);
+              continue;
+            }
             ok++; console.log('[upload] done');
           } catch(err){ fail++; console.warn('[upload] error:', err.message||err); }
         }
