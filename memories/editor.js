@@ -354,11 +354,25 @@ async function renderEssayTab(){
     // 日期选择器逻辑
     // 日期快捷按钮
     var dateEl=$('#eeDate');
+    var titleEl=$('#eeTitle');
+    function syncDateToTitle(){
+      if(!dateEl.value) return;
+      var m=dateEl.value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if(!m) return;
+      var fmt=m[1]+'.'+parseInt(m[2])+'.'+parseInt(m[3]);
+      // 标题为空或本身就是日期 → 自动同步
+      var cur=titleEl.value.trim();
+      if(!cur || cur.match(/^\d+\.\d+\.\d+$/)){
+        titleEl.value=fmt;
+      }
+    }
     if($('#eeDateToday')) $('#eeDateToday').onclick=function(){
       var n=new Date();
       dateEl.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+      syncDateToTitle();
     };
     if($('#eeDateClear')) $('#eeDateClear').onclick=function(){ dateEl.value=''; };
+    dateEl.onchange=syncDateToTitle;
 
     $('#eeSaveBtn').onclick=async()=>{
       var dateVal=$('#eeDate').value.trim();
