@@ -774,6 +774,7 @@ window.closeLightbox = closeLightbox;
 // 灯箱交互
 function bindLightboxInteractions(){
   const lb = $('#lightbox');
+  const stage = $('#lightboxStage');
   if(!lb) return;
 
   // 双击：缩放到 1.8x（更温和）+ 以点击位置为中心
@@ -829,7 +830,7 @@ function bindLightboxInteractions(){
   var tdDist = 0, tdScaleAtStart = 1, tdLastTap = 0, tdLastX = 0, tdLastY = 0;
   var tdSwipeDist = 0;
 
-  lb.addEventListener('touchstart', function(e){
+  stage.addEventListener('touchstart', function(e){
     if(e.touches.length === 1){
       var now = Date.now();
       // 双击检测
@@ -864,7 +865,7 @@ function bindLightboxInteractions(){
     lbAutoHideControls();
   }, {passive:false});
 
-  lb.addEventListener('touchmove', function(e){
+  stage.addEventListener('touchmove', function(e){
     if(tdMode === 'pan' && e.touches.length === 1){
       e.preventDefault();
       lbZoom.x = tdStartZoomX + (e.touches[0].clientX - tdStartX);
@@ -885,7 +886,7 @@ function bindLightboxInteractions(){
     }
   }, {passive:false});
 
-  lb.addEventListener('touchend', function(e){
+  stage.addEventListener('touchend', function(e){
     if(tdMode === 'swipe' && Math.abs(tdSwipeDist) > 50){
       navLightbox(tdSwipeDist > 0 ? -1 : 1);
     }
