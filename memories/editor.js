@@ -364,6 +364,7 @@ async function renderAlbumTab(){
   const body=$('#editorBody');
   const {data:albums}=await db().from('albums').select('*').order('sort_order',{ascending:true});
   const list=albums||[];
+  body.style.paddingTop = '';
 
   body.innerHTML=`
     <div style="margin-bottom:16px"><button class="editor-btn editor-btn-primary" id="aeNewBtn">+ 新建相册</button></div>
@@ -422,6 +423,7 @@ async function renderAlbumTab(){
   function renderAlbumPhotos(album){
     db().from('album_photos').select('*').eq('album_id',album.id).order('sort_order',{ascending:true}).then(({data:photos})=>{
       const plist=photos||[];
+      body.style.paddingTop = '0';
       body.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5">
           <button class="editor-btn editor-btn-secondary" onclick="renderAlbumTab()">← 返回</button>
