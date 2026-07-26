@@ -336,9 +336,9 @@ function openEssayModal(essay, catOnly=true){
     <div class="modal-essay-date">${essay.date||''} · <span style="color:var(--cat-${essay.catId})">● ${esc(essay.cat||'')}</span></div>
     <div class="modal-essay-body">${fmtBody(essay.body)}</div>
     <div class="modal-nav">
-      <button class="editor-btn editor-btn-secondary essay-prev" ${hasPrev?'':'disabled'}>← 上一篇</button>
+      <button class="editor-btn editor-btn-secondary essay-prev" ${hasPrev?'':'disabled'}>↑ 上一篇</button>
       <span style="color:var(--text-muted);font-size:.85rem">${curIdx+1}/${pool.length}</span>
-      <button class="editor-btn editor-btn-secondary essay-next" ${hasNext?'':'disabled'}>下一篇 →</button>
+      <button class="editor-btn editor-btn-secondary essay-next" ${hasNext?'':'disabled'}>下一篇 ↓</button>
     </div>
   `;
   // 用 dom 监听代替 onclick
