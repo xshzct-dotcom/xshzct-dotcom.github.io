@@ -260,7 +260,14 @@ async function renderEssayTab(){
     const g = groups[catId];
     if(!g) return;
     // 按 sort_order 排序（用户拖拽/箭头调整的顺序），同 sort_order 再按日期
-    const items = [...g.items].sort((a,b) => (a.sort_order||0) - (b.sort_order||0) || (b.date||'').localeCompare(a.date||''));
+    // 按日期降序（最新在前），无日期排在最后（按 sort_order）
+    const items = [...g.items].sort(function(a,b){
+      var ad=a.date, bd=b.date;
+      if(ad && bd) return ad>bd?-1:ad<bd?1:0;
+      if(ad) return -1;
+      if(bd) return 1;
+      return (a.sort_order||0)-(b.sort_order||0);
+    });
     const list=$('#eeList');
     const col = `var(--cat-${catId}, var(--cat-default))`;
     list.innerHTML = `
