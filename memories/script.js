@@ -1312,7 +1312,7 @@ async function loadFromSupabase(){
           if(ad && bd) return ad>bd?-1:ad<bd?1:0;
           if(ad) return -1;
           if(bd) return 1;
-          return (a.sort_order||0)-(b.sort_order||0);
+          return 0;
         });
       });
       const cats = Object.values(groups);
