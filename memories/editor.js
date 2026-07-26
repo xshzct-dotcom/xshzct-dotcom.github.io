@@ -272,7 +272,7 @@ async function renderEssayTab(){
       <div id="eeArticles"></div>
     `;
     document.getElementById('eeBack').onclick = () => renderList();
-    document.querySelector('[data-ee-new]').onclick = () => editEssay(null, catId);
+    document.querySelector('[data-ee-new]').onclick = () => { window._essayReturnTo = () => renderArticlesInCat(catId); editEssay(null, catId); };
     const articlesEl = document.getElementById('eeArticles');
     articlesEl.innerHTML = items.map((a,i) => `
       <div class="ee-list-item" data-idx="${i}" data-sid="${a.id}">
@@ -288,7 +288,7 @@ async function renderEssayTab(){
       </div>
     `).join('');
     const itemList = items;
-    articlesEl.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => editEssay(itemList[parseInt(b.dataset.edit)]));
+    articlesEl.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { window._essayReturnTo = () => renderArticlesInCat(catId); editEssay(itemList[parseInt(b.dataset.edit)]); });
     articlesEl.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delEssay(itemList[parseInt(b.dataset.del)]));
     // 上下移动
     articlesEl.querySelectorAll('[data-move]').forEach(b => {
@@ -345,11 +345,17 @@ async function renderEssayTab(){
       </div>
       <div class="editor-form-group"><label>正文</label><textarea id="eeBody" placeholder="写点什么...">${esc(articleBody)}</textarea></div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="editor-btn editor-btn-secondary" onclick="renderEssayTab()">取消</button>
+        <button class="editor-btn editor-btn-secondary" id="eeCancelBtn">取消</button>
         ${!isNew?`<button class="editor-btn editor-btn-danger" id="eeDelBtn">删除</button>`:''}
         <button class="editor-btn editor-btn-primary" id="eeSaveBtn">${isNew?'发布':'保存'}</button>
       </div>
     `;
+
+    // 取消按钮：返回到上一级（如果在分类视图里编辑，就返回分类视图）
+    $('#eeCancelBtn').onclick=function(){
+      if(window._essayReturnTo) window._essayReturnTo();
+      else renderEssayTab();
+    };
 
     // 日期选择器逻辑
     // 日期快捷按钮
@@ -394,14 +400,17 @@ async function renderEssayTab(){
         if(exist&&exist.length) await db().from('essays').update(data).eq('id',exist[0].id);
         else{data.sort_order=0;await db().from('essays').insert(data);}
       }
-      renderEssayTab();
+      // 保存后返回上一级
+      if(window._essayReturnTo) window._essayReturnTo();
+      else renderEssayTab();
       if(window.reloadFromSupabase) setTimeout(window.reloadFromSupabase, 2000);
     };
 
     if(!isNew) $('#eeDelBtn').onclick=async()=>{
       if(!confirm('确定删除「'+title+'」？'))return;
       await db().from('essays').delete().eq('id',a.id);
-      renderEssayTab();
+      if(window._essayReturnTo) window._essayReturnTo();
+      else renderEssayTab();
       if(window.reloadFromSupabase) setTimeout(window.reloadFromSupabase, 2000);
     };
   }
