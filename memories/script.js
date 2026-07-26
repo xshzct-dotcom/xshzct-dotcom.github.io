@@ -925,6 +925,7 @@ function checkPwd(){
   var inp = overlay.classList.contains('active') ? document.getElementById('pwdInput2') : document.getElementById('pwdInput');
   if(inp && inp.value === '科任'){
     try{localStorage.setItem('_v2pw2','1')}catch(e){}
+    document.body.classList.add('pwd-authed');
     // 隐藏主页面密码门
     var gate = document.getElementById('pwdGate');
     if(gate) gate.style.display = 'none';
