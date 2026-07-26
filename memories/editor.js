@@ -322,20 +322,19 @@ async function renderEssayTab(){
       <div class="editor-form-group"><label>分类</label><select id="eeCat">${catIds.map((c,i)=>`<option value="${c}" ${c===category?'selected':''}>${cats[i]}</option>`).join('')}</select></div>
       <div class="editor-form-group"><label>标题</label><input id="eeTitle" value="${esc(articleTitle)}" placeholder="文章标题"></div>
       <div class="editor-form-group"><label>日期</label>
-        <div style="display:flex;gap:8px;align-items:center;position:relative">
+        <div style="display:flex;gap:8px;align-items:center">
           <input id="eeDate" value="${esc(date)}" placeholder="无日期" readonly style="flex:1;cursor:pointer;padding:12px 16px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left">
           <button id="eeDateToday" type="button" class="editor-btn editor-btn-secondary" style="font-size:.8rem">今天</button>
           <button id="eeDateClear" type="button" class="editor-btn editor-btn-secondary" style="font-size:.8rem">无</button>
         </div>
-        <div id="eeDatePicker" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:rgba(20,25,35,.97);backdrop-filter:blur(10px);border:1px solid rgba(232,228,218,.18);border-radius:10px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:100;width:280px">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+        <div id="eeDatePicker" style="margin-top:8px;background:rgba(232,228,218,.04);border:1px solid rgba(232,228,218,.12);border-radius:10px;padding:12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
             <select id="eeYear" style="padding:8px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:6px;color:var(--text);font-size:.9rem"></select>
             <select id="eeMonth" style="padding:8px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:6px;color:var(--text);font-size:.9rem"></select>
             <select id="eeDay" style="padding:8px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:6px;color:var(--text);font-size:.9rem"></select>
           </div>
-          <div style="display:flex;gap:8px;justify-content:flex-end">
-            <button id="eeDateCancel" type="button" class="editor-btn editor-btn-secondary" style="font-size:.82rem">取消</button>
-            <button id="eeDateOk" type="button" class="editor-btn editor-btn-primary" style="font-size:.82rem">确定</button>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+            <button id="eeDateOk" type="button" class="editor-btn editor-btn-primary" style="font-size:.82rem">填入选中日期</button>
           </div>
         </div>
       </div>
@@ -432,29 +431,28 @@ function initDatePicker(initial){
   function updateDate(v){
     var input=$('#eeDate'); if(input) input.value=v;
   }
-  var dateInput=$('#eeDate');
+  // 默认展开 picker
   var picker=$('#eeDatePicker');
-  dateInput.onclick=function(e){ picker.style.display='block'; e.stopPropagation(); };
-  document.addEventListener('click', function(e){
-    if(picker.style.display==='none') return;
-    if(e.target===dateInput || (picker && picker.contains(e.target))) return;
-    picker.style.display='none';
-  });
+  if(picker) picker.style.display='block';
   var todayBtn=$('#eeDateToday');
   if(todayBtn) todayBtn.onclick=function(){
     var n=new Date();
     updateDate(fmt(n.getFullYear(), n.getMonth()+1, n.getDate()));
-    picker.style.display='none';
   };
   var clearBtn=$('#eeDateClear');
   if(clearBtn) clearBtn.onclick=function(){ updateDate(''); };
-  var cancelBtn=$('#eeDateCancel');
-  if(cancelBtn) cancelBtn.onclick=function(){ picker.style.display='none'; };
-  var okBtn=$('#eeDateOk');
-  if(okBtn) okBtn.onclick=function(){
+  // 年/月/日任一变动 → 实时同步到输入框
+  function syncDate(){
     updateDate(fmt(parseInt(yearSel.value), parseInt(monthSel.value), parseInt(daySel.value)));
-    picker.style.display='none';
-  };
+  }
+  if(yearSel) yearSel.onchange=syncDate;
+  if(monthSel){
+    var orig=monthSel.onchange;
+    monthSel.onchange=function(){ if(orig) orig(); syncDate(); };
+  }
+  if(daySel) daySel.onchange=syncDate;
+  var okBtn=$('#eeDateOk');
+  if(okBtn) okBtn.onclick=syncDate;
 }
 
 function renderList(){
