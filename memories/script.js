@@ -654,6 +654,9 @@ function openLightbox(idx, kenBurns){
   lb.classList.add('active');
   lb.style.opacity = '1';
   lb.style.pointerEvents = 'auto';
+  lb.style.touchAction = 'manipulation';
+  // 禁止 body 滚动，避免手机浏览器拦截触摸事件
+  document.body.style.overflow = 'hidden';
 
   // 显示加载状态
   showLbLoader(true, 0, '加载中…');
