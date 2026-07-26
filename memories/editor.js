@@ -195,8 +195,15 @@ async function renderEssayTab(){
   const body=$('#editorBody');
   const cats=['童年篇','初恋篇','日记','旅行见闻'];
   const catIds=['childhood','firstlove','thoughts','travel'];
-  const {data:essays}=await db().from('essays').select('*').order('sort_order',{ascending:true});
-  const all=essays||[];
+  const {data:essays}=await db().from('essays').select('*');
+  // 文章按日期降序（最新在前），无日期文章按sort_order排在最后
+  const all=(essays||[]).slice().sort(function(a,b){
+    var ad=a.date, bd=b.date;
+    if(ad && bd) return ad>bd?-1:ad<bd?1:0;
+    if(ad) return -1;
+    if(bd) return 1;
+    return (a.sort_order||0)-(b.sort_order||0);
+  });
 
   body.innerHTML=`
     <style>
@@ -308,13 +315,30 @@ async function renderEssayTab(){
     const isNew=!a;
     const category=a?a.category:(defaultCat||'thoughts');
     const articleTitle=a?a.title:'';
-    const date=a?a.date||'':new Date().toLocaleDateString('zh-CN').replace(/\//g,'.');
+    const date=a?(a.date||''):new Date().toLocaleDateString('zh-CN').replace(/\//g,'.');
     const articleBody=a?a.body:'';
 
     body.innerHTML=`
       <div class="editor-form-group"><label>分类</label><select id="eeCat">${catIds.map((c,i)=>`<option value="${c}" ${c===category?'selected':''}>${cats[i]}</option>`).join('')}</select></div>
       <div class="editor-form-group"><label>标题</label><input id="eeTitle" value="${esc(articleTitle)}" placeholder="文章标题"></div>
-      <div class="editor-form-group"><label>日期</label><input id="eeDate" value="${date}" placeholder="2026.7.21"></div>
+      <div class="editor-form-group"><label>日期</label>
+        <div style="display:flex;gap:8px;align-items:center;position:relative">
+          <input id="eeDate" value="${esc(date)}" placeholder="无日期" readonly style="flex:1;cursor:pointer;padding:12px 16px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left">
+          <button id="eeDateToday" type="button" class="editor-btn editor-btn-secondary" style="font-size:.8rem">今天</button>
+          <button id="eeDateClear" type="button" class="editor-btn editor-btn-secondary" style="font-size:.8rem">无</button>
+        </div>
+        <div id="eeDatePicker" style="display:none;position:absolute;top:100%;left:0;margin-top:4px;background:rgba(20,25,35,.97);backdrop-filter:blur(10px);border:1px solid rgba(232,228,218,.18);border-radius:10px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:100;width:280px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+            <select id="eeYear" style="padding:8px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:6px;color:var(--text);font-size:.9rem"></select>
+            <select id="eeMonth" style="padding:8px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:6px;color:var(--text);font-size:.9rem"></select>
+            <select id="eeDay" style="padding:8px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:6px;color:var(--text);font-size:.9rem"></select>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button id="eeDateCancel" type="button" class="editor-btn editor-btn-secondary" style="font-size:.82rem">取消</button>
+            <button id="eeDateOk" type="button" class="editor-btn editor-btn-primary" style="font-size:.82rem">确定</button>
+          </div>
+        </div>
+      </div>
       <div class="editor-form-group"><label>正文</label><textarea id="eeBody" placeholder="写点什么...">${esc(articleBody)}</textarea></div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button class="editor-btn editor-btn-secondary" onclick="renderEssayTab()">取消</button>
@@ -322,6 +346,9 @@ async function renderEssayTab(){
         <button class="editor-btn editor-btn-primary" id="eeSaveBtn">${isNew?'发布':'保存'}</button>
       </div>
     `;
+
+    // 日期选择器逻辑
+    initDatePicker(date);
 
     $('#eeSaveBtn').onclick=async()=>{
       const data={
@@ -370,7 +397,67 @@ async function renderAlbumTab(){
     <div id="aeList"></div>
   `;
 
-  function renderList(){
+  // ===== 文章日期选择器（弹出式日历） =====
+function initDatePicker(initial){
+  var yearSel=$('#eeYear'), monthSel=$('#eeMonth'), daySel=$('#eeDay');
+  for(var y=2000;y<=2050;y++){
+    var o=document.createElement('option');o.value=y;o.textContent=y;
+    yearSel.appendChild(o);
+  }
+  for(var m=1;m<=12;m++){
+    var o=document.createElement('option');o.value=m;o.textContent=m+'月';
+    monthSel.appendChild(o);
+  }
+  function fillDays(year, month){
+    var last=new Date(year, month, 0).getDate();
+    daySel.innerHTML='';
+    for(var d=1;d<=last;d++){
+      var o=document.createElement('option');o.value=d;o.textContent=d+'日';
+      daySel.appendChild(o);
+    }
+  }
+  var initY, initM, initD;
+  if(initial){
+    var m1=initial.match(/^(\d{2,4})[.\-/年](\d{1,2})[.\-/月](\d{1,2})/);
+    if(m1){ initY=parseInt(m1[1]); initM=parseInt(m1[2]); initD=parseInt(m1[3]); }
+  }
+  if(!initY){
+    var n=new Date();
+    initY=n.getFullYear(); initM=n.getMonth()+1; initD=n.getDate();
+  }
+  yearSel.value=initY; monthSel.value=initM; fillDays(initY, initM); daySel.value=initD;
+  monthSel.onchange=function(){ fillDays(parseInt(yearSel.value), parseInt(monthSel.value)); };
+  yearSel.onchange=function(){ fillDays(parseInt(yearSel.value), parseInt(monthSel.value)); };
+  function fmt(y,m,d){ return y+'.'+m+'.'+d; }
+  function updateDate(v){
+    var input=$('#eeDate'); if(input) input.value=v;
+  }
+  var dateInput=$('#eeDate');
+  var picker=$('#eeDatePicker');
+  dateInput.onclick=function(e){ picker.style.display='block'; e.stopPropagation(); };
+  document.addEventListener('click', function(e){
+    if(picker.style.display==='none') return;
+    if(e.target===dateInput || (picker && picker.contains(e.target))) return;
+    picker.style.display='none';
+  });
+  var todayBtn=$('#eeDateToday');
+  if(todayBtn) todayBtn.onclick=function(){
+    var n=new Date();
+    updateDate(fmt(n.getFullYear(), n.getMonth()+1, n.getDate()));
+    picker.style.display='none';
+  };
+  var clearBtn=$('#eeDateClear');
+  if(clearBtn) clearBtn.onclick=function(){ updateDate(''); };
+  var cancelBtn=$('#eeDateCancel');
+  if(cancelBtn) cancelBtn.onclick=function(){ picker.style.display='none'; };
+  var okBtn=$('#eeDateOk');
+  if(okBtn) okBtn.onclick=function(){
+    updateDate(fmt(parseInt(yearSel.value), parseInt(monthSel.value), parseInt(daySel.value)));
+    picker.style.display='none';
+  };
+}
+
+function renderList(){
     const el=$('#aeList');
     el.innerHTML=list.map((a,i)=>`
       <div class="editor-list-item" data-idx="${i}" data-id="${a.id}">
