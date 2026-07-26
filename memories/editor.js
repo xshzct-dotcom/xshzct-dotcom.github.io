@@ -1027,16 +1027,32 @@ async function renderMusicTab(){
     if(uploadEl) uploadEl.onchange = async (e)=>{
       const files = e.target.files;
       const total = files.length;
+      if(!files || files.length===0) return;
+      console.log('[music] uploading', total, 'files');
+      // 连通性检查
+      if(!sb){ alert('⚠️ 无法连接 Supabase 存储，上传失败'); return; }
+      try{
+        var testResp=await fetch(SB_URL+'/rest/v1/',{method:'HEAD',headers:{apikey:SB_KEY}});
+        console.log('[music] Supabase reachable:', testResp.ok);
+      }catch(testErr){
+        console.warn('[music] Supabase unreachable:', testErr);
+        alert('❌ 无法连接到 Supabase 服务器，请检查网络');
+        return;
+      }
       let okCount = 0, failCount = 0;
       const errors = [];
       for(const f of files){
         const fname = 'music_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+        console.log('[music] uploading', fname, 'size:', f.size);
         try{
-          const {error:upErr, data:upData} = await sb.storage.from('photos').upload(fname, f, {
+          // 15秒超时
+          const upPromise = sb.storage.from('photos').upload(fname, f, {
             upsert: true,
             contentType: f.type || 'audio/mpeg',
             cacheControl: '3600'
           });
+          const timeoutPromise = new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('上传超时')); }, 15000); });
+          const {error:upErr} = await Promise.race([upPromise, timeoutPromise]);
           if(!upErr){
             // 新音乐放到最前面：全部已有 sort_order +1，新歌 = 0
             try{
