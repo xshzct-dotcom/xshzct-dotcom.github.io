@@ -780,7 +780,10 @@ async function renderAlbumTab(){
         for(const f of files){
           try{
             const fname=Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-            const {error:upErr}=await sb.storage.from('photos').upload(fname, f, {upsert:true});
+            // 10秒超时，避免卡死
+            const uploadPromise = sb.storage.from('photos').upload(fname, f, {upsert:true});
+            const timeoutPromise = new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('上传超时')); }, 12000); });
+            const {error:upErr}=await Promise.race([uploadPromise, timeoutPromise]);
             if(upErr){ fail++; console.warn('[upload]', upErr); continue; }
             await db().from('album_photos').insert({album_id:album.id,storage_path:fname,sort_order:Date.now()});
             ok++;
@@ -789,7 +792,8 @@ async function renderAlbumTab(){
         if(lbl) lbl.textContent='上传照片';
         e.target.value='';
         renderAlbumPhotos(album);
-        if(fail>0) alert('上传完成：'+ok+'张成功，'+fail+'张失败（详见控制台）');
+        if(ok>0 && fail===0) alert('✅ '+ok+'张照片上传成功！');
+        else if(fail>0) alert('上传完成：'+ok+'张成功，'+fail+'张失败（详见控制台 F12）');
       };
     });
   }
