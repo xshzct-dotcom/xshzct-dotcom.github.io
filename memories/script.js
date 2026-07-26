@@ -622,7 +622,7 @@ function zoomTo(newScale, anchorX, anchorY, withAnim){
   const cx = (typeof anchorX === 'number') ? anchorX - r.left - r.width/2 : 0;
   const cy = (typeof anchorY === 'number') ? anchorY - r.top - r.height/2 : 0;
   const oldScale = lbZoom.scale;
-  const finalScale = Math.max(1, Math.min(5, newScale));
+  const finalScale = Math.max(1, Math.min(8, newScale));
   // 缩放后保持光标位置不变
   // 公式：x_new = cx - cx * (scale_new/scale_old) + x_old * (scale_new/scale_old)
   // 简化：x_new = (x_old - cx) * (finalScale/oldScale) + cx
@@ -633,7 +633,7 @@ function zoomTo(newScale, anchorX, anchorY, withAnim){
   // 防止双击动画中又触发
   if(withAnim !== false){
     lbAnimating = true;
-    setTimeout(function(){ lbAnimating = false; }, 280);
+    setTimeout(function(){ lbAnimating = false; }, 300);
   }
   applyTransform();
 }
@@ -788,7 +788,7 @@ function bindLightboxInteractions(){
       resetZoom();
       applyTransform();
     } else {
-      zoomTo(1.8, e.clientX, e.clientY);
+      zoomTo(2, e.clientX, e.clientY);
     }
     lbAutoHideControls();
   });
@@ -845,7 +845,7 @@ function bindLightboxInteractions(){
           resetZoom();
           applyTransform();
         } else {
-          zoomTo(1.8, e.touches[0].clientX, e.touches[0].clientY);
+          zoomTo(2, e.touches[0].clientX, e.touches[0].clientY);
         }
         tdLastTap = 0;
         return;
