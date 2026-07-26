@@ -212,9 +212,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .player-toggle{position:absolute;top:-20px;right:16px;font-size:.7rem;width:28px;height:20px;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glass-border);border-bottom:none;border-radius:8px 8px 0 0;color:var(--text-dim);cursor:pointer}
 
 /* --- Lightbox (全屏 + 缩放/平移) --- */
-.lightbox{position:fixed;inset:0;z-index:200;background:#000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;overflow:hidden}
+.lightbox{position:fixed;inset:0;z-index:200;background:#000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;overflow:hidden;touch-action:manipulation}
 .lightbox.active{opacity:1;pointer-events:auto}
-.lightbox-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:zoom-in}
+.lightbox-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:zoom-in;touch-action:manipulation}
 .lightbox-stage.zoomed{cursor:grab}
 .lightbox-stage.zoomed:active{cursor:grabbing}
 .lightbox-stage.is-zoomed{cursor:grab}
