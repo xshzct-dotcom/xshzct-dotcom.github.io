@@ -46,6 +46,12 @@
   </div>
 </nav>
 
+<script>
+(function(){
+  try{ if(self.localStorage && self.localStorage.getItem('_v2pw2')==='1') document.body.classList.add('pwd-authed'); }catch(e){}
+})();
+</script>
+
 <!-- PWD Gate -->
 <div id="pwdGate" style="position:fixed;inset:0;z-index:9999;background:var(--bg,#0E1116);display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center">
   <style>
@@ -63,6 +69,11 @@
     <div id="pwdError" style="font-size:.78rem;color:#e74c3c;margin-bottom:10px;display:none">密码不对，再试试</div>
     <button id="pwdSubmit" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent,#7C9B7E);color:#fff;font-size:.9rem;font-weight:500;cursor:pointer;transition:opacity .2s">进入</button>
   </div>
+  <script>
+  (function(){
+    try{ if(localStorage.getItem('_v2pw2')==='1') document.body.classList.add('pwd-authed'); }catch(e){}
+  })();
+  </script>
   
 </div>
 
