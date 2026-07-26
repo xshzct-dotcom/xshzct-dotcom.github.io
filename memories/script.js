@@ -1348,7 +1348,7 @@ async function loadFromSupabase(){
     merged.forEach(function(album){
       (album.photos||[]).forEach(function(photo){
         var p = typeof photo === 'string' ? {path:photo, src:photo} : photo;
-        allGalleryPhotos.push({path:p.path||p.src||'', src:p.src||p.path||'', _albumTitle:album.title, _albumId:album._dbId||album.title, _worldId:album.world||''});
+        allGalleryPhotos.push({path:p.path||p.src||'', src:p.src||p.path||'', _albumTitle:album.title, _albumId:String(album._dbId||album.title), _worldId:album.world||''});
       });
     });
     // 从 album_photos 表加载用户上传的照片补充到相册
@@ -1370,7 +1370,7 @@ async function loadFromSupabase(){
             if(!album.photos) album.photos = [];
             if(!album.photos.includes(imgUrl) && !album.photos.includes(sp)){
               album.photos.push(imgUrl || sp);
-              allGalleryPhotos.push({path:imgUrl||sp, src:imgUrl||sp, _albumTitle:album.title, _albumId:album._dbId||album.title});
+              allGalleryPhotos.push({path:imgUrl||sp, src:imgUrl||sp, _albumTitle:album.title, _albumId:String(album._dbId||album.title)});
             }
           });
         }
