@@ -272,7 +272,7 @@ async function renderEssayTab(){
       <div id="eeArticles"></div>
     `;
     document.getElementById('eeBack').onclick = () => renderList();
-    document.querySelector('[data-ee-new]').onclick = () => { window._essayReturnTo = () => renderArticlesInCat(catId); editEssay(null, catId); };
+    document.querySelector('[data-ee-new]').onclick = function(){ window._essayReturnTo = function(){ renderEssayTab().then(function(){ setTimeout(renderArticlesInCat.bind(null, catId), 50); }); }; editEssay(null, catId); };
     const articlesEl = document.getElementById('eeArticles');
     articlesEl.innerHTML = items.map((a,i) => `
       <div class="ee-list-item" data-idx="${i}" data-sid="${a.id}">
@@ -288,7 +288,7 @@ async function renderEssayTab(){
       </div>
     `).join('');
     const itemList = items;
-    articlesEl.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => { window._essayReturnTo = () => renderArticlesInCat(catId); editEssay(itemList[parseInt(b.dataset.edit)]); });
+    articlesEl.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick = function(){ window._essayReturnTo = function(){ renderEssayTab().then(function(){ setTimeout(renderArticlesInCat.bind(null, catId), 50); }); }; editEssay(itemList[parseInt(b.dataset.edit)]); }; });
     articlesEl.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delEssay(itemList[parseInt(b.dataset.del)]));
     // 上下移动
     articlesEl.querySelectorAll('[data-move]').forEach(b => {
