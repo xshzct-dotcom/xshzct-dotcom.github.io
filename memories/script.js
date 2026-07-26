@@ -417,17 +417,21 @@ function ensureRiverQueue(pool){
   }
 }
 
-function renderRiver(){
+function renderRiver(opts){
+  opts = opts || {};
   var stream = document.getElementById('riverStream');
   if(!stream) return;
   var filtered = getFilteredRiver();
   var pool = filtered.length > 0 ? filtered : allGalleryPhotos;
   _riverTotal = pool.length;
 
-  if(_riverPoolKey !== currentFilter){
+  var filterChanged = _riverPoolKey !== currentFilter;
+
+  if(filterChanged){
     _riverQueue = [];
     _riverCycle = 0;
     _riverPoolKey = currentFilter;
+    stream.scrollLeft = 0;  // 切换分类重置到开头
   }
 
   ensureRiverQueue(pool);
@@ -494,21 +498,20 @@ function renderRiver(){
     hint.textContent = '轮回 ' + _riverCycle + ' / 约 ' + ce + ' 次（剩余 ' + _riverQueue.length + ' / ' + _riverTotal + ' 张）';
   }
 
-  stream.scrollLeft = 0;
-  // 滑动到末尾时自动加载下一批
+  // 切换分类时重置滚动到开头；末尾加载新一批时保留原滚动位置
+  // (保留逻辑已移到上方的 filterChanged 分支里)
+
   if(!stream._aeBound){
     stream._aeBound = true;
     var _aeTrigger = function(){
       if(stream.scrollLeft + stream.clientWidth >= stream.scrollWidth - 50){
+        var prevScroll = stream.scrollLeft;
         ensureRiverQueue(allGalleryPhotos);
-        var _iv = setInterval(function(){
-          var ns = stream.scrollWidth;
-          if(ns > _lastW || stream.scrollLeft + stream.clientWidth < stream.scrollWidth - 50){
-            _lastW = ns;
-            renderRiver();
-            clearInterval(_iv);
-          }
-        }, 100);
+        // 保留用户当前滚动位置，新增的照片接在右边
+        renderRiver({preserveScroll:true});
+        setTimeout(function(){
+          stream.scrollLeft = prevScroll;
+        }, 0);
       }
     };
     var _lastW = stream.scrollWidth;
