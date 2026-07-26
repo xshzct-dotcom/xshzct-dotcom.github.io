@@ -772,15 +772,24 @@ async function renderAlbumTab(){
       // Upload - 用 anon key（RLS 已允许）
       $('#aeUpload').onchange=async (e)=>{
         const files=e.target.files;
+        if(!files || files.length===0) return;
+        if(!sb){ alert('⚠️ 无法连接 Supabase 存储，上传失败'); return; }
+        const lbl=document.querySelector('label[for=aeUpload],label.editor-btn');
+        if(lbl) lbl.textContent='⏳ 上传中…';
+        let ok=0, fail=0;
         for(const f of files){
-          const fname=Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-          const {error:upErr}=await sb.storage.from('photos').upload(fname, f, {upsert:true});
-          if(!upErr){
+          try{
+            const fname=Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+            const {error:upErr}=await sb.storage.from('photos').upload(fname, f, {upsert:true});
+            if(upErr){ fail++; console.warn('[upload]', upErr); continue; }
             await db().from('album_photos').insert({album_id:album.id,storage_path:fname,sort_order:Date.now()});
-          }
+            ok++;
+          } catch(err){ fail++; console.warn('[upload]', err); }
         }
+        if(lbl) lbl.textContent='上传照片';
         e.target.value='';
         renderAlbumPhotos(album);
+        if(fail>0) alert('上传完成：'+ok+'张成功，'+fail+'张失败（详见控制台）');
       };
     });
   }
