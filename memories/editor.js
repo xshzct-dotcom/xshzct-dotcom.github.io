@@ -420,7 +420,9 @@ async function renderAlbumTab(){
   }
 
   function renderAlbumPhotos(album){
+    console.log('[album] loading photos for album.id:', album.id, 'title:', album.title);
     db().from('album_photos').select('*').eq('album_id',album.id).order('sort_order',{ascending:true}).then(({data:photos})=>{
+      console.log('[album] got', (photos||[]).length, 'photos for album', album.id);
       const plist=photos||[];
       body.style.paddingTop = '0';
       body.innerHTML = `
@@ -798,7 +800,7 @@ async function renderAlbumTab(){
               fail++; console.warn('[upload] upload error:', result&&result.error);
               continue;
             }
-            console.log('[upload] upload ok, inserting album_photos');
+            console.log('[upload] insert album_photos', {album_id:album.id,storage_path:fname});
             await db().from('album_photos').insert({album_id:album.id,storage_path:fname,sort_order:Date.now()});
             ok++; console.log('[upload] done');
           } catch(err){ fail++; console.warn('[upload] error:', err.message||err); }
@@ -806,6 +808,8 @@ async function renderAlbumTab(){
         if(lbl) lbl.textContent='上传照片';
         e.target.value='';
         renderAlbumPhotos(album);
+        // 同步刷新主页
+        if(window.reloadFromSupabase) setTimeout(function(){ window.reloadFromSupabase(); }, 500);
         if(ok>0 && fail===0) alert('✅ '+ok+'张照片上传成功！');
         else if(fail>0) alert('上传完成：'+ok+'张成功，'+fail+'张失败（F12看Console详情）');
         else if(ok===0 && fail===0) alert('⚠️ 没有上传任何文件');
