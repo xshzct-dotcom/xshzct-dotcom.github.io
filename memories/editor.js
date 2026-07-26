@@ -18,6 +18,25 @@ function $(s,d){return(d||document).querySelector(s)}
 function $$(s,d){return Array.from((d||document).querySelectorAll(s))}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 
+// 日期比较（YYYY.M.D 格式，a<b 返正数，即降序用 cmpDate(a,b)）
+function cmpDate(a,b){
+  if(a && b){
+    var pa=a.match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})/);
+    var pb=b.match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})/);
+    if(pa && pb){
+      var ya=+pa[1], ma=+pa[2], da=+pa[3];
+      var yb=+pb[1], mb=+pb[2], db=+pb[3];
+      if(ya!==yb) return yb-ya;
+      if(ma!==mb) return mb-ma;
+      return db-da;
+    }
+    return b>a?-1:a>b?1:0;
+  }
+  if(a) return -1;
+  if(b) return 1;
+  return 0;
+}
+
 // GitHub token 加密（字符码数组，避免暴露明文）
 const _ghCodes = [103,105,116,104,117,98,95,112,97,116,95,49,49,67,70,85,90,80,69,89,48,116,121,115,53,109,85,106,68,119,68,115,68,95,121,70,113,99,102,70,55,69,71,122,87,80,105,104,87,116,88,108,86,67,55,81,101,120,54,70,71,53,73,113,114,56,79,119,107,112,72,49,83,120,120,99,65,82,80,82,54,68,87,88,82,84,90,101,89,117,83,119,105];
 function _ghToken(){ return String.fromCharCode.apply(null, _ghCodes); }
@@ -198,11 +217,7 @@ async function renderEssayTab(){
   const {data:essays}=await db().from('essays').select('*');
   // 文章按日期降序（最新在前），无日期文章按sort_order排在最后
   const all=(essays||[]).slice().sort(function(a,b){
-    var ad=a.date, bd=b.date;
-    if(ad && bd) return ad>bd?-1:ad<bd?1:0;
-    if(ad) return -1;
-    if(bd) return 1;
-    return 0;
+    return cmpDate(a.date, b.date);
   });
 
   body.innerHTML=`
@@ -259,15 +274,8 @@ async function renderEssayTab(){
   function renderArticlesInCat(catId){
     const g = groups[catId];
     if(!g) return;
-    // 按 sort_order 排序（用户拖拽/箭头调整的顺序），同 sort_order 再按日期
     // 按日期降序（最新在前），无日期排在最后
-    const items = [...g.items].sort(function(a,b){
-      var ad=a.date, bd=b.date;
-      if(ad && bd) return ad>bd?-1:ad<bd?1:0;
-      if(ad) return -1;
-      if(bd) return 1;
-      return 0;
-    });
+    const items = [...g.items].sort(function(a,b){ return cmpDate(a.date, b.date); });
     const list=$('#eeList');
     const col = `var(--cat-${catId}, var(--cat-default))`;
     list.innerHTML = `

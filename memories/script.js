@@ -1305,15 +1305,26 @@ async function loadFromSupabase(){
         if(!groups[cid]) groups[cid] = {id: cid, title: e.category_title||cid, articles:[]};
         groups[cid].articles.push({title:e.title, date:e.date, body:e.body, sort_order:e.sort_order});
       });
-      // 每个分类内按日期降序（最新在前），无日期文章按sort_order排在最后
+      // 每个分类内按日期降序（最新在前），无日期排在最后
+      function cmpEDate(a,b){
+        if(a && b){
+          var pa=a.match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})/);
+          var pb=b.match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})/);
+          if(pa && pb){
+            var ya=+pa[1], ma=+pa[2], da=+pa[3];
+            var yb=+pb[1], mb=+pb[2], db=+pb[3];
+            if(ya!==yb) return yb-ya;
+            if(ma!==mb) return mb-ma;
+            return db-da;
+          }
+          return b>a?-1:a>b?1:0;
+        }
+        if(a) return -1;
+        if(b) return 1;
+        return 0;
+      }
       Object.values(groups).forEach(function(g){
-        g.articles.sort(function(a,b){
-          var ad=a.date, bd=b.date;
-          if(ad && bd) return ad>bd?-1:ad<bd?1:0;
-          if(ad) return -1;
-          if(bd) return 1;
-          return 0;
-        });
+        g.articles.sort(function(a,b){ return cmpEDate(a.date, b.date); });
       });
       const cats = Object.values(groups);
       // 覆盖全局变量（用 splice 原地替换，因为 data.js 声明是 const）
