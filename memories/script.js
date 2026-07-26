@@ -1351,27 +1351,6 @@ async function loadFromSupabase(){
         allGalleryPhotos.push({path:p.path||p.src||'', src:p.src||p.path||'', _albumTitle:album.title, _albumId:album._dbId||album.title, _worldId:album.world||''});
       });
     });
-    // 找出哪些相册在 album_photos 表有记录 → 被编辑器管理过的相册，data.js 照片无效
-    const {data:apTitles} = await SB.from('album_photos').select('album_id');
-    var managedAlbumIds = {};
-    if(apTitles && apTitles.length > 0){
-      apTitles.forEach(function(ap){ managedAlbumIds[ap.album_id] = true; });
-      var {data:allAlbums} = await SB.from('albums').select('id,title');
-      var managedTitles = {};
-      if(allAlbums) allAlbums.forEach(function(a){
-        if(managedAlbumIds[a.id]) managedTitles[a.title] = true;
-      });
-      // 从 allGalleryPhotos 移除被管理相册的旧 data.js 照片
-      if(Object.keys(managedTitles).length > 0){
-        allGalleryPhotos = allGalleryPhotos.filter(function(p){
-          return !managedTitles[p._albumTitle];
-        });
-        // 同时清空 merged 中被管理相册的 photos 数组，避免后面 album_photos 因 includes 检测被跳过
-        merged.forEach(function(ma){
-          if(managedTitles[ma.title]) ma.photos = [];
-        });
-      }
-    }
     // 从 album_photos 表加载用户上传的照片补充到相册
     const {data:albumPhotos} = await SB.from('album_photos').select('*').order('sort_order', {ascending:true});
     if(albumPhotos && albumPhotos.length > 0){
