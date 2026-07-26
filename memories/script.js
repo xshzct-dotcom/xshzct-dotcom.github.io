@@ -781,6 +781,8 @@ function bindLightboxInteractions(){
   lb.addEventListener('dblclick', e => {
     e.preventDefault();
     e.stopPropagation();
+    // 如果触摸触发了双击缩放，不再重复触发（手机双击会同时触 touchstart + dblclick）
+    if(window._touchZoomTime && Date.now() - window._touchZoomTime < 500) return;
     if(lbZoom.scale > 1.01){
       resetZoom();
       applyTransform();
@@ -836,6 +838,7 @@ function bindLightboxInteractions(){
       // 双击检测
       if(now - tdLastTap < 280 && Math.abs(e.touches[0].clientX - tdLastX) < 30 && Math.abs(e.touches[0].clientY - tdLastY) < 30){
         e.preventDefault();
+        window._touchZoomTime = Date.now();
         if(lbZoom.scale > 1.01){
           resetZoom();
           applyTransform();
