@@ -776,24 +776,39 @@ async function renderAlbumTab(){
         if(!sb){ alert('⚠️ 无法连接 Supabase 存储，上传失败'); return; }
         const lbl=document.querySelector('label[for=aeUpload],label.editor-btn');
         if(lbl) lbl.textContent='⏳ 上传中…';
+        // 先测试连通性
+        try{
+          var testResp=await fetch(SB_URL+'/rest/v1/',{method:'HEAD',headers:{apikey:SB_KEY}});
+          console.log('[upload] Supabase reachable:', testResp.ok);
+        }catch(testErr){
+          console.warn('[upload] Supabase unreachable:', testErr);
+          if(lbl) lbl.textContent='上传照片';
+          alert('❌ 无法连接到 Supabase 服务器，请检查网络');
+          return;
+        }
         let ok=0, fail=0;
         for(const f of files){
           try{
-            const fname=Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-            // 10秒超时，避免卡死
-            const uploadPromise = sb.storage.from('photos').upload(fname, f, {upsert:true});
-            const timeoutPromise = new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('上传超时')); }, 12000); });
-            const {error:upErr}=await Promise.race([uploadPromise, timeoutPromise]);
-            if(upErr){ fail++; console.warn('[upload]', upErr); continue; }
+            var fname=Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+            console.log('[upload] starting', fname, 'size:', f.size);
+            var uploadPromise = sb.storage.from('photos').upload(fname, f, {upsert:true});
+            var timeoutPromise = new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('上传超时')); }, 12000); });
+            var result=await Promise.race([uploadPromise, timeoutPromise]);
+            if(!result || result.error){
+              fail++; console.warn('[upload] upload error:', result&&result.error);
+              continue;
+            }
+            console.log('[upload] upload ok, inserting album_photos');
             await db().from('album_photos').insert({album_id:album.id,storage_path:fname,sort_order:Date.now()});
-            ok++;
-          } catch(err){ fail++; console.warn('[upload]', err); }
+            ok++; console.log('[upload] done');
+          } catch(err){ fail++; console.warn('[upload] error:', err.message||err); }
         }
         if(lbl) lbl.textContent='上传照片';
         e.target.value='';
         renderAlbumPhotos(album);
         if(ok>0 && fail===0) alert('✅ '+ok+'张照片上传成功！');
-        else if(fail>0) alert('上传完成：'+ok+'张成功，'+fail+'张失败（详见控制台 F12）');
+        else if(fail>0) alert('上传完成：'+ok+'张成功，'+fail+'张失败（F12看Console详情）');
+        else if(ok===0 && fail===0) alert('⚠️ 没有上传任何文件');
       };
     });
   }
