@@ -1357,6 +1357,10 @@ async function loadFromSupabase(){
         allGalleryPhotos = allGalleryPhotos.filter(function(p){
           return !managedTitles[p._albumTitle];
         });
+        // 同时清空 merged 中被管理相册的 photos 数组，避免后面 album_photos 因 includes 检测被跳过
+        merged.forEach(function(ma){
+          if(managedTitles[ma.title]) ma.photos = [];
+        });
       }
     }
     // 从 album_photos 表加载用户上传的照片补充到相册
