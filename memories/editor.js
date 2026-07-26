@@ -318,24 +318,29 @@ async function renderEssayTab(){
     const date=a?(a.date||''):new Date().toLocaleDateString('zh-CN').replace(/\//g,'.');
     const articleBody=a?a.body:'';
 
+    // 把 "2026.4.26" 转成 "2026-04-26" 给 <input type="date">
+    function toDateInputValue(v){
+      if(!v) return '';
+      var m=v.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+      if(!m) return '';
+      return m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
+    }
+    // 从 input 读取时，把 "2026-04-26" 还原成 "2026.4.26"
+    function fromDateInputValue(v){
+      if(!v) return '';
+      var m=v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if(!m) return v;
+      return m[1]+'.'+parseInt(m[2])+'.'+parseInt(m[3]);
+    }
+
     body.innerHTML=`
       <div class="editor-form-group"><label>分类</label><select id="eeCat">${catIds.map((c,i)=>`<option value="${c}" ${c===category?'selected':''}>${cats[i]}</option>`).join('')}</select></div>
       <div class="editor-form-group"><label>标题</label><input id="eeTitle" value="${esc(articleTitle)}" placeholder="文章标题"></div>
       <div class="editor-form-group"><label>日期</label>
         <div style="display:flex;gap:8px;align-items:center">
-          <input id="eeDate" value="${esc(date)}" placeholder="无日期" readonly style="flex:1;cursor:pointer;padding:12px 16px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left">
+          <input id="eeDate" type="date" value="${esc(toDateInputValue(date))}" placeholder="无日期" style="flex:1;padding:12px 16px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left;font-family:inherit">
           <button id="eeDateToday" type="button" class="editor-btn editor-btn-secondary" style="font-size:.8rem">今天</button>
           <button id="eeDateClear" type="button" class="editor-btn editor-btn-secondary" style="font-size:.8rem">无</button>
-        </div>
-        <div id="eeDatePicker" style="margin-top:8px;background:rgba(232,228,218,.04);border:1px solid rgba(232,228,218,.12);border-radius:10px;padding:12px">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-            <select id="eeYear" style="padding:8px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:6px;color:var(--text);font-size:.9rem"></select>
-            <select id="eeMonth" style="padding:8px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:6px;color:var(--text);font-size:.9rem"></select>
-            <select id="eeDay" style="padding:8px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:6px;color:var(--text);font-size:.9rem"></select>
-          </div>
-          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
-            <button id="eeDateOk" type="button" class="editor-btn editor-btn-primary" style="font-size:.82rem">填入选中日期</button>
-          </div>
         </div>
       </div>
       <div class="editor-form-group"><label>正文</label><textarea id="eeBody" placeholder="写点什么...">${esc(articleBody)}</textarea></div>
@@ -347,14 +352,26 @@ async function renderEssayTab(){
     `;
 
     // 日期选择器逻辑
-    initDatePicker(date);
+    // 日期快捷按钮
+    var dateEl=$('#eeDate');
+    if($('#eeDateToday')) $('#eeDateToday').onclick=function(){
+      var n=new Date();
+      dateEl.value=n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+    };
+    if($('#eeDateClear')) $('#eeDateClear').onclick=function(){ dateEl.value=''; };
 
     $('#eeSaveBtn').onclick=async()=>{
+      var dateVal=$('#eeDate').value.trim();
+      if(dateVal){
+        // 把 "2026-04-26" 还原成 "2026.4.26"
+        var m=dateVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if(m) dateVal=m[1]+'.'+parseInt(m[2])+'.'+parseInt(m[3]);
+      }
       const data={
         category:$('#eeCat').value,
         category_title:cats[catIds.indexOf($('#eeCat').value)]||$('#eeCat').value,
         title:$('#eeTitle').value.trim(),
-        date:$('#eeDate').value.trim(),
+        date:dateVal,
         body:$('#eeBody').value.trim(),
       };
       if(!data.title||!data.body){alert('标题和正文不能为空');return}
@@ -395,65 +412,6 @@ async function renderAlbumTab(){
     <div style="margin-bottom:16px"><button class="editor-btn editor-btn-primary" id="aeNewBtn">+ 新建相册</button></div>
     <div id="aeList"></div>
   `;
-
-  // ===== 文章日期选择器（弹出式日历） =====
-function initDatePicker(initial){
-  var yearSel=$('#eeYear'), monthSel=$('#eeMonth'), daySel=$('#eeDay');
-  for(var y=2000;y<=2050;y++){
-    var o=document.createElement('option');o.value=y;o.textContent=y;
-    yearSel.appendChild(o);
-  }
-  for(var m=1;m<=12;m++){
-    var o=document.createElement('option');o.value=m;o.textContent=m+'月';
-    monthSel.appendChild(o);
-  }
-  function fillDays(year, month){
-    var last=new Date(year, month, 0).getDate();
-    daySel.innerHTML='';
-    for(var d=1;d<=last;d++){
-      var o=document.createElement('option');o.value=d;o.textContent=d+'日';
-      daySel.appendChild(o);
-    }
-  }
-  var initY, initM, initD;
-  if(initial){
-    var m1=initial.match(/^(\d{2,4})[.\-/年](\d{1,2})[.\-/月](\d{1,2})/);
-    if(m1){ initY=parseInt(m1[1]); initM=parseInt(m1[2]); initD=parseInt(m1[3]); }
-  }
-  if(!initY){
-    var n=new Date();
-    initY=n.getFullYear(); initM=n.getMonth()+1; initD=n.getDate();
-  }
-  yearSel.value=initY; monthSel.value=initM; fillDays(initY, initM); daySel.value=initD;
-  monthSel.onchange=function(){ fillDays(parseInt(yearSel.value), parseInt(monthSel.value)); };
-  yearSel.onchange=function(){ fillDays(parseInt(yearSel.value), parseInt(monthSel.value)); };
-  function fmt(y,m,d){ return y+'.'+m+'.'+d; }
-  function updateDate(v){
-    var input=$('#eeDate'); if(input) input.value=v;
-  }
-  // 默认展开 picker
-  var picker=$('#eeDatePicker');
-  if(picker) picker.style.display='block';
-  var todayBtn=$('#eeDateToday');
-  if(todayBtn) todayBtn.onclick=function(){
-    var n=new Date();
-    updateDate(fmt(n.getFullYear(), n.getMonth()+1, n.getDate()));
-  };
-  var clearBtn=$('#eeDateClear');
-  if(clearBtn) clearBtn.onclick=function(){ updateDate(''); };
-  // 年/月/日任一变动 → 实时同步到输入框
-  function syncDate(){
-    updateDate(fmt(parseInt(yearSel.value), parseInt(monthSel.value), parseInt(daySel.value)));
-  }
-  if(yearSel) yearSel.onchange=syncDate;
-  if(monthSel){
-    var orig=monthSel.onchange;
-    monthSel.onchange=function(){ if(orig) orig(); syncDate(); };
-  }
-  if(daySel) daySel.onchange=syncDate;
-  var okBtn=$('#eeDateOk');
-  if(okBtn) okBtn.onclick=syncDate;
-}
 
 function renderList(){
     const el=$('#aeList');
