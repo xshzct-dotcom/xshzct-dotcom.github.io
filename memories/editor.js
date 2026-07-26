@@ -420,6 +420,10 @@ async function renderAlbumTab(){
   }
 
   function renderAlbumPhotos(album){
+    if(!album || !album.id){
+      console.warn('[album] renderAlbumPhotos called with invalid album:', album);
+      return;
+    }
     console.log('[album] loading photos for album.id:', album.id, 'title:', album.title);
     db().from('album_photos').select('*').eq('album_id',album.id).order('sort_order',{ascending:true}).then(({data:photos})=>{
       console.log('[album] got', (photos||[]).length, 'photos for album', album.id);
@@ -776,6 +780,12 @@ async function renderAlbumTab(){
         const files=e.target.files;
         if(!files || files.length===0) return;
         if(!sb){ alert('⚠️ 无法连接 Supabase 存储，上传失败'); return; }
+        // 检查 album.id 是否有效
+        if(!album || album.id === undefined || album.id === null){
+          alert('⚠️ 当前相册 ID 无效（'+JSON.stringify(album)+'），无法上传。请重新打开相册');
+          e.target.value='';
+          return;
+        }
         const lbl=document.querySelector('label[for=aeUpload],label.editor-btn');
         if(lbl) lbl.textContent='⏳ 上传中…';
         // 先测试连通性
