@@ -140,7 +140,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .river-filter.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
 
 .river{overflow:hidden;padding:20px 0;position:relative}
-.river-stream{display:flex;gap:60px;padding:20px 100px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:thin;cursor:grab}
+.river-stream{display:flex;gap:60px;padding:20px 100px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:thin;cursor:grab;overscroll-behavior-x:contain;touch-action:pan-x pan-y pinch-zoom}
 .river-stream:active{cursor:grabbing}
 .river-stream::-webkit-scrollbar{height:4px}
 .river-stream::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
@@ -160,7 +160,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .polaroid img.img-fail::after{content:'?';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:2rem;color:rgba(120,100,80,.4);font-weight:700}
 .polaroid-broken{background:rgba(201,123,92,.12);display:flex;align-items:center;justify-content:center}
 .polaroid-broken::before{content:'📷';font-size:2rem;opacity:.4}
-.polaroid-loading .polaroid-frame{background:linear-gradient(135deg,#3a3a3a 25%,#2a2a2a 50%,#3a3a3a 75%);background-size:200% 200%;animation:shimmer2 1.5s infinite}
+.polaroid-loading .polaroid-frame{background:#2a2a35}
 
 @keyframes shimmer2{0%{background-position:200% 0}100%{background-position:-200% 0}}
 
