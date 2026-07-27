@@ -173,7 +173,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 @media(max-width:768px){
   .polaroid{width:200px;padding:8px 8px 28px 8px}
   .polaroid::after{bottom:6px;font-size:.65rem}
-  .river-stream{gap:40px;padding:16px 50px;scroll-snap-type:x proximity}
+  .river-stream{gap:40px;padding:16px 50px;scroll-snap-type:none;scroll-behavior:auto;overscroll-behavior-x:contain}
 }
 
 /* --- Year Heatmap (GitHub-style) --- *//* --- Year Heatmap (GitHub-style) --- *//* --- Year Heatmap (GitHub-style) --- */
