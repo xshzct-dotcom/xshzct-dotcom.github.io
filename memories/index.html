@@ -314,7 +314,7 @@
       var now = Date.now();
       var seg = Math.round((now - _t0) / 1000);
       if(seg < 0) seg = 0;
-      if(!done) seg = Math.max(seg, 1);
+      if(seg < 1) seg = 1;  // 最少1秒（页面至少加载了）
       var dur = _acc + seg;
       if(done) _acc = dur; else _acc += Math.floor((now - _t0) / 1000);
       if(!done && !document.hidden) _t0 = now;

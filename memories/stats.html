@@ -182,7 +182,7 @@ async function render(){
     document.getElementById('content').innerHTML='<div class="msg">加载失败</div>';
   }
 }
-function fmt(s){ if(!s||s<0) return '--'; if(s<60) return s+'秒'; var m=Math.floor(s/60); var r=s%60; return m+'分'+r+'秒'; }
+function fmt(s){ if(s==null||s===undefined) return '--'; if(s<60) return s+'秒'; var m=Math.floor(s/60); var r=s%60; return m+'分'+r+'秒'; }
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 render();
