@@ -456,7 +456,11 @@ function renderRiver(opts){
     rotations.push(((seed % 12) - 6));
   }
 
-  _galleryLoadTotal += indices.length;
+  // 每次渲染重置加载计数（不再累计，新一批的照片重新计数）
+  _galleryLoadTotal = indices.length;
+  _galleryLoadDone = 0;
+  var progressEl = document.getElementById('galleryLoadProgress');
+  if(progressEl) progressEl.textContent = '0 / ' + _galleryLoadTotal + ' 张已加载';
   stream.innerHTML = indices.map(function(pi, i){
     var p = pool[pi];
     var rot = rotations[i];
@@ -514,15 +518,15 @@ function renderRiver(opts){
     var _aeTrigger = function(){
       if(stream.scrollLeft + stream.clientWidth >= stream.scrollWidth - 50){
         var prevScroll = stream.scrollLeft;
-        ensureRiverQueue(allGalleryPhotos);
+        var pool = getFilteredRiver();
+        if(pool.length === 0) pool = allGalleryPhotos;
+        ensureRiverQueue(pool);
         // 保留用户当前滚动位置，新增的照片接在右边
         renderRiver({preserveScroll:true});
-        setTimeout(function(){
-          stream.scrollLeft = prevScroll;
-        }, 0);
+        // 直接在同帧设置，不经过 setTimeout 减少闪现
+        stream.scrollLeft = prevScroll;
       }
     };
-    var _lastW = stream.scrollWidth;
     stream.addEventListener('scroll', _aeTrigger, {passive:true});
   }
 }
@@ -535,6 +539,7 @@ function riverScroll(dir){
 }
 
 function riverShuffle(){
+  _riverQueue = []; // 清空队列让下一批重新洗牌
   renderRiver();
   if(window.SFX) window.SFX.shutter();
 }
