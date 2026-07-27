@@ -1114,21 +1114,11 @@ function playSong(idx, seekTime){
           : sp ? SUPABASE_STORAGE+sp
           : MUSIC_BASE+(t.name||t.title||'')+'.mp3';
   bgMusic.src=url; bgMusic.load();
-  // 自动恢复进度（优先用传入的 seekTime，否则从 localStorage 找）
-  var targetTime = seekTime || 0;
-  if(!seekTime){
-    try{
-      const key=url.split('/').pop();
-      const saved=localStorage.getItem('musicResume_'+key);
-      if(saved){
-        const obj=JSON.parse(saved);
-        if(obj.idx === idx && obj.t > 0) targetTime = obj.t;
-      }
-    }catch(e){}
-  }
-  if(targetTime > 0){
+  // 自动恢复进度：只在 switchPlaylist 传了 seekTime 时才恢复（即页面刚加载恢复上次进度）
+  // 手动切歌（上一首/下一首）不恢复进度，从头开始
+  if(seekTime && seekTime > 0){
     bgMusic.addEventListener('loadedmetadata', function once(){
-      bgMusic.currentTime = targetTime;
+      bgMusic.currentTime = seekTime;
       if(window._userStarted) bgMusic.play().catch(()=>{});
       bgMusic.removeEventListener('loadedmetadata', once);
     }, {once:true});
