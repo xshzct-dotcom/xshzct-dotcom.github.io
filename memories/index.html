@@ -280,8 +280,8 @@
 
   var key = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
   var base = 'https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1/visits';
-  var _t0 = Date.now();
-  var _acc = 0;
+  var _visitId = null;
+  var _visitStartMs = Date.now();
 
   // 先查最近 30 秒内是否已有这个 client_id+path 的访问记录，如果有就 PATCH 而不是 POST
   var since = new Date(Date.now() - 30000).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
@@ -289,14 +289,9 @@
     headers: {'apikey':key,'Authorization':'Bearer '+key}
   }).then(function(r){ return r.json(); }).then(function(rows){
     if(rows && rows.length > 0){
-      // 已有最近访问，更新时间戳和 left_at
-      return fetch(base + '?id=eq.' + rows[0].id, {
-        method: 'PATCH',
-        headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
-        body: JSON.stringify({visited_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}), left_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}), duration: 0})
-      }).then(function(){ rows[0].id; });
+      _visitId = rows[0].id;
+      return;
     }
-    // 没有就 POST 新记录
     return fetch(base, {
       method: 'POST',
       headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=representation'},
@@ -306,27 +301,22 @@
         visited_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}),
         session_id: clientId
       })
-    }).then(function(r){ return r.json(); });
-  }).then(function(data){
-    var visitId = data && data[0] && data[0].id;
-    if(!visitId) return;
-    function patch(done){
-      var now = Date.now();
-      var seg = Math.round((now - _t0) / 1000);
-      if(seg < 0) seg = 0;
-      if(seg < 1) seg = 1;  // 最少1秒（页面至少加载了）
-      var dur = _acc + seg;
-      if(done) _acc = dur; else _acc += Math.floor((now - _t0) / 1000);
-      if(!done && !document.hidden) _t0 = now;
-      fetch(base+'?id=eq.'+visitId, {
-        method: 'PATCH',
-        headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
-        body: JSON.stringify({left_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}), duration: dur})
-      }).catch(function(){});
+    }).then(function(r){ return r.json(); }).then(function(data){
+      _visitId = data && data[0] && data[0].id;
+    });
+  }).then(function(){
+    if(!_visitId) return;
+    function save(){
+      var dur = Math.max(1, Math.round((Date.now() - _visitStartMs) / 1000));
+      var payload = JSON.stringify({duration: dur, left_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'})});
+      // 用 sendBeacon 代替 fetch 以保证页面关闭时也能送达
+      try{ navigator.sendBeacon(base+'?id=eq.'+_visitId, payload); }catch(e){}
+      // 备用 fetch
+      fetch(base+'?id=eq.'+_visitId, { method:'PATCH', headers:{'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'}, body: payload }).catch(function(){});
     }
-    window.addEventListener('beforeunload', function(){ patch(true); });
-    document.addEventListener('visibilitychange', function(){ patch(document.hidden); });
-    setInterval(function(){ if(!document.hidden) patch(false); }, 10000);
+    setInterval(save, 10000);
+    window.addEventListener('beforeunload', save);
+    document.addEventListener('visibilitychange', function(){ if(document.hidden) save(); });
   }).catch(function(){});
 })();
 </script>
