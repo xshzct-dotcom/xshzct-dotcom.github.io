@@ -219,9 +219,16 @@ function buildTimeline(){
   catIds.forEach((k,gi) => {
     const g = groups[k];
     // 组内按日期降序（童年篇按 sort_order 升序=旧到新）
-    g.items.sort((a,b)=>{
+    g.items.sort(function(a,b){
       const da=a.date||'', db=b.date||'';
-      if(da>db) return -1; if(da<db) return 1;
+      const pa=da.match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})/), pb=db.match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})/);
+      if(pa && pb){
+        if(+pa[1]!==+pb[1]) return +pb[1]-+pa[1];
+        if(+pa[2]!==+pb[2]) return +pb[2]-+pa[2];
+        return +pb[3]-+pa[3];
+      }
+      if(da && !pb) return -1;
+      if(!da && pb) return 1;
       if(k==='childhood') return (a.sort_order||0)-(b.sort_order||0);
       return (b.sort_order||0)-(a.sort_order||0);
     });
@@ -442,7 +449,8 @@ function renderRiver(opts){
   }
 
   var rotations = [];
-  var seed = Date.now() % 10000;
+  // 用 albumId+索引做种子，每一组照片的旋转角度保持稳定不闪
+  var seed = (String(currentFilter||'all') + '_' + _riverCycle).split('').reduce(function(acc,ch){ return (acc*131 + ch.charCodeAt(0)) % 2147483647; }, 7);
   for(var i = 0; i < indices.length; i++){
     seed = (seed * 16807) % 2147483647;
     rotations.push(((seed % 12) - 6));
@@ -998,8 +1006,15 @@ function initMusic(){
   bgMusic.addEventListener('timeupdate',()=>{
     if(bgMusic.duration)
       $('#playerProgress').style.width = (bgMusic.currentTime/bgMusic.duration)*100+'%';
+    // 保存当前播放进度
+    try{
+      const key=(bgMusic.src||'').split('/').pop();
+      localStorage.setItem('musicResume_'+key, JSON.stringify({
+        t:bgMusic.currentTime, idx:currentSongIdx
+      }));
+    }catch(e){}
   });
-  bgMusic.addEventListener('ended',nextSong);
+  bgMusic.addEventListener('ended',()=>{ try{localStorage.removeItem('musicResume_'+(bgMusic.src||'').split('/').pop());}catch(e){}; nextSong(); });
   bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';});
   bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';});
   bgMusic.addEventListener('error',()=>{ setTimeout(nextSong,1200); });
@@ -1042,6 +1057,21 @@ function playSong(idx){
           : sp ? SUPABASE_STORAGE+sp
           : MUSIC_BASE+(t.name||t.title||'')+'.mp3';
   bgMusic.src=url; bgMusic.load();
+  // 自动恢复进度
+  try{
+    const key=url.split('/').pop();
+    const saved=localStorage.getItem('musicResume_'+key);
+    if(saved){
+      const obj=JSON.parse(saved);
+      if(obj.idx === idx && obj.t > 0){
+        bgMusic.addEventListener('loadedmetadata', function once(){
+          bgMusic.currentTime = obj.t;
+          if(window._userStarted) bgMusic.play().catch(()=>{});
+          bgMusic.removeEventListener('loadedmetadata', once);
+        }, {once:true});
+      }
+    }
+  }catch(e){}
   // 用户已点过页面（授权手势）→ play；否则等用户点
   if(window._userStarted) bgMusic.play().catch(()=>{});
   $('#playerTitle').textContent=t.name||t.title||'未知';
@@ -1087,9 +1117,31 @@ window.setPlaylistTo=function(songs, idxOrId){
   }else{
     idx = typeof idxOrId === 'number' ? idxOrId : 0;
   }
+  // 如果没有传 idx/id，尝试从 localStorage 恢复上次的进度
+  if(typeof idxOrId === 'undefined' || idx < 0){
+    try{
+      for(let k in localStorage){
+        if(k.startsWith('musicResume_')){
+          const obj = JSON.parse(localStorage.getItem(k));
+          if(obj && typeof obj.idx === 'number'){
+            // 找到匹配 idx 的歌（按 storage_path 或 url 找）
+            const targetKey = k.replace('musicResume_','');
+            for(let i=0;i<window._currentSongs.length;i++){
+              const t = window._currentSongs[i];
+              const sp = t.storage_path || t.url || '';
+              if(sp.endsWith(targetKey) || sp === targetKey || targetKey.endsWith((t.name||'')+'.mp3')){
+                idx = i; break;
+              }
+            }
+            break;
+          }
+        }
+      }
+    }catch(e){}
+  }
   currentSongIdx = (idx >= 0 && idx < window._currentSongs.length) ? idx : 0;
   playSong(currentSongIdx);
-};
+}
 // 通过 storage_path 找出歌曲并在当前列表中播放（不替换列表）
 window.playSongByPath = function(storagePath){
   if(!window._currentSongs || !storagePath) return;
@@ -1127,10 +1179,17 @@ function fillTimelineIndex(){
   if(typeof travels !== 'undefined'){
     travels.forEach(art => _timelineItems.push({...art, cat:'旅行见闻', catId:'travel'}));
   }
-  // 排序：按日期新的在上，同日期按 sort_order
-  _timelineItems.sort((a,b)=>{
+  // 按日期数字解析后倒序：最新在前
+  _timelineItems.sort(function(a,b){
     var da=a.date||'', db=b.date||'';
-    if(da>db) return -1; if(da<db) return 1;
+    var pa=da.match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})/), pb=db.match(/^(\d{4})\.(\d{1,2})\.(\d{1,2})/);
+    if(pa && pb){
+      if(+pa[1]!==+pb[1]) return +pb[1]-+pa[1];
+      if(+pa[2]!==+pb[2]) return +pb[2]-+pa[2];
+      return +pb[3]-+pa[3];
+    }
+    if(da && !pb) return -1;
+    if(!da && pb) return 1;
     return (b.sort_order||0)-(a.sort_order||0);
   });
   // 从 Supabase 同步 sort_order（如果已编辑过）
