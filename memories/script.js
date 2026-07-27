@@ -1067,8 +1067,8 @@ function _grant(){
   if(window._userStarted) return;
   window._userStarted = true;
   // 如果 switchPlaylist 已加载好歌，立即播放
-  if(bgMusic && bgMusic.src && bgMusic.src !== window.location.href && bgMusic.paused){
-    bgMusic.play().catch(()=>{});
+  if(bgMusic && bgMusic.src && bgMusic.src !== window.location.href){
+    bgMusic.play().catch(function(){});
   }
 }
 
@@ -1117,14 +1117,15 @@ function playSong(idx, seekTime){
   // 自动恢复进度：只在 switchPlaylist 传了 seekTime 时才恢复（即页面刚加载恢复上次进度）
   // 手动切歌（上一首/下一首）不恢复进度，从头开始
   if(seekTime && seekTime > 0){
-    bgMusic.addEventListener('loadedmetadata', function once(){
+    bgMusic.addEventListener('loadedmetadata', function onSeek(){
       bgMusic.currentTime = seekTime;
-      if(window._userStarted) bgMusic.play().catch(()=>{});
-      bgMusic.removeEventListener('loadedmetadata', once);
+      bgMusic.removeEventListener('loadedmetadata', onSeek);
     }, {once:true});
   }
-  // 用户已点过页面（授权手势）→ play；否则等用户点
-  if(window._userStarted) bgMusic.play().catch(()=>{});
+  // 播放：如果用户已授权过直接播，没授权等 _grant
+  if(window._userStarted){
+    bgMusic.play().catch(function(){});
+  }
   $('#playerTitle').textContent=t.name||t.title||'未知';
   // 保存最后一次播放的歌曲（含时间戳，供下次进入自动恢复）
   try{
