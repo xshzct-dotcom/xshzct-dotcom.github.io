@@ -1035,6 +1035,15 @@ function initMusic(){
       localStorage.setItem('musicResume_'+key, JSON.stringify({
         t:bgMusic.currentTime, idx:currentSongIdx
       }));
+      // 同时更新 lastSong 里的进度
+      var lastRaw = localStorage.getItem('musicResume_lastSong');
+      if(lastRaw){
+        var lastObj = JSON.parse(lastRaw);
+        if(lastObj.idx === currentSongIdx){
+          lastObj.t = bgMusic.currentTime;
+          localStorage.setItem('musicResume_lastSong', JSON.stringify(lastObj));
+        }
+      }
     }catch(e){}
   });
   bgMusic.addEventListener('ended',()=>{ try{localStorage.removeItem('musicResume_'+(bgMusic.src||'').split('/').pop());}catch(e){}; nextSong(); });
@@ -1065,10 +1074,35 @@ function _grant(){
 
 function switchPlaylist(songs){
   window._currentSongs=songs||[];
-  currentSongIdx=0;
-  if(window._currentSongs.length) playSong(0);
+  if(window._currentSongs.length===0) return;
+
+  // 尝试恢复上次的歌曲：保存时间在一小时内才恢复
+  var resumeIdx = -1;
+  var resumeTime = 0;
+  try{
+    var savedRaw = localStorage.getItem('musicResume_lastSong');
+    if(savedRaw){
+      var saved = JSON.parse(savedRaw);
+      if(saved && saved.idx != null && saved.ts){
+        var elapsed = Date.now() - saved.ts;
+        if(elapsed < 3600000){ // 1小时内 → 恢复
+          resumeIdx = saved.idx;
+          resumeTime = saved.t || 0;
+        }
+        // 超过1小时 → 清除所有记录，下次重新从第一首开始
+        if(elapsed >= 3600000){
+          for(var kk in localStorage){
+            if(kk.startsWith('musicResume_')) localStorage.removeItem(kk);
+          }
+        }
+      }
+    }
+  }catch(e){}
+
+  currentSongIdx = (resumeIdx >= 0 && resumeIdx < window._currentSongs.length) ? resumeIdx : 0;
+  playSong(currentSongIdx, resumeTime);
 }
-function playSong(idx){
+function playSong(idx, seekTime){
   const s=window._currentSongs;
   if(!s||idx<0||idx>=s.length) return;
   currentSongIdx=idx;
@@ -1080,24 +1114,32 @@ function playSong(idx){
           : sp ? SUPABASE_STORAGE+sp
           : MUSIC_BASE+(t.name||t.title||'')+'.mp3';
   bgMusic.src=url; bgMusic.load();
-  // 自动恢复进度
-  try{
-    const key=url.split('/').pop();
-    const saved=localStorage.getItem('musicResume_'+key);
-    if(saved){
-      const obj=JSON.parse(saved);
-      if(obj.idx === idx && obj.t > 0){
-        bgMusic.addEventListener('loadedmetadata', function once(){
-          bgMusic.currentTime = obj.t;
-          if(window._userStarted) bgMusic.play().catch(()=>{});
-          bgMusic.removeEventListener('loadedmetadata', once);
-        }, {once:true});
+  // 自动恢复进度（优先用传入的 seekTime，否则从 localStorage 找）
+  var targetTime = seekTime || 0;
+  if(!seekTime){
+    try{
+      const key=url.split('/').pop();
+      const saved=localStorage.getItem('musicResume_'+key);
+      if(saved){
+        const obj=JSON.parse(saved);
+        if(obj.idx === idx && obj.t > 0) targetTime = obj.t;
       }
-    }
-  }catch(e){}
+    }catch(e){}
+  }
+  if(targetTime > 0){
+    bgMusic.addEventListener('loadedmetadata', function once(){
+      bgMusic.currentTime = targetTime;
+      if(window._userStarted) bgMusic.play().catch(()=>{});
+      bgMusic.removeEventListener('loadedmetadata', once);
+    }, {once:true});
+  }
   // 用户已点过页面（授权手势）→ play；否则等用户点
   if(window._userStarted) bgMusic.play().catch(()=>{});
   $('#playerTitle').textContent=t.name||t.title||'未知';
+  // 保存最后一次播放的歌曲（含时间戳，供下次进入自动恢复）
+  try{
+    localStorage.setItem('musicResume_lastSong', JSON.stringify({idx: currentSongIdx, ts: Date.now()}));
+  }catch(e){}
 }
 function togglePlay(){
   if(!bgMusic) return;
