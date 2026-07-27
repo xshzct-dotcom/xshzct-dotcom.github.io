@@ -407,11 +407,14 @@ function updateGalleryLoadProgress(){
   if(el) el.textContent = _galleryLoadDone + ' / ' + _galleryLoadTotal + ' 张已加载';
 }
 
-// ===== 记忆河流（队列模式 — 每次都不一样直到看完所有） =====
+// ===== 记忆河流 v2（追加式 — 滑到底只追加不替换，防重复加载锁） =====
 let _riverQueue = [];
 let _riverCycle = 0;
 let _riverTotal = 0;
 let _riverPoolKey = null;
+let _riverLoadingMore = false;
+let _riverDOMCount = 0;
+let _riverScrollBound = false;
 
 function ensureRiverQueue(pool){
   if(_riverQueue.length === 0){
@@ -424,110 +427,126 @@ function ensureRiverQueue(pool){
   }
 }
 
-function renderRiver(opts){
-  opts = opts || {};
-  var stream = document.getElementById('riverStream');
-  if(!stream) return;
-  var filtered = getFilteredRiver();
-  var pool = filtered.length > 0 ? filtered : allGalleryPhotos;
-  _riverTotal = pool.length;
+function buildPolaroid(pool, pi, rot, z){
+  var p = pool[pi];
+  var name = (typeof p === 'string' ? p : (p.path||p.src||'')).split('/').pop()
+    .replace(/看图王\.jpg$|\.jpg$|\.jpeg$/i,'').replace(/^_+/,'');
+  return '<div class="polaroid polaroid-loading" data-idx="'+pi+'" style="transform:rotate('+rot+'deg);z-index:'+z+'" data-label="'+esc(p._albumTitle||'')+'" data-missing="暂未上传 · '+esc(name)+'">'+
+    '<div class="polaroid-frame"><img src="'+thumb(p)+'" alt="" decoding="async" data-full="'+full(p)+'" data-name="'+esc(name)+'"></div>'+
+    '<div class="polaroid-caption">'+esc(name)+'</div></div>';
+}
 
-  var filterChanged = _riverPoolKey !== currentFilter;
+function bindPolaroidEvents(container, pool, startIdx){
+  var els = container.querySelectorAll('.polaroid');
+  for(var i = startIdx; i < els.length; i++){
+    (function(el){
+      var img = el.querySelector('img');
+      if(img){
+        img.onload = function(){ el.classList.remove('polaroid-loading'); updateGalleryLoadProgress(); };
+        img.onerror = function(){
+          if(img.dataset.fb!=='1'){ img.dataset.fb='1'; img.src=img.dataset.full; }
+          else if(img.dataset.fb!=='2'){ img.dataset.fb='2'; img.src=img.dataset.full.replace('_看图王',''); }
+          else{ img.style.display='none'; el.classList.add('img-fail-frame'); }
+        };
+      }
+      el.onclick = function(){
+        var idx = parseInt(el.dataset.idx); if(isNaN(idx)) return;
+        lightboxPhotos=pool; lightboxIdx=idx; openLightbox(idx);
+      };
+    })(els[i]);
+  }
+}
+
+function riverSeed(c, cycle, skip){
+  var s = (String(c||'all')+'_'+cycle).split('').reduce(function(a,ch){ return (a*131+ch.charCodeAt(0))%2147483647; }, 7);
+  for(var i=0; i<skip; i++) s = (s*16807)%2147483647;
+  return s;
+}
+
+function updateRiverHint(){
+  var hint=document.getElementById('riverHint');
+  if(!hint) return;
+  var ce=Math.ceil(_riverTotal/POLAROID_COUNT);
+  hint.textContent='轮回 '+_riverCycle+' / 约 '+ce+' 次（剩余 '+_riverQueue.length+' / '+_riverTotal+' 张）';
+}
+
+// 核心渲染函数 — reset 时全量替换，otherwise 追加
+function renderRiver(opts){
+  opts=opts||{};
+  var stream=document.getElementById('riverStream');
+  if(!stream) return;
+  var filtered=getFilteredRiver();
+  var pool=filtered.length>0?filtered:allGalleryPhotos;
+  _riverTotal=pool.length;
+  var filterChanged=_riverPoolKey!==currentFilter;
+  var isReset=opts.forceReset||filterChanged||_riverDOMCount===0;
 
   if(filterChanged){
-    _riverQueue = [];
-    _riverCycle = 0;
-    _riverPoolKey = currentFilter;
-    stream.scrollLeft = 0;  // 切换分类重置到开头
+    _riverQueue=[]; _riverCycle=0; _riverPoolKey=currentFilter;
+    _riverDOMCount=0; _riverLoadingMore=false;
   }
+  if(isReset) _riverLoadingMore=false;
 
   ensureRiverQueue(pool);
-  var n = Math.min(POLAROID_COUNT, pool.length);
-  var indices = [];
-  for(var i = 0; i < n && _riverQueue.length > 0; i++){
-    indices.push(_riverQueue.shift());
+  var n=Math.min(POLAROID_COUNT, pool.length);
+  var indices=[];
+  for(var i=0; i<n && _riverQueue.length>0; i++) indices.push(_riverQueue.shift());
+
+  if(indices.length===0){ updateRiverHint(); return; }
+
+  var rotSeed=riverSeed(currentFilter, _riverCycle, 0);
+  var rotations=[];
+  for(var i=0; i<indices.length; i++){ rotSeed=(rotSeed*16807)%2147483647; rotations.push(((rotSeed%12)-6)); }
+
+  if(isReset){
+    _galleryLoadTotal=indices.length; _galleryLoadDone=0;
+    var pEl=document.getElementById('galleryLoadProgress');
+    if(pEl) pEl.textContent='0 / '+_galleryLoadTotal+' 张已加载';
+    stream.innerHTML=indices.map(function(pi,i){ return buildPolaroid(pool,pi,rotations[i],POLAROID_COUNT-i); }).join('');
+    _riverDOMCount=indices.length;
+    bindPolaroidEvents(stream, pool, 0);
+    updateRiverHint();
+    stream.scrollLeft=0;
+  } else {
+    var html=indices.map(function(pi,i){ return buildPolaroid(pool,pi,rotations[i],_riverDOMCount+i); }).join('');
+    stream.insertAdjacentHTML('beforeend', html);
+    bindPolaroidEvents(stream, pool, _riverDOMCount);
+    _riverDOMCount+=indices.length;
+    _galleryLoadTotal+=indices.length;
+    updateRiverHint();
   }
 
-  var rotations = [];
-  // 用 albumId+索引做种子，每一组照片的旋转角度保持稳定不闪
-  var seed = (String(currentFilter||'all') + '_' + _riverCycle).split('').reduce(function(acc,ch){ return (acc*131 + ch.charCodeAt(0)) % 2147483647; }, 7);
-  for(var i = 0; i < indices.length; i++){
-    seed = (seed * 16807) % 2147483647;
-    rotations.push(((seed % 12) - 6));
-  }
-
-  // 每次渲染重置加载计数（不再累计，新一批的照片重新计数）
-  _galleryLoadTotal = indices.length;
-  _galleryLoadDone = 0;
-  var progressEl = document.getElementById('galleryLoadProgress');
-  if(progressEl) progressEl.textContent = '0 / ' + _galleryLoadTotal + ' 张已加载';
-  stream.innerHTML = indices.map(function(pi, i){
-    var p = pool[pi];
-    var rot = rotations[i];
-    var name = (typeof p === 'string' ? p : (p.path||p.src||'')).split('/').pop().replace(/看图王\.jpg$|\.jpg$|\.jpeg$/i, '').replace(/^_+/, '');
-    return '<div class="polaroid" data-idx="' + pi + '" style="transform:rotate(' + rot + 'deg);z-index:' + (POLAROID_COUNT - i) + '" data-label="' + esc(p._albumTitle||'') + '" data-missing="暂未上传 · ' + esc(name) + '">' +
-      '<div class="polaroid-frame"><img src="' + thumb(p) + '" alt="" decoding="async" data-full="' + full(p) + '" data-name="' + esc(name) + '"></div>' +
-      '<div class="polaroid-caption">' + esc(name) + '</div>' +
-    '</div>';
-  }).join('');
-
-  // 绑定 onload/onerror（分离绑定避免转义问题）
-  stream.querySelectorAll('.polaroid img').forEach(function(img){
-    var polaroid = img.parentElement.parentElement;
-    img.onload = function(){
-      polaroid.classList.remove('polaroid-loading');
-      updateGalleryLoadProgress();
-    };
-    img.onerror = function(){
-      if(img.dataset.fb !== '1'){
-        img.dataset.fb = '1';
-        img.src = img.dataset.full;
-      } else if(img.dataset.fb !== '2'){
-        // 第三级回退：去掉 _看图王 后缀
-        img.dataset.fb = '2';
-        img.src = img.dataset.full.replace('_看图王', '');
-      } else {
-        img.style.display = 'none';
-        polaroid.classList.add('img-fail-frame');
-      }
-    };
-  });
-
-  stream.querySelectorAll('.polaroid').forEach(function(el){
-    el.classList.add('polaroid-loading');
-    el.onclick = function(){
-      var idx = parseInt(el.dataset.idx);
-      if(isNaN(idx)) return;
-      lightboxPhotos = pool;
-      lightboxIdx = idx;
-      openLightbox(idx);
-    };
-  });
-
-  var hint = document.getElementById('riverHint');
-  if(hint){
-    var ce = Math.ceil(_riverTotal / POLAROID_COUNT);
-    hint.textContent = '轮回 ' + _riverCycle + ' / 约 ' + ce + ' 次（剩余 ' + _riverQueue.length + ' / ' + _riverTotal + ' 张）';
-  }
-
-  // 切换分类时重置滚动到开头；末尾加载新一批时保留原滚动位置
-  // (保留逻辑已移到上方的 filterChanged 分支里)
-
-  if(!stream._aeBound){
-    stream._aeBound = true;
-    var _aeTrigger = function(){
-      if(stream.scrollLeft + stream.clientWidth >= stream.scrollWidth - 50){
-        var prevScroll = stream.scrollLeft;
-        var pool = getFilteredRiver();
-        if(pool.length === 0) pool = allGalleryPhotos;
-        ensureRiverQueue(pool);
-        // 保留用户当前滚动位置，新增的照片接在右边
-        renderRiver({preserveScroll:true});
-        // 直接在同帧设置，不经过 setTimeout 减少闪现
-        stream.scrollLeft = prevScroll;
-      }
-    };
-    stream.addEventListener('scroll', _aeTrigger, {passive:true});
+  // 绑定滚动自动加载（只绑一次）
+  if(!_riverScrollBound){
+    _riverScrollBound=true;
+    var deb=null;
+    stream.addEventListener('scroll', function(){
+      if(_riverLoadingMore) return;
+      if(deb) clearTimeout(deb);
+      deb=setTimeout(function(){
+        if(stream.scrollLeft+stream.clientWidth>=stream.scrollWidth-80){
+          _riverLoadingMore=true;
+          var fp=getFilteredRiver();
+          var p2=fp.length>0?fp:allGalleryPhotos;
+          ensureRiverQueue(p2);
+          _riverTotal=p2.length;
+          if(_riverQueue.length===0){ updateRiverHint(); _riverLoadingMore=false; return; }
+          var nn=Math.min(POLAROID_COUNT,_riverQueue.length);
+          var nid=[];
+          for(var ii=0; ii<nn; ii++) nid.push(_riverQueue.shift());
+          var rs=riverSeed(currentFilter,_riverCycle,_riverDOMCount);
+          var rot2=[];
+          for(var ii=0; ii<nid.length; ii++){ rs=(rs*16807)%2147483647; rot2.push(((rs%12)-6)); }
+          var nh=nid.map(function(pi,ii){ return buildPolaroid(p2,pi,rot2[ii],_riverDOMCount+ii); }).join('');
+          stream.insertAdjacentHTML('beforeend', nh);
+          bindPolaroidEvents(stream, p2, _riverDOMCount);
+          _riverDOMCount+=nid.length;
+          _galleryLoadTotal+=nid.length;
+          updateRiverHint();
+          _riverLoadingMore=false;
+        }
+      }, 200);
+    }, {passive:true});
   }
 }
 
@@ -539,11 +558,10 @@ function riverScroll(dir){
 }
 
 function riverShuffle(){
-  _riverQueue = []; // 清空队列让下一批重新洗牌
-  renderRiver();
+  renderRiver({forceReset:true});
   if(window.SFX) window.SFX.shutter();
 }
-window._galleryFilterChanged = function(){ renderRiver(); };
+window._galleryFilterChanged = function(){ renderRiver({forceReset:true}); };
 
 function buildRiverFilters(){
   var container = document.getElementById('viewerFilters');
@@ -565,7 +583,7 @@ function buildRiverFilters(){
       container.querySelectorAll('.river-filter').forEach(function(e){ e.classList.remove('active'); });
       el.classList.add('active');
       if(window.SFX) window.SFX.tick();
-      renderRiver();
+      renderRiver({forceReset:true});
     };
   });
   // 静音按钮
