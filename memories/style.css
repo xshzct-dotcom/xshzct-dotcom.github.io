@@ -46,7 +46,7 @@
 /* --- Reset --- */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
-body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden;overscroll-behavior-x:none;-webkit-font-smoothing:antialiased;font-size:16px;touch-action:pan-y pinch-zoom}
+body{font-family:var(--font);background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden;overscroll-behavior-x:none;-webkit-font-smoothing:antialiased;font-size:16px}
 a{color:var(--accent);text-decoration:none;transition:color .25s}
 a:hover{color:var(--accent-2)}
 img{display:block;max-width:100%}
@@ -140,7 +140,8 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .river-filter.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
 
 .river{overflow:hidden;padding:20px 0;position:relative}
-.river-stream{display:flex;gap:60px;padding:20px 100px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:thin;cursor:grab;overscroll-behavior-x:contain;touch-action:pan-x pan-y pinch-zoom}
+.river-stream{display:flex;gap:60px;padding:20px 50px;overflow-x:auto;scroll-behavior:smooth;scrollbar-width:thin;cursor:grab;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.river-stream::after{content:'';flex:0 0 30px}
 .river-stream:active{cursor:grabbing}
 .river-stream::-webkit-scrollbar{height:4px}
 .river-stream::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
@@ -173,7 +174,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 @media(max-width:768px){
   .polaroid{width:200px;padding:8px 8px 28px 8px}
   .polaroid::after{bottom:6px;font-size:.65rem}
-  .river-stream{gap:40px;padding:16px 50px;scroll-snap-type:none;scroll-behavior:auto;overscroll-behavior-x:contain}
+  .river-stream{gap:30px;padding:12px 24px;overscroll-behavior-x:contain}
 }
 
 /* --- Year Heatmap (GitHub-style) --- *//* --- Year Heatmap (GitHub-style) --- *//* --- Year Heatmap (GitHub-style) --- */
