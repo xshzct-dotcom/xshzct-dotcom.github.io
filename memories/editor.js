@@ -199,12 +199,26 @@ $('#editorClose').onclick=close;
 $('#editorBackdrop').onclick=close;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#editorPanel').classList.contains('open'))close()});
 
-// Tab 切换
+// Tab 切换（带缓存）
+var _editorCache = {essay: null, album: null, music: null};
+var _cacheTime = {essay: 0, album: 0, music: 0};
+var _CACHE_TTL = 15000; // 15秒内不重复请求
+function invalidateCache(tab){ if(tab) _cacheTime[tab]=0; else{_cacheTime={essay:0,album:0,music:0};} }
+function afterMutation(tab, renderFn){
+  invalidateCache(tab);
+  if(typeof renderFn==='function') renderFn();
+}
+
+function showTabLoading(){
+  const body=$('#editorBody');
+  body.innerHTML='<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:.9rem">加载中...</div>';
+}
 $$('#editorTabs .editor-tab').forEach(tab=>{
   tab.onclick=()=>{
     $$('#editorTabs .editor-tab').forEach(t=>t.classList.remove('active'));
     tab.classList.add('active');
     currentTab=tab.dataset.tab;
+    showTabLoading();
     renderTab();
   };
 });
@@ -214,7 +228,15 @@ async function renderEssayTab(){
   const body=$('#editorBody');
   const cats=['童年篇','初恋篇','日记','旅行见闻'];
   const catIds=['childhood','firstlove','thoughts','travel'];
-  const {data:essays}=await db().from('essays').select('*');
+  var essays;
+  if(_editorCache.essay && Date.now()-_cacheTime.essay < _CACHE_TTL){
+    essays = _editorCache.essay;
+  } else {
+    const {data:d}=await db().from('essays').select('*');
+    essays = d;
+    _editorCache.essay = essays;
+    _cacheTime.essay = Date.now();
+  }
   // 文章按日期降序（最新在前），无日期文章按sort_order排在最后
   const all=(essays||[]).slice().sort(function(a,b){
     return cmpDate(a.date, b.date);
@@ -415,7 +437,8 @@ async function renderEssayTab(){
         if(exist&&exist.length) await db().from('essays').update(data).eq('id',exist[0].id);
         else{data.sort_order=0;await db().from('essays').insert(data);}
       }
-      // 保存后返回上一级
+      // 保存后返回上一级 + 清除缓存
+      invalidateCache('essay');
       if(window._essayReturnTo) window._essayReturnTo();
       else renderEssayTab();
       if(window.reloadFromSupabase) setTimeout(window.reloadFromSupabase, 2000);
@@ -424,6 +447,7 @@ async function renderEssayTab(){
     if(!isNew) $('#eeDelBtn').onclick=async()=>{
       if(!confirm('确定删除「'+title+'」？'))return;
       await db().from('essays').delete().eq('id',a.id);
+      invalidateCache('essay');
       if(window._essayReturnTo) window._essayReturnTo();
       else renderEssayTab();
       if(window.reloadFromSupabase) setTimeout(window.reloadFromSupabase, 2000);
@@ -443,7 +467,15 @@ window.renderEssayTab=renderEssayTab;
 // ===== 相册编辑 =====
 async function renderAlbumTab(){
   const body=$('#editorBody');
-  const {data:albums}=await db().from('albums').select('*').order('sort_order',{ascending:true});
+  var albums;
+  if(_editorCache.album && Date.now()-_cacheTime.album < _CACHE_TTL){
+    albums = _editorCache.album;
+  } else {
+    const {data:d}=await db().from('albums').select('*').order('sort_order',{ascending:true});
+    albums = d;
+    _editorCache.album = albums;
+    _cacheTime.album = Date.now();
+  }
   const list=albums||[];
   body.style.paddingTop = '';
   body.innerHTML=`
@@ -924,7 +956,15 @@ window.renderAlbumTab=renderAlbumTab;
 // ===== 音乐编辑 =====
 async function renderMusicTab(){
   const body=$('#editorBody');
-  const {data:tracks}=await db().from('music').select('*').order('sort_order',{ascending:true});
+  var tracks;
+  if(_editorCache.music && Date.now()-_cacheTime.music < _CACHE_TTL){
+    tracks = _editorCache.music;
+  } else {
+    const {data:d}=await db().from('music').select('*').order('sort_order',{ascending:true});
+    tracks = d;
+    _editorCache.music = tracks;
+    _cacheTime.music = Date.now();
+  }
   const list=tracks||[];
 
   body.innerHTML=`
