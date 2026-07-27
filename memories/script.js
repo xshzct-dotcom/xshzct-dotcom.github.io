@@ -1066,8 +1066,8 @@ function initMusic(){
 function _grant(){ 
   if(window._userStarted) return;
   window._userStarted = true;
-  // 如果 switchPlaylist 已加载好歌，立即播放
-  if(bgMusic && bgMusic.src && bgMusic.src !== window.location.href){
+  // 如果 switchPlaylist 已加载好歌，立即播放（恢复 paused 检查）
+  if(bgMusic && bgMusic.src && bgMusic.src !== window.location.href && bgMusic.paused){
     bgMusic.play().catch(function(){});
   }
 }
