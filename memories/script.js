@@ -407,14 +407,11 @@ function updateGalleryLoadProgress(){
   if(el) el.textContent = _galleryLoadDone + ' / ' + _galleryLoadTotal + ' 张已加载';
 }
 
-// ===== 记忆河流 v2（追加式 — 滑到底只追加不替换，防重复加载锁） =====
+// ===== 记忆河流 v3（简单版本 — 每次渲染一批，换一批才刷新，无自动加载） =====
 let _riverQueue = [];
 let _riverCycle = 0;
 let _riverTotal = 0;
 let _riverPoolKey = null;
-let _riverLoadingMore = false;
-let _riverDOMCount = 0;
-let _riverScrollBound = false;
 
 function ensureRiverQueue(pool){
   if(_riverQueue.length === 0){
@@ -466,11 +463,9 @@ function riverSeed(c, cycle, skip){
 function updateRiverHint(){
   var hint=document.getElementById('riverHint');
   if(!hint) return;
-  var ce=Math.ceil(_riverTotal/POLAROID_COUNT);
-  hint.textContent='轮回 '+_riverCycle+' / 约 '+ce+' 次（剩余 '+_riverQueue.length+' / '+_riverTotal+' 张）';
+  hint.textContent='轮回 '+_riverCycle+' （剩余 '+_riverQueue.length+' / '+_riverTotal+' 张）';
 }
 
-// 核心渲染函数 — reset 时全量替换，otherwise 追加
 function renderRiver(opts){
   opts=opts||{};
   var stream=document.getElementById('riverStream');
@@ -478,77 +473,36 @@ function renderRiver(opts){
   var filtered=getFilteredRiver();
   var pool=filtered.length>0?filtered:allGalleryPhotos;
   _riverTotal=pool.length;
-  var filterChanged=_riverPoolKey!==currentFilter;
-  var isReset=opts.forceReset||filterChanged||_riverDOMCount===0;
 
-  if(filterChanged){
+  if(opts.forceReset || _riverPoolKey!==currentFilter){
     _riverQueue=[]; _riverCycle=0; _riverPoolKey=currentFilter;
-    _riverDOMCount=0; _riverLoadingMore=false;
+    stream.scrollLeft=0;
   }
-  if(isReset) _riverLoadingMore=false;
 
   ensureRiverQueue(pool);
   var n=Math.min(POLAROID_COUNT, pool.length);
   var indices=[];
   for(var i=0; i<n && _riverQueue.length>0; i++) indices.push(_riverQueue.shift());
-
   if(indices.length===0){ updateRiverHint(); return; }
 
   var rotSeed=riverSeed(currentFilter, _riverCycle, 0);
   var rotations=[];
   for(var i=0; i<indices.length; i++){ rotSeed=(rotSeed*16807)%2147483647; rotations.push(((rotSeed%12)-6)); }
 
-  if(isReset){
-    _galleryLoadTotal=indices.length; _galleryLoadDone=0;
-    var pEl=document.getElementById('galleryLoadProgress');
-    if(pEl) pEl.textContent='0 / '+_galleryLoadTotal+' 张已加载';
-    stream.innerHTML=indices.map(function(pi,i){ return buildPolaroid(pool,pi,rotations[i],POLAROID_COUNT-i); }).join('');
-    _riverDOMCount=indices.length;
-    bindPolaroidEvents(stream, pool, 0);
-    updateRiverHint();
-    stream.scrollLeft=0;
-  } else {
-    var html=indices.map(function(pi,i){ return buildPolaroid(pool,pi,rotations[i],_riverDOMCount+i); }).join('');
-    stream.insertAdjacentHTML('beforeend', html);
-    bindPolaroidEvents(stream, pool, _riverDOMCount);
-    _riverDOMCount+=indices.length;
-    _galleryLoadTotal+=indices.length;
-    updateRiverHint();
-  }
+  _galleryLoadTotal=indices.length; _galleryLoadDone=0;
+  var pEl=document.getElementById('galleryLoadProgress');
+  if(pEl) pEl.textContent='0 / '+_galleryLoadTotal+' 张已加载';
 
-  // 绑定滚动自动加载（只绑一次）
-  if(!_riverScrollBound){
-    _riverScrollBound=true;
-    var deb=null;
-    stream.addEventListener('scroll', function(){
-      if(_riverLoadingMore) return;
-      if(deb) clearTimeout(deb);
-      deb=setTimeout(function(){
-        if(stream.scrollLeft+stream.clientWidth>=stream.scrollWidth-80){
-          _riverLoadingMore=true;
-          var fp=getFilteredRiver();
-          var p2=fp.length>0?fp:allGalleryPhotos;
-          ensureRiverQueue(p2);
-          _riverTotal=p2.length;
-          if(_riverQueue.length===0){ updateRiverHint(); _riverLoadingMore=false; return; }
-          var nn=Math.min(POLAROID_COUNT,_riverQueue.length);
-          var nid=[];
-          for(var ii=0; ii<nn; ii++) nid.push(_riverQueue.shift());
-          var rs=riverSeed(currentFilter,_riverCycle,_riverDOMCount);
-          var rot2=[];
-          for(var ii=0; ii<nid.length; ii++){ rs=(rs*16807)%2147483647; rot2.push(((rs%12)-6)); }
-          var nh=nid.map(function(pi,ii){ return buildPolaroid(p2,pi,rot2[ii],_riverDOMCount+ii); }).join('');
-          stream.insertAdjacentHTML('beforeend', nh);
-          bindPolaroidEvents(stream, p2, _riverDOMCount);
-          _riverDOMCount+=nid.length;
-          _galleryLoadTotal+=nid.length;
-          updateRiverHint();
-          _riverLoadingMore=false;
-        }
-      }, 200);
-    }, {passive:true});
-  }
+  stream.innerHTML=indices.map(function(pi,i){ return buildPolaroid(pool,pi,rotations[i],POLAROID_COUNT-i); }).join('');
+  bindPolaroidEvents(stream, pool, 0);
+  updateRiverHint();
 }
+
+function riverShuffle(){
+  renderRiver({forceReset:true});
+  if(window.SFX) window.SFX.shutter();
+}
+window._galleryFilterChanged = function(){ renderRiver({forceReset:true}); };
 
 function riverScroll(dir){
   var stream = document.getElementById('riverStream');
@@ -1483,38 +1437,29 @@ async function loadFromSupabase(){
     if(typeof albums !== 'undefined'){
       albums.splice(0, albums.length, ...merged);
     }
-    // 重建 allGalleryPhotos
-    allGalleryPhotos = [];
-    merged.forEach(function(album){
-      (album.photos||[]).forEach(function(photo){
-        var p = typeof photo === 'string' ? {path:photo, src:photo} : photo;
-        allGalleryPhotos.push({path:p.path||p.src||'', src:p.src||p.path||'', _albumTitle:album.title, _albumId:String(album._dbId||album.title), _worldId:album.world||''});
-      });
-    });
-    // 从 album_photos 表加载用户上传的照片补充到相册
+    // 从 album_photos 表加载用户上传的照片（新版本：album_photos 是唯一源，data.js 照片仅首次同步用）
     const {data:albumPhotos} = await SB.from('album_photos').select('*').order('sort_order', {ascending:true});
+    // 重建 allGalleryPhotos — 只从 album_photos 取
+    allGalleryPhotos = [];
+    var sbAlbumMap = {};
+    (sbAlbums||[]).forEach(function(a){ sbAlbumMap[a.id] = a; });
     if(albumPhotos && albumPhotos.length > 0){
-      var photoMap = {};
       albumPhotos.forEach(function(ap){
-        if(!photoMap[ap.album_id]) photoMap[ap.album_id] = [];
-        photoMap[ap.album_id].push(ap);
+        var sp = ap.storage_path || ap.filename || '';
+        var imgUrl = sp.startsWith('images/') ? ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//,''))
+          : ('https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/' + sp);
+        allGalleryPhotos.push({path:imgUrl||sp, src:imgUrl||sp, _albumTitle:sbAlbumMap[ap.album_id]?sbAlbumMap[ap.album_id].title:'未知', _albumId:String(ap.album_id)});
       });
-      // 按 _dbId 分配照片到对应相册（_dbId 是 Supabase albums.id）
-      merged.forEach(function(album){
-        var aid = album._dbId;
-        if(aid && photoMap[aid]){
-          photoMap[aid].forEach(function(ap){
-            var sp = ap.storage_path || ap.filename || '';
-            var imgUrl = sp.startsWith('images/') ? ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//,''))
-              : ('https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/' + sp);
-            if(!album.photos) album.photos = [];
-            if(!album.photos.includes(imgUrl) && !album.photos.includes(sp)){
-              album.photos.push(imgUrl || sp);
-              allGalleryPhotos.push({path:imgUrl||sp, src:imgUrl||sp, _albumTitle:album.title, _albumId:String(album._dbId||album.title)});
-            }
+    } else {
+      // 首次访问还没有album_photos数据时，从data.js兜底
+      if(typeof albums !== 'undefined'){
+        albums.forEach(function(album){
+          (album.photos||[]).forEach(function(photo){
+            var p = typeof photo === 'string' ? {path:photo, src:photo} : photo;
+            allGalleryPhotos.push({path:p.path||p.src||'', src:p.src||p.path||'', _albumTitle:album.title, _albumId:String(album._dbId||album.title), _worldId:album.world||''});
           });
-        }
-      });
+        });
+      }
     }
 
     // 3. 音乐 — 从 music 表加载排序（只取主页音乐，排除相册专属）
