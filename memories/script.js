@@ -1444,7 +1444,17 @@ async function loadFromSupabase(){
       albums.splice(0, albums.length, ...merged);
     }
     // 从 album_photos 表加载用户上传的照片（新版本：album_photos 是唯一源，data.js 照片仅首次同步用）
-    const {data:albumPhotos} = await SB.from('album_photos').select('*').order('sort_order', {ascending:true});
+    // 注意：Supabase 默认每页 1000 条，要分页拉全部
+    let allAlbumPhotos = [];
+    let pgStart = 0, pgSize = 1000;
+    while(true){
+      const {data:page} = await SB.from('album_photos').select('*').order('sort_order', {ascending:true}).range(pgStart, pgStart + pgSize - 1);
+      if(!page || page.length === 0) break;
+      allAlbumPhotos = allAlbumPhotos.concat(page);
+      if(page.length < pgSize) break;
+      pgStart += pgSize;
+    }
+    const albumPhotos = allAlbumPhotos;
     // 重建 allGalleryPhotos — 只从 album_photos 取
     allGalleryPhotos = [];
     var sbAlbumMap = {};
