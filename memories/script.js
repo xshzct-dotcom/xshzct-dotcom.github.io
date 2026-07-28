@@ -475,7 +475,8 @@ function renderRiver(opts){
   var pool=filtered.length>0?filtered:allGalleryPhotos;
   _riverTotal=pool.length;
 
-  if(opts.forceReset || _riverPoolKey!==currentFilter){
+  // loadFromSupabase 之后可能所有数据都变了，强制重置一次
+  if(opts.forceReset || _riverPoolKey!==currentFilter || opts.fromSupabase){
     _riverQueue=[]; _riverCycle=0; _riverPoolKey=currentFilter;
     stream.scrollLeft=0;
   }
@@ -497,6 +498,8 @@ function renderRiver(opts){
   stream.innerHTML=indices.map(function(pi,i){ return buildPolaroid(pool,pi,rotations[i],POLAROID_COUNT-i); }).join('');
   bindPolaroidEvents(stream, pool, 0);
   updateRiverHint();
+  // 滚回最左（让用户看到新一批的第一张）
+  stream.scrollLeft=0;
 }
 
 function riverShuffle(){
@@ -1487,7 +1490,7 @@ async function loadFromSupabase(){
     console.log('[memories] loadFromSupabase done');
     // 重新渲染相册 chips 和极地（DB sort_order 已同步）
     if(typeof buildRiverFilters === 'function') buildRiverFilters();
-    if(typeof renderRiver === 'function') renderRiver();
+    if(typeof renderRiver === 'function') renderRiver({fromSupabase:true});
     // 重新触发当前视图刷新
     if(window._galleryFilterChanged) window._galleryFilterChanged();
     window._testReady = true;
