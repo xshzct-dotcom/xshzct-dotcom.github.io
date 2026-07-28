@@ -463,8 +463,7 @@ function riverSeed(c, cycle, skip){
 function updateRiverHint(){
   var hint=document.getElementById('riverHint');
   if(!hint) return;
-  var shown = _riverTotal - _riverQueue.length;
-  hint.textContent='轮回 '+_riverCycle+' · 已看 '+shown+' / '+_riverTotal+' 张';
+  hint.textContent='轮回 '+_riverCycle+' （剩余 '+_riverQueue.length+' / '+_riverTotal+' 张）';
 }
 
 function renderRiver(opts){
@@ -475,8 +474,7 @@ function renderRiver(opts){
   var pool=filtered.length>0?filtered:allGalleryPhotos;
   _riverTotal=pool.length;
 
-  // loadFromSupabase 之后可能所有数据都变了，强制重置一次
-  if(opts.forceReset || _riverPoolKey!==currentFilter || opts.fromSupabase){
+  if(opts.forceReset || _riverPoolKey!==currentFilter){
     _riverQueue=[]; _riverCycle=0; _riverPoolKey=currentFilter;
     stream.scrollLeft=0;
   }
@@ -498,12 +496,10 @@ function renderRiver(opts){
   stream.innerHTML=indices.map(function(pi,i){ return buildPolaroid(pool,pi,rotations[i],POLAROID_COUNT-i); }).join('');
   bindPolaroidEvents(stream, pool, 0);
   updateRiverHint();
-  // 滚回最左（让用户看到新一批的第一张）
-  stream.scrollLeft=0;
 }
 
 function riverShuffle(){
-  renderRiver();  // 不传forceReset = 从队列取下一批，看完一轮自动重洗
+  renderRiver({forceReset:true});
   if(window.SFX) window.SFX.shutter();
 }
 window._galleryFilterChanged = function(){ renderRiver({forceReset:true}); };
@@ -516,7 +512,7 @@ function riverScroll(dir){
 }
 
 function riverShuffle(){
-  renderRiver();  // 不传forceReset = 从队列取下一批，看完一轮自动重洗
+  renderRiver({forceReset:true});
   if(window.SFX) window.SFX.shutter();
 }
 window._galleryFilterChanged = function(){ renderRiver({forceReset:true}); };
@@ -1490,7 +1486,7 @@ async function loadFromSupabase(){
     console.log('[memories] loadFromSupabase done');
     // 重新渲染相册 chips 和极地（DB sort_order 已同步）
     if(typeof buildRiverFilters === 'function') buildRiverFilters();
-    if(typeof renderRiver === 'function') renderRiver({fromSupabase:true});
+    if(typeof renderRiver === 'function') renderRiver();
     // 重新触发当前视图刷新
     if(window._galleryFilterChanged) window._galleryFilterChanged();
     window._testReady = true;
