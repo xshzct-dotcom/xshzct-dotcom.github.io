@@ -463,7 +463,8 @@ function riverSeed(c, cycle, skip){
 function updateRiverHint(){
   var hint=document.getElementById('riverHint');
   if(!hint) return;
-  hint.textContent='轮回 '+_riverCycle+' （剩余 '+_riverQueue.length+' / '+_riverTotal+' 张）';
+  var shown = _riverTotal - _riverQueue.length;
+  hint.textContent='轮回 '+_riverCycle+' · 已看 '+shown+' / '+_riverTotal+' 张';
 }
 
 function renderRiver(opts){
@@ -499,7 +500,7 @@ function renderRiver(opts){
 }
 
 function riverShuffle(){
-  renderRiver({forceReset:true});
+  renderRiver();  // 不传forceReset = 从队列取下一批，看完一轮自动重洗
   if(window.SFX) window.SFX.shutter();
 }
 window._galleryFilterChanged = function(){ renderRiver({forceReset:true}); };
@@ -512,7 +513,7 @@ function riverScroll(dir){
 }
 
 function riverShuffle(){
-  renderRiver({forceReset:true});
+  renderRiver();  // 不传forceReset = 从队列取下一批，看完一轮自动重洗
   if(window.SFX) window.SFX.shutter();
 }
 window._galleryFilterChanged = function(){ renderRiver({forceReset:true}); };
