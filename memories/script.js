@@ -1227,15 +1227,7 @@ async function loadSortOrderFromDB(){
         var found = _timelineItems.find(function(t){ return t.title === dbItem.title && t.date === dbItem.date; });
         if(found) found.sort_order = dbItem.sort_order;
       });
-      // 重新排序
-      _timelineItems.sort((a,b)=>{
-        var ao=a.sort_order!=null?a.sort_order:0, bo=b.sort_order!=null?b.sort_order:0;
-        if(ao!==bo) return ao-bo;
-        var da=a.date||'', db=b.date||'';
-        if(da>db) return -1; if(da<db) return 1;
-        return 0;
-      });
-      buildTimeline();
+      // 不再按 sort_order 重排（时间线按日期显示，sort_order 只在编辑器拖拽排序时用）
     }
   }catch(e){}
 }
