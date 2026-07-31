@@ -2,8 +2,9 @@
 // Service Worker - 照片从 Supabase Storage 加载
 // 策略：network-first（每次都拿最新），离线时回退缓存
 // 2026-07-21 升级：从 cache-first 改为 network-first，解决"改了却看不到"的缓存锁死
+// 2026-08-01 升级：Supabase REST 读请求 stale-while-revalidate（二次访问秒开）
 // ============================================
-const CACHE = 'blog-v56';
+const CACHE = 'blog-v57';
 const STATIC_ASSETS = [
   '/', '/index.html',
   '/style.css', '/data.js', '/script.js',
@@ -11,6 +12,18 @@ const STATIC_ASSETS = [
 ];
 
 const SUPABASE_STORAGE = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos';
+const SUPABASE_REST = 'https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1';
+// Supabase 读请求缓存名 + 有效期（5分钟内直接用缓存，后台再刷新）
+const SUPABASE_CACHE = 'supabase-reads-v1';
+const SUPABASE_TTL = 5 * 60 * 1000;
+
+// Headers → 普通对象
+function toObj(headers){
+  const o = {};
+  if(!headers || !headers.forEach) return o;
+  headers.forEach(function(v, k){ o[k] = v; });
+  return o;
+}
 
 self.addEventListener('install', function(e) {
   self.skipWaiting();
@@ -27,7 +40,8 @@ self.addEventListener('activate', function(e) {
     caches.keys().then(function(names) {
       return Promise.all(
         names.map(function(name) {
-          if (name !== CACHE) return caches.delete(name);
+          // 保留 Supabase 读缓存，其它旧缓存删除
+          if (name !== CACHE && name !== SUPABASE_CACHE) return caches.delete(name);
         })
       );
     })
@@ -35,8 +49,54 @@ self.addEventListener('activate', function(e) {
   self.clients.claim();
 });
 
+// 用时间戳判断缓存是否过期
+function cacheIsFresh(cacheResp){
+  if(!cacheResp) return false;
+  const ts = cacheResp.headers.get('x-cache-time');
+  if(!ts) return false;
+  return (Date.now() - parseInt(ts)) < SUPABASE_TTL;
+}
+
 self.addEventListener('fetch', function(e) {
   const url = new URL(e.request.url);
+
+  // Supabase REST 读请求（GET）：stale-while-revalidate
+  // 5分钟内的缓存直接用（快），同时后台刷新；无缓存或过期就走网络
+  if (e.request.method === 'GET' && url.href.startsWith(SUPABASE_REST)) {
+    e.respondWith(
+      caches.open(SUPABASE_CACHE).then(function(cache){
+        return cache.match(e.request).then(function(cached){
+          if(cacheIsFresh(cached)){
+            // 命中缓存：立即返回 + 后台刷新
+            fetch(e.request).then(function(fresh){
+              if(fresh && fresh.status === 200){
+                var clone = fresh.clone();
+                cache.put(e.request, new Response(clone.body, {
+                  status: clone.status, statusText: clone.statusText,
+                  headers: Object.assign({}, toObj(clone.headers), {'x-cache-time': String(Date.now())})
+                }));
+              }
+            }).catch(function(){});
+            return cached;
+          }
+          // 无缓存：走网络，成功后存缓存
+          return fetch(e.request).then(function(fresh){
+            if(fresh && fresh.status === 200){
+              var clone = fresh.clone();
+              cache.put(e.request, new Response(clone.body, {
+                status: clone.status, statusText: clone.statusText,
+                headers: Object.assign({}, toObj(clone.headers), {'x-cache-time': String(Date.now())})
+              }));
+            }
+            return fresh;
+          }).catch(function(){
+            return cached || Response.error();
+          });
+        });
+      })
+    );
+    return;
+  }
 
   // 仅处理同源 GET
   if (!url.href.startsWith(self.location.origin)) return;

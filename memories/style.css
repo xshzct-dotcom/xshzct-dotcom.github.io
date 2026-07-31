@@ -372,3 +372,59 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   .nav{padding:0 8px}
 }
 
+
+/* ============================================
+   v48 优化 — 无障碍 & 动效润色（不影响功能）
+   ============================================ */
+
+/* 键盘导航焦点可见（无障碍） */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+button:focus-visible,.river-filter:focus-visible,.polaroid:focus-visible{outline:2px solid var(--accent-2);outline-offset:3px}
+
+/* 减少动态效果（用户系统设置） */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+}
+
+/* 极坐标悬停（桌面端）——轻微上浮 + 阴影加深 */
+@media (hover:hover) and (pointer:fine){
+  .polaroid:hover{transform:translateY(-6px) rotate(0deg) scale(1.03) !important;box-shadow:0 16px 40px rgba(0,0,0,.45);z-index:50 !important;transition:transform .3s var(--ease-spring),box-shadow .3s ease}
+  .timeline-card:hover{transform:translateY(-3px);border-color:var(--border-hover);box-shadow:var(--shadow-md)}
+  .daily-quote:hover{border-color:var(--border-hover)}
+}
+
+/* 按钮按压反馈 */
+button:active{transform:scale(.96)}
+.nav-icon-btn:active{transform:scale(.88)}
+
+/* 河流按钮hover增强 */
+.river-ctrl:hover{transform:scale(1.06)}
+.river-shuffle:hover{letter-spacing:.5px}
+
+/* 分区标题微动画（滚动进入时已有 fade-up，这里补标题装饰线） */
+.section-title{position:relative;padding-bottom:10px}
+.section-title::after{content:'';position:absolute;left:0;bottom:0;width:44px;height:2px;background:linear-gradient(90deg,var(--accent),transparent);border-radius:1px}
+
+/* 弹窗入场动画更顺滑 */
+.modal-content{animation:modalIn .32s var(--ease)}
+@keyframes modalIn{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+
+/* 加载提示骨架（河流/时间线数据未到时） */
+.polaroid-loading .polaroid-frame{background:linear-gradient(110deg,var(--bg-card) 8%,var(--bg-card-hover) 18%,var(--bg-card) 33%);background-size:200% 100%;animation:shimmer 1.4s linear infinite}
+@keyframes shimmer{to{background-position-x:-200%}}
+
+/* 文章弹窗正文行高优化 */
+.modal-essay-body p{margin-bottom:.9em;line-height:1.85;text-align:justify}
+
+/* 播放器按钮微调 */
+.player-btn{transition:transform .2s var(--ease),color .2s}
+.player-btn:hover{transform:scale(1.15);color:var(--accent)}
+
+/* ===== Toast 轻提示 ===== */
+#toastBox{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.toast{background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:10px 22px;border-radius:24px;font-size:.85rem;box-shadow:var(--shadow-md);opacity:0;transform:translateY(12px);animation:toastIn .3s var(--ease) forwards;max-width:80vw;text-align:center;line-height:1.5}
+.toast.toast-success{border-color:var(--success);color:#A8C4AA}
+.toast.toast-error{border-color:var(--danger);color:#E89A8C}
+.toast.toast-warn{border-color:var(--accent-2);color:#DDA28A}
+.toast.toast-out{opacity:0;transform:translateY(-8px);transition:opacity .3s,transform .3s}
+@keyframes toastIn{to{opacity:1;transform:none}}

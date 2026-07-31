@@ -431,12 +431,13 @@ async function renderEssayTab(){
         date:dateVal,
         body:$('#eeBody').value.trim(),
       };
-      if(!data.title||!data.body){alert('标题和正文不能为空');return}
+      if(!data.title||!data.body){ if(window.toast) toast('标题和正文不能为空','warn'); else alert('标题和正文不能为空'); return }
       if(a&&a.id) await db().from('essays').update(data).eq('id',a.id);
       else{const {data:exist}=await db().from('essays').select('id').eq('title',data.title).limit(1);
         if(exist&&exist.length) await db().from('essays').update(data).eq('id',exist[0].id);
         else{data.sort_order=0;await db().from('essays').insert(data);}
       }
+      if(window.toast) toast('已保存 ✓','success');
       // 保存后返回上一级 + 清除缓存
       invalidateCache('essay');
       if(window._essayReturnTo) window._essayReturnTo();
@@ -938,7 +939,7 @@ function renderList(){
         renderAlbumPhotos(album);
         // 同步刷新主页
         if(window.reloadFromSupabase) setTimeout(function(){ window.reloadFromSupabase(); }, 500);
-        if(ok>0 && fail===0) alert('✅ '+ok+'张照片上传成功！');
+        if(ok>0 && fail===0){ if(window.toast) toast('✅ '+ok+'张照片上传成功','success'); else alert('✅ '+ok+'张照片上传成功！'); }
         else if(fail>0) alert('上传完成：'+ok+'张成功，'+fail+'张失败（F12看Console详情）');
         else if(ok===0 && fail===0) alert('⚠️ 没有上传任何文件');
       };
