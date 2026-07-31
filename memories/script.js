@@ -48,16 +48,6 @@ function full(p){
   }
   return IMG_BASE+s;
 }
-// 音乐：优先本地 ../music/，CDN URL 保留作 fallback
-function musicPath(m){
-  if(!m) return '';
-  let s = typeof m==='string' ? m : (m.url||m.path||m.storage_path||'');
-  if(!s) return '';
-  if(s.startsWith('http')) return s; // CDN URL 直用
-  if(s.startsWith('music/')) return '../'+s;
-  // 兜底：根据文件名拼本地路径
-  return '../music/'+s;
-}
 
 // ===== 导航 =====
 const nav=$('#nav');
@@ -532,12 +522,6 @@ function riverScroll(dir){
   if(window.SFX) window.SFX.flip();
 }
 
-function riverShuffle(){
-  renderRiver({forceReset:true});
-  if(window.SFX) window.SFX.shutter();
-}
-window._galleryFilterChanged = function(){ renderRiver({forceReset:true}); };
-
 function buildRiverFilters(){
   var container = document.getElementById('viewerFilters');
   if(!container) return;
@@ -764,18 +748,6 @@ function showLbLoader(show, pct, text){
   if(tx) tx.textContent = text + (pct > 0 ? ' ' + pct + '%' : '');
 }
 
-function renderFilmstrip(kenBurns){
-  const strip = $('#lightboxFilmstrip');
-  if(!strip || lightboxPhotos.length < 4){ if(strip) strip.classList.remove('show'); return; }
-  strip.innerHTML = lightboxPhotos.map((p,i) =>
-    `<div class="fs-item${i===lightboxIdx?' active':''}" data-fs="${i}"><img src="${thumb(p)}" alt=""></div>`
-  ).join('');
-  strip.classList.add('show');
-  strip.querySelectorAll('[data-fs]').forEach(el => el.onclick = () => openLightbox(parseInt(el.dataset.fs)));
-  const active = strip.querySelector('.fs-item.active');
-  if(active) active.scrollIntoView({inline:'center', block:'nearest'});
-}
-
 function navLightbox(dir){
   lightboxIdx += dir;
   if(lightboxIdx < 0) lightboxIdx = lightboxPhotos.length - 1;
@@ -987,28 +959,6 @@ $('#pwdInput').onkeydown=e=>{if(e.key==='Enter')checkPwd();};
 var _ovInp2 = document.getElementById('pwdInput2');
 if(_ovInp2) _ovInp2.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
 // toggleBtn 是那个齿轮灯箱的预览按钮
-
-function handleAlbumClick(albumId){
-  const album = (albums||[]).find(a=>a.id===albumId);
-  if(!album) return;
-  if(typeof worlds!=='undefined'){
-    const oldworld = worlds.find(w=>w.id==='oldworld');
-    if(oldworld){
-      const isOldWorld = (album.world==='oldworld')||(oldworld.children&&oldworld.children.includes(albumId));
-      if(isOldWorld&&!localStorage.getItem('memories_oldworld')){
-        showPwdModal(()=>openAlbumLightbox(albumId));
-        return;
-      }
-    }
-  }
-  openAlbumLightbox(albumId);
-}
-function openAlbumLightbox(albumId){
-  const album = (albums||[]).find(a=>a.id===albumId);
-  if(!album||!album.photos||album.photos.length===0) return;
-  lightboxPhotos = album.photos.map(p=>({path:p, src:p, _albumTitle:album.title}));
-  openLightbox(0);
-}
 
 // ===== 音乐播放器 =====
 let currentSongIdx=0, isPlaying=false, bgMusic=null;
@@ -1275,18 +1225,6 @@ const SB_KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
 let SB = null;
 try { SB = supabase.createClient(SB_URL, SB_KEY); } catch(e) { SB = null; }
 
-function dbQ(){
-  if(SB) return SB;
-  // 离线 mock
-  const qb = r => new Proxy({},{get:(_,p)=>{
-    if(['select','insert','update','delete','upsert','order','eq','limit','single','maybeSingle','filter','match'].includes(p)) return ()=>qb(r);
-    if(p==='then') return res=>res(r);
-    if(p==='catch') return ()=>{};
-    return ()=>qb(r);
-  }});
-  return {from:()=>qb({data:[],error:null})};
-}
-
 // 把 data.js 现有内容灌到 Supabase（完整版：表空时 bulk insert，否则 per-item merge）
 async function ensureSync(){
   if(!SB) return;
@@ -1377,25 +1315,6 @@ async function ensureSync(){
     console.log('[memories] ensureSync done');
   } catch(e){
     console.warn('[memories] ensureSync failed:', e);
-  }
-}
-
-// 从 Supabase 拉所有内容（编辑器打开前先拉一次，编辑器直接显示）
-async function loadFromSupabase(){
-  if(!SB) return null;
-  try{
-    const [{data:albumsData}, {data:essaysData}, {data:musicData}] = await Promise.all([
-      SB.from('albums').select('*').order('sort_order', {ascending:true}),
-      SB.from('essays').select('*').order('sort_order', {ascending:true}),
-      SB.from('music').select('*').order('sort_order', {ascending:true}),
-    ]);
-    return {
-      albums: albumsData || [],
-      essays: essaysData || [],
-      music: musicData || [],
-    };
-  } catch(e){
-    return null;
   }
 }
 
