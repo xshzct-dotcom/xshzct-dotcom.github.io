@@ -363,6 +363,27 @@ function closeEssayModal(){
   $('#essayModal').classList.remove('active');
   document.body.style.overflow='';
 }
+
+// ===== Toast 轻提示 =====
+let _toastTimer = null;
+function toast(msg, type){
+  type = type || 'info';
+  let box = document.getElementById('toastBox');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'toastBox';
+    document.body.appendChild(box);
+  }
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = msg;
+  box.appendChild(t);
+  // 最多同时3条，超出移除最早的
+  while(box.children.length > 3) box.removeChild(box.firstChild);
+  setTimeout(function(){ t.classList.add('toast-out'); }, 2400);
+  setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, 2800);
+}
+window.toast = toast;
 window.closeEssayModal = closeEssayModal;
 $('#essayModal').onclick = e => { if(e.target===e.currentTarget) closeEssayModal(); };
 
@@ -429,7 +450,7 @@ function buildPolaroid(pool, pi, rot, z){
   var name = (typeof p === 'string' ? p : (p.path||p.src||'')).split('/').pop()
     .replace(/看图王\.jpg$|\.jpg$|\.jpeg$/i,'').replace(/^_+/,'');
   return '<div class="polaroid polaroid-loading" data-idx="'+pi+'" style="transform:rotate('+rot+'deg);z-index:'+z+'" data-label="'+esc(p._albumTitle||'')+'" data-missing="暂未上传 · '+esc(name)+'">'+
-    '<div class="polaroid-frame"><img src="'+thumb(p)+'" alt="" decoding="async" data-full="'+full(p)+'" data-name="'+esc(name)+'"></div>'+
+    '<div class="polaroid-frame"><img src="'+thumb(p)+'" alt="" decoding="async" loading="lazy" data-full="'+full(p)+'" data-name="'+esc(name)+'"></div>'+
     '<div class="polaroid-caption">'+esc(name)+'</div></div>';
 }
 
@@ -672,6 +693,22 @@ function openLightbox(idx, kenBurns){
       setTimeout(() => showLbLoader(false, 0, ''), 2000);
     };
     img.src = url;
+
+    // 预加载相邻图片，切换更流畅
+    preloadAdjacent(idx);
+  });
+}
+
+// 预加载相邻（前后各1张）原图
+function preloadAdjacent(idx){
+  if(!lightboxPhotos || lightboxPhotos.length === 0) return;
+  [idx-1, idx+1].forEach(function(i){
+    if(i < 0 || i >= lightboxPhotos.length) return;
+    try{
+      var src = full(lightboxPhotos[i]);
+      var im = new Image();
+      im.src = src;
+    }catch(e){}
   });
 }
 
