@@ -93,9 +93,8 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 
 /* --- Sections --- */
 .section{padding:100px 32px;max-width:1280px;margin:0 auto}
-.section-title{font-family:var(--font-display);font-size:clamp(1.8rem,3vw,2.5rem);margin-bottom:48px;text-align:center;letter-spacing:-.5px;position:relative}
+.section-title{font-family:var(--font-display);font-size:clamp(1.8rem,3vw,2.5rem);margin-bottom:48px;text-align:center;letter-spacing:-.5px}
 .section-title em{font-style:italic;color:var(--accent);font-weight:400}
-.section-title::after{content:'';display:block;width:40px;height:2px;background:var(--accent);margin:16px auto 0;border-radius:1px}
 
 /* --- Timeline (Essays) --- */
 .timeline{position:relative;padding:20px 0}
@@ -400,10 +399,6 @@ button:active{transform:scale(.96)}
 /* 河流按钮hover增强 */
 .river-ctrl:hover{transform:scale(1.06)}
 .river-shuffle:hover{letter-spacing:.5px}
-
-/* 分区标题微动画（滚动进入时已有 fade-up，这里补标题装饰线） */
-.section-title{position:relative;padding-bottom:10px}
-.section-title::after{content:'';position:absolute;left:0;bottom:0;width:44px;height:2px;background:linear-gradient(90deg,var(--accent),transparent);border-radius:1px}
 
 /* 弹窗入场动画更顺滑 */
 .modal-content{animation:modalIn .32s var(--ease)}
