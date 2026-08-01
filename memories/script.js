@@ -301,8 +301,9 @@ function buildTimeline(){
       }, null);
       if(!grp) return;
       const globalIdx = _timelineItems.indexOf(grp.items[itemIdx]);
-      if(globalIdx>=0) openEssayModal(_timelineItems[globalIdx]);
-      else openEssayModal(grp.items[itemIdx]);
+      // 第三个参数传分类的"页面显示顺序"作为弹窗池子（保证上一篇/下一篇和页面一致）
+      if(globalIdx>=0) openEssayModal(_timelineItems[globalIdx], true, grp.items);
+      else openEssayModal(grp.items[itemIdx], true, grp.items);
     };
   });
   observeFadeUps();
@@ -311,12 +312,16 @@ function buildTimeline(){
 // 文章阅读弹窗
 let _timelineItems = [];
 window._timelineItems = _timelineItems;
-function openEssayModal(essay, catOnly=true){
+function openEssayModal(essay, catOnly=true, displayList){
   const overlay=$('#essayModal');
   const content=$('#essayModalContent');
   if(!overlay||!content) return;
   // 默认按分类隔离导航（不跨分类跳转）
-  const pool = catOnly ? window._timelineItems.filter(t => t.catId === essay.catId) : window._timelineItems;
+  // 优先用传入的 displayList（页面显示顺序），保证 上一篇/下一篇 和页面一致
+  // 童年篇 用 sort_order ASC、其他用日期 DESC，这里取的是分类在 buildTimeline 里的实际渲染顺序
+  const pool = displayList
+    ? displayList
+    : (catOnly ? window._timelineItems.filter(t => t.catId === essay.catId) : window._timelineItems);
   const curIdx = pool.findIndex(t => t.title === essay.title);
   const hasPrev = curIdx >= 0 && curIdx > 0;
   const hasNext = curIdx >= 0 && curIdx < pool.length - 1;
