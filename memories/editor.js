@@ -539,9 +539,18 @@ function renderList(){
       return;
     }
     console.log('[album] loading photos for album.id:', album.id, 'title:', album.title);
-    db().from('album_photos').select('*').eq('album_id',album.id).order('sort_order',{ascending:false}).then(({data:photos})=>{
+    db().from('album_photos').select('*').eq('album_id',album.id).then(({data:photos})=>{
       console.log('[album] got', (photos||[]).length, 'photos for album', album.id);
-      const plist=photos||[];
+      // 混合排序：用户新上传的（sort_order 是 Date.now() 大数字）排最前（按时间倒序），
+      // 其余老照片保持原始顺序（sort_order 升序）
+      const NEW_THRESHOLD = 1000000000; // 大于 10 亿的都是上传接口写入的 Date.now()
+      const plist=(photos||[]).slice().sort(function(a,b){
+        var aNew = (a.sort_order||0) > NEW_THRESHOLD;
+        var bNew = (b.sort_order||0) > NEW_THRESHOLD;
+        if(aNew !== bNew) return aNew ? -1 : 1;      // 新上传优先
+        if(aNew) return (b.sort_order||0)-(a.sort_order||0); // 新上传之间：最新在前
+        return (a.sort_order||0)-(b.sort_order||0);  // 老照片：保持原始顺序
+      });
       body.style.paddingTop = '0';
       body.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:5">
