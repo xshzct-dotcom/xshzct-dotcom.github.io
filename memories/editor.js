@@ -539,7 +539,7 @@ function renderList(){
       return;
     }
     console.log('[album] loading photos for album.id:', album.id, 'title:', album.title);
-    db().from('album_photos').select('*').eq('album_id',album.id).order('sort_order',{ascending:true}).then(({data:photos})=>{
+    db().from('album_photos').select('*').eq('album_id',album.id).order('sort_order',{ascending:false}).then(({data:photos})=>{
       console.log('[album] got', (photos||[]).length, 'photos for album', album.id);
       const plist=photos||[];
       body.style.paddingTop = '0';
