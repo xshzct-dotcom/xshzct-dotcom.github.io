@@ -8,10 +8,29 @@
 const SB_URL='https://mvzbkuhwapdqcdkekczh.supabase.co';
 const SB_KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
 const STORAGE_URL=SB_URL+'/storage/v1/object/public/photos';
-const REPO='xshzct-dotcom/xshzct-dotcom.github.io@main';
-const MUSIC_BASE='https://cdn.jsdelivr.net/gh/'+REPO+'/music/';
 let sb;
 try{sb=supabase.createClient(SB_URL,SB_KEY)}catch(e){sb=null}
+
+// ===== 编辑器相册灯箱：全局事件只绑一次（修 ESC 关不掉 + 事件累积泄漏） =====
+// window._aeGrid 由 renderAlbumPhotos 创建时设置，离开相册时置空
+let _aeDragging = false;
+document.addEventListener('keydown', function(e){
+  if(e.key !== 'Escape') return;
+  var grid = window._aeGrid;
+  if(grid && grid.style.display !== 'none') grid.style.display = 'none';
+});
+document.addEventListener('mousemove', function(e){
+  if(!_aeDragging) return;
+  var z = window._aeZoom;
+  var grid = window._aeGrid;
+  if(!z || !grid || grid.style.display === 'none'){ _aeDragging = false; return; }
+  z.x += e.clientX - z.lastX;
+  z.y += e.clientY - z.lastY;
+  z.lastX = e.clientX; z.lastY = e.clientY;
+  var img = document.getElementById('aeLbImg');
+  if(img){ img.style.transition = 'none'; img.style.transform = 'translate('+z.x+'px,'+z.y+'px) scale('+z.scale+')'; }
+});
+document.addEventListener('mouseup', function(){ _aeDragging = false; });
 
 // 工具提前声明
 function $(s,d){return(d||document).querySelector(s)}
@@ -37,96 +56,9 @@ function cmpDate(a,b){
   return 0;
 }
 
-// GitHub token 加密（字符码数组，避免暴露明文）
-const _ghCodes = [103,105,116,104,117,98,95,112,97,116,95,49,49,67,70,85,90,80,69,89,48,116,121,115,53,109,85,106,68,119,68,115,68,95,121,70,113,99,102,70,55,69,71,122,87,80,105,104,87,116,88,108,86,67,55,81,101,120,54,70,71,53,73,113,114,56,79,119,107,112,72,49,83,120,120,99,65,82,80,82,54,68,87,88,82,84,90,101,89,117,83,119,105];
-function _ghToken(){ return String.fromCharCode.apply(null, _ghCodes); }
-const GH_OWNER='xshzct-dotcom', GH_REPO='xshzct-dotcom.github.io';
-// 从 GitHub 仓库删除文件（与 DB/Supabase 同步删除）
-async function deleteFromGitHub(repoPath){
-  if(!repoPath || !repoPath.startsWith('music/')) return;
-  try{
-    const url='https://api.github.com/repos/'+GH_OWNER+'/'+GH_REPO+'/contents/'+encodeURI(repoPath);
-    const auth='Bearer '+_ghToken();
-    // 1. 获取 SHA
-    const r=await fetch(url,{headers:{'Authorization':auth,'Accept':'application/vnd.github+json'}});
-    if(r.status===404) return; // 文件已不存在
-    if(!r.ok) throw new Error('GET SHA '+r.status);
-    const sha=(await r.json()).sha;
-    if(!sha) return;
-    // 2. 删文件
-    const dr=await fetch(url,{method:'DELETE',headers:{'Authorization':auth,'Content-Type':'application/json'},body:JSON.stringify({message:'delete '+repoPath,sha:sha,branch:'main'})});
-    if(!dr.ok) console.warn('[GitHub del]', (await dr.json().catch(()=>({}))).message||dr.status);
-    else console.log('[GitHub] deleted '+repoPath);
-  }catch(e){ console.warn('[GitHub]', e); }
-}
-
-// ===== 共享：拖拽排序 =====
-async function bindDragSort(listEl, data, table, sortField, onReorder){
-  if(!listEl) return;
-  const items = listEl.querySelectorAll('[draggable="true"]');
-  items.forEach(el=>{
-    el.addEventListener('dragstart', e=>{
-      e.dataTransfer.setData('text/plain', el.dataset.idx);
-      el.classList.add('dragging');
-    });
-    el.addEventListener('dragend', ()=>{ el.classList.remove('dragging'); });
-    el.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
-    el.addEventListener('drop', async e=>{
-      e.preventDefault();
-      const from = parseInt(e.dataTransfer.getData('text/plain'));
-      const to = parseInt(el.dataset.idx);
-      if(from===to || isNaN(from) || isNaN(to)) return;
-      const item = data.splice(from,1)[0];
-      data.splice(to,0,item);
-      // 批量更新 sort_order
-      try{
-        if(!sb){ console.warn('[drag] Supabase 未连接，拖拽仅视觉生效'); }
-        for(let j=0;j<data.length;j++){
-          if(sb){
-            const {error} = await sb.from(table).update({[sortField]:j}).eq('id', data[j].id);
-            if(error) console.warn('[drag] update row '+j+' failed:', error);
-          }
-        }
-      }catch(e){ console.warn('[drag] sort update failed:', e); }
-      if(onReorder) onReorder();
-      if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 1000);
-    });
-  });
-}
-
-// 照片缩略图拖拽排序（用 data-i 而非 data-idx）
-function bindPhotoDragSort(listEl, data, album){
-  if(!listEl) return;
-  const cards = listEl.querySelectorAll('.ae-photo-card');
-  cards.forEach(card=>{
-    card.addEventListener('dragstart', e=>{
-      e.dataTransfer.setData('text/plain', card.dataset.i);
-      card.style.opacity='0.4';
-    });
-    card.addEventListener('dragend', ()=>{ card.style.opacity='1'; });
-    card.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
-    card.addEventListener('drop', async e=>{
-      e.preventDefault();
-      const from = parseInt(e.dataTransfer.getData('text/plain'));
-      const to = parseInt(card.dataset.i);
-      if(from===to || isNaN(from) || isNaN(to)) return;
-      const item = data.splice(from,1)[0];
-      data.splice(to,0,item);
-      // 批量更新 sort_order
-      try{
-        if(sb){
-          for(let j=0;j<data.length;j++){
-            const {error} = await sb.from('album_photos').update({sort_order:j}).eq('id', data[j].id);
-            if(error) console.warn('[photo drag]', error);
-          }
-        }
-      }catch(e){ console.warn('[photo drag] failed:', e); }
-      // 重新渲染
-      renderAlbumPhotos(album);
-      if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 1500);
-    });
-  });
-}
+// 【安全】已移除 GitHub token 硬编码和 GitHub 仓库删除功能（2026-08-11）
+// 原因：token 暴露在公开网页代码里，任何人可解码后操作仓库。
+// 删除歌曲现在只清理 Supabase 数据库记录（不再动 GitHub 仓库文件）。
 
 function db(){
   if(sb)return sb;
@@ -183,7 +115,8 @@ async function ensureDataSync(){
     } else if(typeof albums !== 'undefined'){
       for(const a of albums){
         const {data:exist} = await sb.from('albums').select('id').eq('title', a.title).limit(1);
-        if(exist && exist.length) await sb.from('albums').update({cover:a.cover||'', sort_order:0}).eq('id', exist[0].id);
+        // 只补 cover，不再改 sort_order（否则覆盖用户在编辑器里排好的相册顺序）
+        if(exist && exist.length) await sb.from('albums').update({cover:a.cover||''}).eq('id', exist[0].id);
       }
     }
     // 音乐
@@ -317,8 +250,6 @@ async function renderEssayTab(){
         <span class="e-title">${esc(a.title)}</span>
         <span class="e-meta">${a.date||''}</span>
         <div class="ee-actions">
-          <button class="ee-btn" data-move="${i}" data-dir="-1" ${i===0?'disabled':''}>▲</button>
-          <button class="ee-btn" data-move="${i}" data-dir="1" ${i===items.length-1?'disabled':''}>▼</button>
           <button class="ee-btn" data-edit="${i}">✎</button>
           <button class="ee-btn del" data-del="${i}">🗑</button>
         </div>
@@ -327,24 +258,7 @@ async function renderEssayTab(){
     const itemList = items;
     articlesEl.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick = function(){ window._essayReturnTo = function(){ renderEssayTab().then(function(){ setTimeout(renderArticlesInCat.bind(null, catId), 50); }); }; editEssay(itemList[parseInt(b.dataset.edit)]); }; });
     articlesEl.querySelectorAll('[data-del]').forEach(b => b.onclick = () => delEssay(itemList[parseInt(b.dataset.del)]));
-    // 上下移动
-    articlesEl.querySelectorAll('[data-move]').forEach(b => {
-      b.onclick = async () => {
-        const i = parseInt(b.dataset.move);
-        const dir = parseInt(b.dataset.dir);
-        const j = i + dir;
-        if(j<0 || j>=itemList.length) return;
-        const aa = itemList[i], bb = itemList[j];
-        if(!sb) return;
-        await sb.from('essays').update({sort_order:j}).eq('id', aa.id);
-        await sb.from('essays').update({sort_order:i}).eq('id', bb.id);
-        const {data:updated} = await sb.from('essays').select('*').eq('category', catId).order('sort_order', {ascending:true});
-        if(updated && updated.length > 0){
-          groups[catId] = {title: updated[0].category_title || catId, items: updated};
-          renderArticlesInCat(catId);
-        }
-      };
-    });
+    // 上移/下移按钮已移除：列表按日期排序，sort_order 交换无效（2026-08-11）
   }
 
   // 编辑/新建
@@ -433,7 +347,7 @@ async function renderEssayTab(){
       };
       if(!data.title||!data.body){ if(window.toast) toast('标题和正文不能为空','warn'); else alert('标题和正文不能为空'); return }
       if(a&&a.id) await db().from('essays').update(data).eq('id',a.id);
-      else{const {data:exist}=await db().from('essays').select('id').eq('title',data.title).limit(1);
+      else{const {data:exist}=await db().from('essays').select('id').eq('category',data.category).eq('title',data.title).limit(1);
         if(exist&&exist.length) await db().from('essays').update(data).eq('id',exist[0].id);
         else{data.sort_order=0;await db().from('essays').insert(data);}
       }
@@ -457,7 +371,7 @@ async function renderEssayTab(){
 
   function delEssay(a){
     if(!confirm('确定删除「'+a.title+'」？'))return;
-    db().from('essays').delete().eq('id',a.id).then(()=>{renderEssayTab();if(typeof buildTimeline==='function')buildTimeline();});
+    db().from('essays').delete().eq('id',a.id).then(()=>{invalidateCache('essay');renderEssayTab();if(typeof buildTimeline==='function')buildTimeline();});
   }
 
   renderList();
@@ -467,6 +381,7 @@ window.renderEssayTab=renderEssayTab;
 
 // ===== 相册编辑 =====
 async function renderAlbumTab(){
+  window._aeGrid = null;  // 离开相册视图，释放灯箱引用
   const body=$('#editorBody');
   var albums;
   if(_editorCache.album && Date.now()-_cacheTime.album < _CACHE_TTL){
@@ -569,6 +484,7 @@ function renderList(){
       // 灯箱容器直接挂 body，用 inline 事件隔离脏代码
       const aeGrid = document.createElement('div');
       aeGrid.id = 'aeLightbox';
+      window._aeGrid = aeGrid;   // 供模块级 ESC / mousemove 使用
       aeGrid.style.cssText = 'display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.94);align-items:center;justify-content:center;flex-direction:column';
       // 移除已有的重复灯箱
       var oldGrid = document.getElementById('aeLightbox');
@@ -594,6 +510,7 @@ function renderList(){
       }
       // ===== 独立灯箱缩放（1:1 复刻主页） =====
       var aeZoom = {scale:1, x:0, y:0, dragging:false, lastX:0, lastY:0};
+      window._aeZoom = aeZoom;   // 供模块级 mousemove 使用
       var aeAnim = false;
       function aeApply(){
         var img = document.getElementById('aeLbImg');
@@ -649,20 +566,11 @@ function renderList(){
           var factor = e.deltaY < 0 ? 1.1 : 1/1.1;
           aeZoomTo(aeZoom.scale*factor, e.clientX, e.clientY);
         }, {passive:false});
-        // 鼠标拖动
+        // 鼠标拖动（mousemove/mouseup 已在模块级只绑一次，这里只标记开始）
         stage.addEventListener('mousedown', function(e){
           if(aeZoom.scale <= 1.01) return;
           if(e.target.closest('.aelb-close,.aelb-prev,.aelb-next')) return;
-          aeZoom.dragging = true; aeZoom.lastX = e.clientX; aeZoom.lastY = e.clientY; aeApply();
-        });
-        document.addEventListener('mousemove', function(e){
-          if(!aeZoom.dragging) return;
-          aeZoom.x += e.clientX - aeZoom.lastX; aeZoom.y += e.clientY - aeZoom.lastY;
-          aeZoom.lastX = e.clientX; aeZoom.lastY = e.clientY; aeApply();
-        });
-        document.addEventListener('mouseup', function(){
-          if(!aeZoom.dragging) return;
-          aeZoom.dragging = false; aeApply();
+          aeZoom.dragging = true; _aeDragging = true; aeZoom.lastX = e.clientX; aeZoom.lastY = e.clientY; aeApply();
         });
         // 触摸
         var tdM='none',tdSX=0,tdSY=0,tdZX=0,tdZY=0,tdD=0,tdSA=1,tdLT=0,tdLX=0,tdLY=0,tdSD=0;
@@ -892,10 +800,10 @@ function renderList(){
         if(cancelBtn) cancelBtn.onclick = function(){ _selSet.clear(); _selectMode = false; updateSelUI(); };
       }, 0);
 
-      // ESC 关闭灯箱 + 退出多选
+      // ESC 关闭灯箱已由模块级 keydown 统一处理（不再每次新增监听）；
+      // 这里只处理"退出多选模式"
       document.addEventListener('keydown', function(e){
         if(e.key !== 'Escape') return;
-        if(aeGrid.style.display !== 'none'){ closeLightbox(); return; }
         if(_selectMode || _selSet.size > 0){ _selSet.clear(); _selectMode = false; updateSelUI(); }
       });
       // Upload - 用 anon key（RLS 已允许）
@@ -1037,12 +945,8 @@ async function renderMusicTab(){
           const objName = sp.includes('photos/') ? sp.split('photos/')[1] : sp;
           sb.storage.from('photos').remove([objName]).catch(()=>{});
         }
-        // 3. 如果歌曲来自 git 仓库（CDN/GitHub Pages URL），也从 GitHub 删
-        const sp = (t.storage_path || '').trim();
-        if(sp.includes('xshzct-dotcom.github.io/music/') || sp.includes('@main/music/') || sp.startsWith('music/')){
-          const path = sp.includes('/music/') ? 'music/' + decodeURIComponent(sp.split('/music/')[1]) : sp;
-          deleteFromGitHub(path);
-        }
+        // 3. 歌曲文件在 Supabase storage 里已在上一步删了
+        //   （GitHub 仓库里的旧文件不再删——安全起见不携带仓库写权限）
         renderMusicTab();
         if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 500);
       } catch(e){
