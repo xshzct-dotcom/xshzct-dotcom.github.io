@@ -348,8 +348,10 @@ function openEssayModal(essay, catOnly=true, displayList){
   var nextBtn = content.querySelector('.essay-next');
   if(prevBtn && hasPrev) prevBtn.onclick = function(){ window.goPrevEssay(); };
   if(nextBtn && hasNext) nextBtn.onclick = function(){ window.goNextEssay(); };
-  window.goPrevEssay = function(){ if(window._essayIdx>0) openEssayModal(window._essayPool[window._essayIdx-1], true); };
-  window.goNextEssay = function(){ if(window._essayIdx<window._essayPool.length-1) openEssayModal(window._essayPool[window._essayIdx+1], true); };
+  // 记录当前池子，跳转时沿用同一个顺序（否则又回落到全局日期序导致顺序错乱）
+  window._essayDisplayList = pool;
+  window.goPrevEssay = function(){ if(window._essayIdx>0) openEssayModal(window._essayPool[window._essayIdx-1], true, window._essayDisplayList); };
+  window.goNextEssay = function(){ if(window._essayIdx<window._essayPool.length-1) openEssayModal(window._essayPool[window._essayIdx+1], true, window._essayDisplayList); };
   overlay.classList.add('active');
   document.body.style.overflow='hidden';
 }
