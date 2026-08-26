@@ -5,7 +5,7 @@
 
 /* --- CSS Variables --- */
 :root {
-  /* 配色：墨黑基 + 米白文字 + 鼠尾草绿主点缀 + 陶土橙辅 */
+  /* 默认 = 暗色 */
   --bg: #0E1116;            /* 墨黑，比纯黑柔和 */
   --bg-elevated: #161A21;   /* 卡片底 */
   --bg-card: #1C2029;       /* 浮起卡片 */
@@ -43,6 +43,31 @@
   --nav-h: 60px;
 }
 
+/* 白色主题（通过 html[data-theme="light"] 切换） */
+:root[data-theme="light"]{
+  --bg: #FAF8F3;            /* 米白底 */
+  --bg-elevated: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F2EEE3;
+  --border: rgba(20,18,14,.10);
+  --border-hover: rgba(20,18,14,.20);
+  --text: #1A1A1A;          /* 深灰文字 */
+  --text-dim: rgba(26,26,26,.65);
+  --text-muted: rgba(26,26,26,.40);
+  --accent: #5A7259;        /* 深一点的鼠尾草绿，白底需要更深的对比 */
+  --accent-2: #B8644A;      /* 深一点的陶土橙 */
+  --accent-glow: rgba(90,114,89,.18);
+  --accent-2-glow: rgba(184,100,74,.18);
+  --accent-dim: #4A5E49;
+  --danger: #C25B4B;
+  --success: #5A7259;
+  --glass: rgba(255,255,255,.85);
+  --glass-border: rgba(20,18,14,.10);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.08);
+  --shadow-md: 0 8px 24px rgba(0,0,0,.10);
+  --shadow-lg: 0 20px 50px rgba(0,0,0,.15);
+}
+
 /* --- Reset --- */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
@@ -73,6 +98,8 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .nav-shuffle:hover{transform:rotate(180deg);color:var(--accent-2)}
 .nav-gear:hover{transform:rotate(30deg)}
 .nav-gear:active{transform:rotate(60deg) scale(.92)}
+.nav-theme{transition:transform .4s var(--ease-spring),background .25s,color .25s}
+.nav-theme:hover{transform:rotate(40deg) scale(1.08);color:var(--accent)}
 .nav-hamburger{display:none;width:36px;height:36px;flex-direction:column;justify-content:center;gap:5px;padding:6px;cursor:pointer}
 .nav-hamburger span{display:block;height:1.5px;background:var(--text);border-radius:1px;transition:transform .3s,opacity .3s}
 .nav-hamburger.open span:nth-child(1){transform:rotate(45deg) translate(2px,2px)}
@@ -423,3 +450,28 @@ button:active{transform:scale(.96)}
 .toast.toast-warn{border-color:var(--accent-2);color:#DDA28A}
 .toast.toast-out{opacity:0;transform:translateY(-8px);transition:opacity .3s,transform .3s}
 @keyframes toastIn{to{opacity:1;transform:none}}
+
+/* ===== 白色模式特殊覆盖 ===== */
+/* 主题切换时全局平滑过渡 */
+html{color-scheme:dark}
+html[data-theme="light"]{color-scheme:light}
+/* 主题切换平滑过渡（只针对常用容器，避免 * 性能问题） */
+html,body,.nav,.nav-icon-btn,.section,.nav-brand,.hero-title,.hero-sub,.hero-content,.timeline-card,.polaroid,.daily-quote,.modal-content,#pwdGate,#editorPanel,#editorBackdrop{transition:background-color .35s ease,color .35s ease,border-color .35s ease,box-shadow .35s ease}
+
+/* 白色模式 hero 背景图需要蒙一层白色渐变（暗色图片太突兀） */
+:root[data-theme="light"] .hero-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(250,248,243,.65),rgba(250,248,243,.85))}
+
+/* 白色模式 hero 文字颜色加深（深色背景图太暗看不清，加深处理） */
+:root[data-theme="light"] .hero-title{color:#1A1A1A;text-shadow:0 1px 2px rgba(255,255,255,.4)}
+:root[data-theme="light"] .hero-sub{color:rgba(26,26,26,.75)}
+
+/* 白色模式 nav.scrolled 背景（用 --glass 已处理） */
+:root[data-theme="light"] .nav.scrolled{background:rgba(255,255,255,.92)}
+
+/* 白色模式选择文本颜色 */
+:root[data-theme="light"] ::selection{background:var(--accent-glow);color:#1A1A1A}
+
+/* 白色模式滚动条 */
+:root[data-theme="light"] ::-webkit-scrollbar-track{background:#F2EEE3}
+:root[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(20,18,14,.18)}
+:root[data-theme="light"] ::-webkit-scrollbar-thumb:hover{background:rgba(20,18,14,.30)}
