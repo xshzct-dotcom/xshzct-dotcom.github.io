@@ -115,6 +115,18 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
+  // CSS 永远走网络、不缓存（避免旧 CSS 导致主题切换错乱）
+  if(url.pathname.endsWith('.css')){
+    e.respondWith(
+      fetch(e.request, { cache: 'no-store' }).then(function(resp){
+        return resp;
+      }).catch(function(){
+        return caches.match(e.request);
+      })
+    );
+    return;
+  }
+
   // 其他资源：network-first（先网络后缓存）
   e.respondWith(
     fetch(e.request).then(function(resp) {
