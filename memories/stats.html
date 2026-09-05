@@ -87,10 +87,11 @@ document.getElementById('datePicker').onchange = (e)=>{ if(e.target.value){ curr
 
 async function render(){
   document.getElementById('content').innerHTML = '<div class="msg ld">加载中···</div>';
-  // 预检网络（如果连不上 Supabase，提前提示）—— 用 GET 试读 visits 第一条，10s 超时
+  // 预检：用 GET 试读 visits 第一条；手写超时（兼容所有浏览器）
   try{
-    var probe = AbortSignal.timeout(10000);
-    var probeRes = await fetch(BASE+'/rest/v1/visits?limit=1', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}, signal: probe});
+    var probeRes = await fetchWithTimeout(BASE+'/rest/v1/visits?limit=1', {
+      headers:{apikey:KEY,'Authorization':'Bearer '+KEY}
+    }, 10000);
     if(!probeRes.ok){
       document.getElementById('content').innerHTML='<div class="msg">Supabase 返回 '+probeRes.status+' '+probeRes.statusText+'<br>URL: '+esc(BASE)+'<br>可能是 anon key 失效、RLS 拒绝、或服务异常</div>';
       return;
@@ -198,6 +199,22 @@ async function render(){
 }
 function fmt(s){ if(s==null||s===undefined) return '--'; if(s<60) return s+'秒'; var m=Math.floor(s/60); var r=s%60; return m+'分'+r+'秒'; }
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// 通用 fetch + 超时（兼容性最好，不用 AbortSignal.timeout）
+function fetchWithTimeout(url, opts, timeoutMs){
+  return new Promise(function(resolve, reject){
+    var timer = setTimeout(function(){
+      reject(new Error('fetch 超时 ('+timeoutMs+'ms) — 可能是网络慢/代理问题'));
+    }, timeoutMs);
+    fetch(url, opts).then(function(r){
+      clearTimeout(timer);
+      resolve(r);
+    }, function(err){
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
 
 render();
 </script>
