@@ -285,6 +285,23 @@
   var _visitId = null;
   var _visitStartMs = Date.now();
 
+  // 2026-09-06：本地也存一份访问记录（即使 Supabase 不通，统计页也能显示本机历史）
+  // localStorage 结构：memories.visits = [{path, ref, visited_at, session_id, duration, left_at?}, ...]
+  try{
+    var localVisits = JSON.parse(localStorage.getItem('memories.visits') || '[]');
+    localVisits.push({
+      path: location.pathname || '/',
+      ref: document.referrer || '',
+      visited_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}),
+      session_id: clientId,
+      duration: 0
+    });
+    // 最多保留最近 500 条
+    if(localVisits.length > 500) localVisits = localVisits.slice(-500);
+    localStorage.setItem('memories.visits', JSON.stringify(localVisits));
+    window._localVisitIndex = localVisits.length - 1;   // 记录这次访问的索引，duration 更新时用
+  }catch(e){}
+
   // 先查最近 30 秒内是否已有这个 client_id+path 的访问记录，如果有就 PATCH 而不是 POST
   var since = new Date(Date.now() - 30000).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
   fetch(base + '?select=id,visited_at&session_id=eq.' + clientId + '&path=eq.' + encodeURIComponent(location.pathname || '/') + '&visited_at=gte.' + encodeURIComponent(since) + '&order=visited_at.desc&limit=1', {
@@ -313,6 +330,14 @@
       var payload = JSON.stringify({duration: dur, left_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'})});
       // sendBeacon 只能发 POST，不适合 PATCH；直接用 fetch PATCH（keepalive 保证页面关闭时送达）
       fetch(base+'?id=eq.'+_visitId, { method:'PATCH', headers:{'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'}, body: payload, keepalive: true }).catch(function(){});
+      // 同步更新 localStorage 的 duration（供统计页 fallback 显示）
+      try{
+        var idx = window._localVisitIndex;
+        if(typeof idx === 'number'){
+          var arr = JSON.parse(localStorage.getItem('memories.visits') || '[]');
+          if(arr[idx]){ arr[idx].duration = dur; localStorage.setItem('memories.visits', JSON.stringify(arr)); }
+        }
+      }catch(e){}
     }
     setInterval(save, 10000);
     window.addEventListener('beforeunload', save);
