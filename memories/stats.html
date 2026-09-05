@@ -70,8 +70,10 @@ tbody .r{max-width:120px;overflow:hidden;text-overflow:ellipsis;color:rgba(232,2
 </div>
 <div id="content"><div class="msg ld">加载中···</div></div>
 
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
 const KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb',BASE='https://mvzbkuhwapdqcdkekczh.supabase.co';
+const SB = supabase.createClient(BASE, KEY);   // 和主页用同款 SDK，行为一致
 function localDateStr(d){return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);}
 function todayStr(){return localDateStr(new Date());}
 function addDays(s,n){var d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return localDateStr(d);}
@@ -87,29 +89,24 @@ document.getElementById('datePicker').onchange = (e)=>{ if(e.target.value){ curr
 
 async function render(){
   document.getElementById('content').innerHTML = '<div class="msg ld">加载中···</div>';
-  // 预检：用 GET 试读 visits 第一条；手写超时（兼容所有浏览器）
   try{
-    var probeRes = await fetchWithTimeout(BASE+'/rest/v1/visits?limit=1', {
-      headers:{apikey:KEY,'Authorization':'Bearer '+KEY}
-    }, 10000);
-    if(!probeRes.ok){
-      document.getElementById('content').innerHTML='<div class="msg">Supabase 返回 '+probeRes.status+' '+probeRes.statusText+'<br>URL: '+esc(BASE)+'<br>可能是 anon key 失效、RLS 拒绝、或服务异常</div>';
-      return;
-    }
-  }catch(preErr){
-    document.getElementById('content').innerHTML='<div class="msg">无法连接到 Supabase：'+esc(preErr.message||String(preErr))+'<br>URL: '+esc(BASE)+'<br>检查网络代理后刷新</div>';
-    return;
-  }
-  try{
-    // 选中的当天
-    var dayStart = currentDate;
-    var nextDay = addDays(currentDate, 1);
-    var visitsR = await fetch(BASE+'/rest/v1/visits?select=id,path,ref,visited_at,left_at,duration&visited_at=gte.'+dayStart+'T00:00:00.000Z&visited_at=lt.'+nextDay+'T00:00:00.000Z&order=visited_at.desc&limit=1000', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}});
-    var visits = await visitsR.json();
+    // 选中的当天（北京时间 UTC+8 的一天）
+    var dayStart = currentDate + 'T00:00:00+08:00';
+    var nextDay = addDays(currentDate, 1) + 'T00:00:00+08:00';
 
-    // 总访问量（始终是全部）
-    var totalR=await fetch(BASE+'/rest/v1/visits?select=id&limit=0',{headers:{apikey:KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact'}});
-    var total=parseInt(totalR.headers.get('content-range')?.split('/')[1]||0);
+    // 当天记录（用 SDK，和主页同款）
+    var q1 = await SB.from('visits').select('id,path,ref,visited_at,left_at,duration')
+      .gte('visited_at', dayStart)
+      .lt('visited_at', nextDay)
+      .order('visited_at', {ascending:false})
+      .limit(1000);
+    if(q1.error) throw q1.error;
+    var visits = q1.data || [];
+
+    // 总访问量（全部）
+    var q2 = await SB.from('visits').select('id', {count:'exact', head:true});
+    if(q2.error) throw q2.error;
+    var total = q2.count || 0;
 
     // 当天数据计算
     var hourly=new Array(24).fill(0), pageMap={}, refMap={}, durSum=0, durN=0;
