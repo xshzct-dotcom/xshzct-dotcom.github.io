@@ -87,6 +87,13 @@ document.getElementById('datePicker').onchange = (e)=>{ if(e.target.value){ curr
 
 async function render(){
   document.getElementById('content').innerHTML = '<div class="msg ld">加载中···</div>';
+  // 预检网络（如果连不上 Supabase，提前提示）
+  try{
+    await fetch(BASE+'/', {method:'HEAD', signal: AbortSignal.timeout(5000)});
+  }catch(preErr){
+    document.getElementById('content').innerHTML='<div class="msg">无法连接到 Supabase ('+esc(BASE)+')：'+esc(preErr.message||String(preErr))+'<br><br>检查网络或代理后刷新</div>';
+    return;
+  }
   try{
     // 选中的当天
     var dayStart = currentDate;
@@ -179,7 +186,9 @@ async function render(){
 
     document.getElementById('content').innerHTML=html;
   }catch(e){
-    document.getElementById('content').innerHTML='<div class="msg">加载失败</div>';
+    // 2026-09-06 改进：把具体错误显示出来，方便排查（之前只显示"加载失败"四个字）
+    var detail = (e && e.message) ? e.message : String(e);
+    document.getElementById('content').innerHTML='<div class="msg">加载失败：'+esc(detail)+'</div>';
   }
 }
 function fmt(s){ if(s==null||s===undefined) return '--'; if(s<60) return s+'秒'; var m=Math.floor(s/60); var r=s%60; return m+'分'+r+'秒'; }
