@@ -87,11 +87,16 @@ document.getElementById('datePicker').onchange = (e)=>{ if(e.target.value){ curr
 
 async function render(){
   document.getElementById('content').innerHTML = '<div class="msg ld">加载中···</div>';
-  // 预检网络（如果连不上 Supabase，提前提示）
+  // 预检网络（如果连不上 Supabase，提前提示）—— 用 GET 试读 visits 第一条，10s 超时
   try{
-    await fetch(BASE+'/', {method:'HEAD', signal: AbortSignal.timeout(5000)});
+    var probe = AbortSignal.timeout(10000);
+    var probeRes = await fetch(BASE+'/rest/v1/visits?limit=1', {headers:{apikey:KEY,'Authorization':'Bearer '+KEY}, signal: probe});
+    if(!probeRes.ok){
+      document.getElementById('content').innerHTML='<div class="msg">Supabase 返回 '+probeRes.status+' '+probeRes.statusText+'<br>URL: '+esc(BASE)+'<br>可能是 anon key 失效、RLS 拒绝、或服务异常</div>';
+      return;
+    }
   }catch(preErr){
-    document.getElementById('content').innerHTML='<div class="msg">无法连接到 Supabase ('+esc(BASE)+')：'+esc(preErr.message||String(preErr))+'<br><br>检查网络或代理后刷新</div>';
+    document.getElementById('content').innerHTML='<div class="msg">无法连接到 Supabase：'+esc(preErr.message||String(preErr))+'<br>URL: '+esc(BASE)+'<br>检查网络代理后刷新</div>';
     return;
   }
   try{
