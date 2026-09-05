@@ -127,6 +127,18 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
+  // stats.html（独立访问统计页）：走网络不缓存，确保错误诊断代码能立即生效
+  if(url.pathname.endsWith('/stats.html')){
+    e.respondWith(
+      fetch(e.request, { cache: 'no-store' }).then(function(resp){
+        return resp;
+      }).catch(function(){
+        return caches.match(e.request);
+      })
+    );
+    return;
+  }
+
   // 其他资源：network-first（先网络后缓存）
   e.respondWith(
     fetch(e.request).then(function(resp) {
