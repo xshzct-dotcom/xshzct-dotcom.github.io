@@ -216,6 +216,13 @@ function fetchWithTimeout(url, opts, timeoutMs){
   });
 }
 
+// 注册 Service Worker 让后续 fetch 走缓存兜底（2026-09-06）
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+
 render();
 </script>
 </body>
