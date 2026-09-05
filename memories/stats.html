@@ -189,9 +189,45 @@ async function render(){
 
     document.getElementById('content').innerHTML=html;
   }catch(e){
-    // 2026-09-06 改进：把具体错误显示出来，方便排查（之前只显示"加载失败"四个字）
+    // 2026-09-06：Supabase 不通时回退到 localStorage 显示本机访问记录
     var detail = (e && e.message) ? e.message : String(e);
-    document.getElementById('content').innerHTML='<div class="msg">加载失败：'+esc(detail)+'</div>';
+    var localHTML = '<div class="msg">⚠️ 无法连接 Supabase（'+esc(detail)+'）<br><br>以下显示的是 <strong>本机浏览器</strong>累积的访问记录（仅这台机器）：<br></div>';
+    try{
+      var visits = JSON.parse(localStorage.getItem('memories.visits') || '[]');
+      if(visits.length === 0){
+        localHTML += '<div class="msg">本机暂无访问记录。<br>先在主页 <a href="https://xshzct-dotcom.github.io/memories/">xshzct-dotcom.github.io/memories/</a> 访问一次，浏览器会累积记录。</div>';
+      } else {
+        var hourly=new Array(24).fill(0), pageMap={};
+        visits.forEach(function(d){
+          var m = String(d.visited_at||'').match(/(\d+):(\d+):(\d+)/);
+          if(m) hourly[parseInt(m[1])]++;
+          if(d.path) pageMap[d.path]=(pageMap[d.path]||0)+1;
+        });
+        localHTML += '<div class="overview"><div><div class="n">'+visits.length+'</div><div class="l">本机访问</div></div>';
+        localHTML += '<div><div class="n">'+Object.keys(pageMap).length+'</div><div class="l">不同页面</div></div></div>';
+        localHTML += '<div class="section"><h2>🕐 时段分布（本机）</h2><div class="hour-grid">';
+        var maxH = Math.max.apply(null, hourly) || 1;
+        for(var i=0;i<24;i++){
+          var pct = hourly[i]/maxH;
+          localHTML += '<div class="hour-cell'+(pct>.6?' hot':pct>.3?' warm':'')+'"><span class="hc">'+(hourly[i]||0)+'</span>'+(i<10?'0':'')+i+':00</div>';
+        }
+        localHTML += '</div></div>';
+        localHTML += '<div class="section"><h2>📄 页面访问（本机）</h2>';
+        Object.keys(pageMap).sort(function(a,b){return pageMap[b]-pageMap[a];}).forEach(function(p){
+          localHTML += '<div class="list-item"><span class="p">'+esc(p)+'</span><span class="c">'+pageMap[p]+'</span></div>';
+        });
+        localHTML += '</div></div>';
+        localHTML += '<div class="section"><h2>📋 详细记录</h2><table><thead><tr><th>时间</th><th>页面</th><th>停留</th></tr></thead><tbody>';
+        visits.slice(-30).reverse().forEach(function(d){
+          var time = (d.visited_at||'').match(/(\d+):(\d+):(\d+)/);
+          time = time ? (time[1]+':'+time[2]+':'+time[3]) : '';
+          var dur = d.duration ? fmt(d.duration) : '--';
+          localHTML += '<tr><td style="color:rgba(232,228,218,.4);font-size:.75rem">'+time+'</td><td class="p">'+esc(d.path||'/')+'</td><td style="font-size:.78rem;color:rgba(124,155,126,.7)">'+dur+'</td></tr>';
+        });
+        localHTML += '</tbody></table></div>';
+      }
+    }catch(le){ localHTML += '<div class="msg">读取本机记录失败：'+esc(le.message)+'</div>'; }
+    document.getElementById('content').innerHTML = localHTML;
   }
 }
 function fmt(s){ if(s==null||s===undefined) return '--'; if(s<60) return s+'秒'; var m=Math.floor(s/60); var r=s%60; return m+'分'+r+'秒'; }
