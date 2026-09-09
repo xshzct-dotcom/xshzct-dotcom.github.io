@@ -795,6 +795,7 @@ function renderList(){
             if(sps.length && sb) sb.storage.from('photos').remove(sps).catch(function(){});
           }catch(err){ console.warn(err); }
           _selSet.clear(); _selectMode = false;
+          invalidateCache('album');   // 删除照片后清相册列表缓存（返回时张数正确）
           renderAlbumPhotos(album);
         };
         if(cancelBtn) cancelBtn.onclick = function(){ _selSet.clear(); _selectMode = false; updateSelUI(); };
@@ -853,6 +854,7 @@ function renderList(){
         }
         if(lbl) lbl.textContent='上传照片';
         e.target.value='';
+        invalidateCache('album');   // 上传后清相册列表缓存（返回时张数正确）
         renderAlbumPhotos(album);
         // 同步刷新主页
         if(window.reloadFromSupabase) setTimeout(function(){ window.reloadFromSupabase(); }, 500);
@@ -923,6 +925,7 @@ async function renderMusicTab(){
     el.querySelectorAll('[data-me-edit]').forEach(b=>b.onclick=()=>{
       const t=list[parseInt(b.dataset.meEdit)];
       const nt=prompt('歌曲名:',t.title);if(!nt)return;
+      invalidateCache('music');
       db().from('music').update({title:nt.trim()}).eq('id',t.id).then(()=>renderMusicTab());
     });
     el.querySelectorAll('[data-me-del]').forEach(b=>b.onclick=async ()=>{
@@ -947,6 +950,7 @@ async function renderMusicTab(){
         }
         // 3. 歌曲文件在 Supabase storage 里已在上一步删了
         //   （GitHub 仓库里的旧文件不再删——安全起见不携带仓库写权限）
+        invalidateCache('music');
         renderMusicTab();
         if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 500);
       } catch(e){
@@ -1031,6 +1035,7 @@ async function renderMusicTab(){
         }catch(err){ errors.push(f.name + ': ' + err.message); failCount++; }
       }
       e.target.value = '';
+      invalidateCache('music');   // 上传后清缓存，立即显示新歌
       renderMusicTab();
       if(window.reloadFromSupabase) setTimeout(()=>window.reloadFromSupabase(), 2000);
       if(total > 0){
