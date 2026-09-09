@@ -15,8 +15,9 @@ function randi(min,max){return Math.floor(rand(min,max+1))}
 // ===== 路径处理（兼容字符串与对象） =====
 // 用 jsdelivr CDN 加速 — GitHub Pages 限流会 429
 const REPO = 'xshzct-dotcom/xshzct-dotcom.github.io@main';
-const IMG_BASE = 'https://cdn.jsdelivr.net/gh/'+REPO+'/images/';
-const THUMB_BASE = 'https://cdn.jsdelivr.net/gh/'+REPO+'/thumbs/';
+// 2026-09-10：图片改走 GitHub Pages 直连（之前 jsDelivr CDN 偶尔缓存错乱导致灯箱图片灰白）
+const IMG_BASE = 'https://xshzct-dotcom.github.io/images/';
+const THUMB_BASE = 'https://xshzct-dotcom.github.io/thumbs/';
 const MUSIC_BASE = 'https://xshzct-dotcom.github.io/music/';
 function getPath(p){
   if(!p) return '';
