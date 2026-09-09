@@ -1,0 +1,27 @@
+name: Supabase Keep-Alive
+
+# 目的：每周自动访问一次 Supabase，防止免费项目因 7 天无 API 调用被自动暂停
+# 说明：GitHub Actions 运行在海外服务器，可访问 supabase.co，不依赖本机开机
+
+on:
+  schedule:
+    # 每周三 11:00 (北京时间) = 03:00 UTC
+    - cron: '0 3 * * 3'
+  workflow_dispatch: {}   # 支持手动点击 "Run workflow" 立即触发
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            -H "apikey: sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb" \
+            -H "Authorization: Bearer sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb" \
+            "https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1/essays?select=id&limit=1")
+          echo "supabase HTTP status: $code"
+          if [ "$code" != "200" ]; then
+            echo "::warning::Supabase 返回 $code（可能仍在恢复中或又暂停）"
+          else
+            echo "OK: Supabase 项目活跃 ✅"
+          fi
