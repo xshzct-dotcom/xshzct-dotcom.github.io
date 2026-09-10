@@ -70,7 +70,13 @@ tbody .r{max-width:120px;overflow:hidden;text-overflow:ellipsis;color:rgba(232,2
 </div>
 <div id="content"><div class="msg ld">加载中···</div></div>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<!-- Supabase SDK：本地托管（同主页），避免外部 CDN 加载失败 -->
+<script src="vendor/supabase.js?v=20260910-1"></script>
+<script>
+  if (typeof supabase === 'undefined') {
+    document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
+  }
+</script>
 <script>
 const KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb',BASE='https://mvzbkuhwapdqcdkekczh.supabase.co';
 const SB = supabase.createClient(BASE, KEY);   // 和主页用同款 SDK，行为一致
