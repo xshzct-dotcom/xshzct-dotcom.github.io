@@ -171,19 +171,14 @@ async function render(){
     html+='<div class="section"><h2>📋 当日访问明细</h2><div class="scroll"><table><thead><tr><th>时间</th><th>页面</th><th>停留</th><th>来源</th></tr></thead><tbody>';
     (visits||[]).forEach(function(d){
       var time = '--';
-      // 数据库存的 visited_at 实际上是带 +00 的 UTC 字符串
-      // 例如 "2026-07-25 11:21:36+00" 表示 UTC 11:21:36，
-      // 但用户期望看到的是浏览器输入的北京时间（原本就是 11:21:36）
-      // 由于发送时格式 "2026/7/25 11:21:36" 没有 TZ 标记被 supabase 当 UTC 存了，
-      // 所以读回来后不需要再加 8 小时，直接按字符串里的时间显示即可
+      // 2026-09-10 修正：数据库现在存的是标准 UTC（写入端已改为 toISOString()）
+      // 用 Date 解析后按浏览器本地时区（北京时间）显示
       if(d.visited_at){
-        var s = String(d.visited_at);
-        // 兼容两种格式：'2026-07-25 11:31:01+00' (PostgREST) 或 ISO '2026-07-25T03:31:01+00:00'
-        var m = s.match(/(\d+)-(\d+)-(\d+)[T\s](\d+):(\d+):(\d+)/);
-        if(m){
-          var hh = String(m[4]).padStart(2,'0');
-          var mi = String(m[5]).padStart(2,'0');
-          var ss = String(m[6]).padStart(2,'0');
+        var _dt = new Date(d.visited_at);
+        if(!isNaN(_dt.getTime())){
+          var hh = String(_dt.getHours()).padStart(2,'0');
+          var mi = String(_dt.getMinutes()).padStart(2,'0');
+          var ss = String(_dt.getSeconds()).padStart(2,'0');
           time = hh+':'+mi+':'+ss;
         }
       }

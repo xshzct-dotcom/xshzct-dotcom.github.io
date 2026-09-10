@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-<link rel="stylesheet" href="style.css?v=20260910-07">
+<link rel="stylesheet" href="style.css?v=20260910-08">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>body{font-family:'Inter','Noto Serif SC',system-ui,sans-serif;background:#0E1116;color:#E8E4DA;margin:0}
 /* 灯箱核心 CSS — 内联!important 确保 SW 缓存旧版 style.css 也不影响 */
@@ -258,9 +258,9 @@
   }, 100);
 })();
 </script>
-<script src="script.js?v=20260910-07"></script>
+<script src="script.js?v=20260910-08"></script>
 <script src="sound.js?v=20260811"></script>
-<script src="editor.js?v=20260910-07"></script>
+<script src="editor.js?v=20260910-08"></script>
 <script>
 // 访客统计（Supabase，后台记录，不在页面上显示，不被 adblock 拦截）
 (function(){
@@ -309,7 +309,7 @@
   }catch(e){}
 
   // 先查最近 30 秒内是否已有这个 client_id+path 的访问记录，如果有就 PATCH 而不是 POST
-  var since = new Date(Date.now() - 30000).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'});
+  var since = new Date(Date.now() - 30000).toISOString();   // 2026-09-10 修正：标准 UTC（原来北京时间字符串被按 UTC 解释，导致 8 小时偏差）
   fetch(base + '?select=id,visited_at&session_id=eq.' + clientId + '&path=eq.' + encodeURIComponent(location.pathname || '/') + '&visited_at=gte.' + encodeURIComponent(since) + '&order=visited_at.desc&limit=1', {
     headers: {'apikey':key,'Authorization':'Bearer '+key}
   }).then(function(r){ return r.json(); }).then(function(rows){
@@ -323,7 +323,7 @@
       body: JSON.stringify({
         path: location.pathname,
         ref: document.referrer || '',
-        visited_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'}),
+        visited_at: new Date().toISOString(),   // 2026-09-10 修正：标准 UTC
         session_id: clientId
       })
     }).then(function(r){ return r.json(); }).then(function(data){
@@ -333,7 +333,7 @@
     if(!_visitId) return;
     function save(){
       var dur = Math.max(1, Math.round((Date.now() - _visitStartMs) / 1000));
-      var payload = JSON.stringify({duration: dur, left_at: new Date().toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'})});
+      var payload = JSON.stringify({duration: dur, left_at: new Date().toISOString()});
       // sendBeacon 只能发 POST，不适合 PATCH；直接用 fetch PATCH（keepalive 保证页面关闭时送达）
       fetch(base+'?id=eq.'+_visitId, { method:'PATCH', headers:{'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'}, body: payload, keepalive: true }).catch(function(){});
       // 同步更新 localStorage 的 duration（供统计页 fallback 显示）
