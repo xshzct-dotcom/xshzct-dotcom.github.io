@@ -1049,6 +1049,18 @@ window.renderMusicTab=renderMusicTab;
 
 // ===== 主渲染分发 =====
 function renderTab(){
+  // 2026-09-10：Supabase SDK 未加载成功时明确提示（避免误以为数据丢了）
+  if(!sb){
+    const body = $('#editorBody');
+    if(body) body.innerHTML = '<div style="padding:40px 24px;text-align:center;color:var(--text-muted);font-size:.9rem;line-height:2">'+
+      '<div style="font-size:1.6rem;margin-bottom:12px">⚠️</div>'+
+      '<div style="color:var(--text);margin-bottom:8px">云端数据暂时读不到</div>'+
+      '<div style="font-size:.8rem">Supabase 客户端未加载成功<br>（网络或外部资源被拦截）</div>'+
+      '<div style="font-size:.8rem;margin-top:12px">你的数据没有丢，页面刷新后重试即可</div>'+
+      '<button class="editor-btn editor-btn-secondary" style="margin-top:18px" onclick="location.reload()">刷新重试</button>'+
+      '</div>';
+    return;
+  }
   if(currentTab==='essay') renderEssayTab();
   else if(currentTab==='album') renderAlbumTab();
   else if(currentTab==='music') renderMusicTab();
