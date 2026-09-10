@@ -13,42 +13,52 @@ function rand(min,max){return min+Math.random()*(max-min)}
 function randi(min,max){return Math.floor(rand(min,max+1))}
 
 // ===== 路径处理（兼容字符串与对象） =====
-// 用 jsdelivr CDN 加速 — GitHub Pages 限流会 429
+// 双源策略（2026-09-10）：
+//   主源 = GitHub Pages 直连（源站，永远最新，不会拿到 CDN 缓存的旧坏图）
+//   备源 = jsDelivr CDN（加速 + 免疫 GitHub Pages 的 429 限流）
+//   图片 onerror 时自动切到备源重试，两源都失败才显示"图丢失"
 const REPO = 'xshzct-dotcom/xshzct-dotcom.github.io@main';
-// 2026-09-10：图片改走 GitHub Pages 直连（之前 jsDelivr CDN 偶尔缓存错乱导致灯箱图片灰白）
 const IMG_BASE = 'https://xshzct-dotcom.github.io/images/';
 const THUMB_BASE = 'https://xshzct-dotcom.github.io/thumbs/';
+// 备用 CDN 源
+const IMG_BASE_ALT = 'https://cdn.jsdelivr.net/gh/'+REPO+'/images/';
+const THUMB_BASE_ALT = 'https://cdn.jsdelivr.net/gh/'+REPO+'/thumbs/';
 const MUSIC_BASE = 'https://xshzct-dotcom.github.io/music/';
 function getPath(p){
   if(!p) return '';
   if(typeof p==='string') return p;
   return p.path||p.src||p.storage_path||p.url||p.filename||'';
 }
-// 缩略图：images/x.jpg → thumbs CDN 路径/x.webp（CDN 加速，免 429）
-function thumb(p){
+// 内部：按指定 base 生成缩略图 URL
+function _thumbWith(p, base){
   const s=getPath(p); if(!s) return '';
   if(s.startsWith('http')) return s;
   let t = s;
   if(t.startsWith('images/')) t = t.slice(7);
-  if(t.startsWith('thumbs/')) return THUMB_BASE+t.slice(7);
+  if(t.startsWith('thumbs/')) return base+t.slice(7);
   t = t.replace(/\.jpg$/i, '.webp')
        .replace(/\.jpeg$/i, '.webp')
        .replace(/\.png$/i, '.webp');
-  return THUMB_BASE+t;
+  return base+t;
 }
-// 全图：灯箱用原图
-function full(p){
+// 内部：按指定 base 生成原图 URL
+function _fullWith(p, base){
   const s=getPath(p); if(!s) return '';
   if(s.startsWith('http')) return s;
-  if(s.startsWith('images/')) return IMG_BASE+s.slice(7);
+  if(s.startsWith('images/')) return base+s.slice(7);
   if(s.startsWith('thumbs/')){
-    // thumbs/xxx.webp → images/xxx.jpg
     let t = s.replace(/^\.\.\/thumbs\//, 'images/').replace(/^thumbs\//, 'images/');
     t = t.replace(/\.webp$/i, '.jpg');
-    return IMG_BASE+t.slice(7);
+    return base+t.slice(7);
   }
-  return IMG_BASE+s;
+  return base+s;
 }
+// 缩略图（主源 / 备源）
+function thumb(p){ return _thumbWith(p, THUMB_BASE); }
+function thumbAlt(p){ return _thumbWith(p, THUMB_BASE_ALT); }
+// 原图（主源 / 备源）
+function full(p){ return _fullWith(p, IMG_BASE); }
+function fullAlt(p){ return _fullWith(p, IMG_BASE_ALT); }
 
 // ===== 导航 =====
 const nav=$('#nav');
@@ -477,7 +487,7 @@ function buildPolaroid(pool, pi, rot, z){
   var name = (typeof p === 'string' ? p : (p.path||p.src||'')).split('/').pop()
     .replace(/看图王\.jpg$|\.jpg$|\.jpeg$/i,'').replace(/^_+/,'');
   return '<div class="polaroid polaroid-loading" data-idx="'+pi+'" style="transform:rotate('+rot+'deg);z-index:'+z+'" data-label="'+esc(p._albumTitle||'')+'" data-missing="暂未上传 · '+esc(name)+'">'+
-    '<div class="polaroid-frame"><img src="'+thumb(p)+'" alt="" decoding="async" loading="lazy" data-full="'+full(p)+'" data-name="'+esc(name)+'"></div>'+
+    '<div class="polaroid-frame"><img src="'+thumb(p)+'" alt="" decoding="async" loading="lazy" data-path="'+esc(getPath(p)).replace(/"/g,'&quot;')+'" data-full="'+full(p)+'" data-name="'+esc(name)+'"></div>'+
     '<div class="polaroid-caption">'+esc(name)+'</div></div>';
 }
 
@@ -488,10 +498,15 @@ function bindPolaroidEvents(container, pool, startIdx){
       var img = el.querySelector('img');
       if(img){
         img.onload = function(){ el.classList.remove('polaroid-loading'); updateGalleryLoadProgress(); };
+        // 失败回退链：主源缩略图 → CDN备源缩略图 → 主源原图 → CDN备源原图 → 去掉"_看图王" → 失败框
         img.onerror = function(){
-          if(img.dataset.fb!=='1'){ img.dataset.fb='1'; img.src=img.dataset.full; }
-          else if(img.dataset.fb!=='2'){ img.dataset.fb='2'; img.src=img.dataset.full.replace('_看图王',''); }
-          else{ img.style.display='none'; el.classList.add('img-fail-frame'); }
+          var st = img.dataset.fb || '0';
+          var path = img.dataset.path || '';
+          if(st === '0'){ img.dataset.fb='1'; img.src = thumbAlt(path); }
+          else if(st === '1'){ img.dataset.fb='2'; img.src = full(path); }
+          else if(st === '2'){ img.dataset.fb='3'; img.src = fullAlt(path); }
+          else if(st === '3'){ img.dataset.fb='4'; img.src = full(path).replace('_看图王',''); }
+          else { img.style.display='none'; el.classList.add('img-fail-frame'); }
         };
       }
       el.onclick = function(){
@@ -696,17 +711,29 @@ function openLightbox(idx, kenBurns){
   counter.textContent = (idx+1) + ' / ' + lightboxPhotos.length;
   if(window.SFX) window.SFX.shutter();
 
-  // 用 fetch 拿真实下载进度
-  loadImageWithProgress(src).then(url => {
+  // 用 fetch 拿真实下载进度（主源失败自动切备用 CDN 源）
+  loadImageWithProgress(src, fullAlt(photo)).then(url => {
     img.style.transition = 'none';
     img.style.transform = 'translate(0,0) scale(1)';
     img.style.opacity = '0';
     img.onload = function(){
       img.style.transition = 'opacity .35s ease';
       img.style.opacity = '1';
+      img.style.filter = '';       // 清掉上一次失败可能残留的灰白滤镜
       showLbLoader(false, 100, '');
     };
+    // 失败回退：主源 → CDN备源 →（都失败才）显示灰白"图丢失"
+    var _triedAlt = false;
     img.onerror = function(){
+      if(!_triedAlt){
+        var altUrl = fullAlt(photo);
+        if(altUrl && altUrl !== url){
+          _triedAlt = true;
+          showLbLoader(true, 0, '换源重试…');
+          img.src = altUrl;
+          return;
+        }
+      }
       img.style.opacity = '0.3';
       img.style.filter = 'grayscale(1) blur(8px)';
       img.alt = '原图已丢失：' + (img.src.split('/').pop() || '');
@@ -728,6 +755,8 @@ function preloadAdjacent(idx){
     try{
       var src = full(lightboxPhotos[i]);
       var im = new Image();
+      // 预加载失败也试一次备用源
+      im.onerror = function(){ try{ im.onerror = null; im.src = fullAlt(lightboxPhotos[i]); }catch(e){} };
       im.src = src;
     }catch(e){}
   });
@@ -735,8 +764,8 @@ function preloadAdjacent(idx){
 
 window.openLightbox = openLightbox;
 
-// 用 fetch 流式下载图片 + 实时进度
-async function loadImageWithProgress(url){
+// 用 fetch 流式下载图片 + 实时进度（主源失败自动切备用 CDN 源）
+async function loadImageWithProgress(url, altUrl){
   showLbLoader(true, 0, '准备…');
   try {
     const resp = await fetch(url);
@@ -761,6 +790,18 @@ async function loadImageWithProgress(url){
     const blob = new Blob(chunks);
     return URL.createObjectURL(blob);
   } catch(e){
+    // 主源失败 → 试备用 CDN 源
+    if(altUrl){
+      try{
+        showLbLoader(true, 0, '换源重试…');
+        const resp2 = await fetch(altUrl);
+        if(resp2.ok){
+          const blob2 = await resp2.blob();
+          return URL.createObjectURL(blob2);
+        }
+      }catch(e2){}
+      return altUrl;
+    }
     showLbLoader(true, 0, '直接加载…');
     return url;  // 失败时回退到直接 src
   }
