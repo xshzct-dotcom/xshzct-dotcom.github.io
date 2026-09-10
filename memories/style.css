@@ -212,8 +212,15 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .player-controls button{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:var(--text-dim);transition:all .2s}
 .player-controls button:hover{background:rgba(var(--fg-rgb),.06);color:var(--text)}
 .player-controls #playBtn{width:44px;height:44px;font-size:1.1rem;background:var(--accent-glow);color:var(--accent)}
-.player-bar{flex:1;height:4px;background:rgba(var(--fg-rgb),.08);border-radius:2px;position:relative;cursor:pointer;min-width:60px;overflow:hidden}
+/* 进度条：视觉 4px，但用 padding 把触摸/点击热区撑到 20px（手机上才按得准）
+   touch-action:none 防止手机上拖动时页面跟着滚动 */
+.player-bar{flex:1;min-width:60px;position:relative;cursor:pointer;height:20px;padding:8px 0;background:rgba(var(--fg-rgb),.08);background-clip:content-box;border-radius:2px;touch-action:none;-webkit-user-select:none;user-select:none}
 .player-progress{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:2px;width:0%;transition:width .1s linear}
+/* 拖动圆点：鼠标悬停或拖动时显示，触屏设备常显 */
+.player-thumb{position:absolute;top:50%;left:0%;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:50%;background:var(--accent-2);box-shadow:0 1px 5px rgba(0,0,0,.5);opacity:0;transition:opacity .18s;pointer-events:none;z-index:2}
+.player-bar:hover .player-thumb,.player-bar.dragging .player-thumb{opacity:1}
+.player-bar.dragging{cursor:grabbing}
+@media (hover:none){.player-thumb{opacity:1}}
 .player-toggle{position:absolute;top:-20px;right:16px;font-size:.7rem;width:28px;height:20px;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glass-border);border-bottom:none;border-radius:8px 8px 0 0;color:var(--text-dim);cursor:pointer}
 
 /* --- Lightbox (全屏 + 缩放/平移) --- */

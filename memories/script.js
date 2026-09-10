@@ -1013,15 +1013,21 @@ if(_ovInp2) _ovInp2.onkeydown = function(e){ if(e.key==='Enter') checkPwd(); };
 // toggleBtn 是那个齿轮灯箱的预览按钮
 
 // ===== 音乐播放器 =====
-let currentSongIdx=0, isPlaying=false, bgMusic=null;
+let currentSongIdx=0, isPlaying=false, bgMusic=null, isSeeking=false;
 
 function initMusic(){
   bgMusic=$('#bgMusic');
   if(!bgMusic) return;
   bgMusic.volume=0.5;
   bgMusic.addEventListener('timeupdate',()=>{
-    if(bgMusic.duration)
-      $('#playerProgress').style.width = (bgMusic.currentTime/bgMusic.duration)*100+'%';
+    if(bgMusic.duration){
+      const pct = (bgMusic.currentTime/bgMusic.duration)*100;
+      // 拖动中由手指/鼠标控制进度 UI，避免自动更新抢走显示
+      if(!isSeeking){
+        const pel = $('#playerProgress'); if(pel) pel.style.width = pct+'%';
+        const th = document.getElementById('playerThumb'); if(th) th.style.left = pct+'%';
+      }
+    }
     // 保存当前播放进度
     try{
       const key=(bgMusic.src||'').split('/').pop();
@@ -1055,6 +1061,9 @@ function initMusic(){
 
   // 首次点击 → 授权播放手势（不播歌，等 DB 加载完毕再播）
   document.addEventListener('click', _grant); document.addEventListener('keydown', _grant); document.addEventListener('touchstart', _grant);
+
+  // 进度条拖动支持（鼠标 + 触摸）
+  initSeekBar();
 }
 function _grant(){ 
   if(window._userStarted) return;
@@ -1139,23 +1148,70 @@ function togglePlay(){
 }
 function prevSong(){ const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx-1; if(i<0)i=s.length-1; playSong(i); }
 function nextSong(){ const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx+1; if(i>=s.length)i=0; playSong(i); }
-function seek(e){
-  const bg=window.bgMusic; if(!bg) return;
-  const b=document.getElementById('playerBar'); if(!b) return;
-  // 如果 duration 还没拿到（歌没加载完），先加载再跳转
-  if(!bg.duration || isNaN(bg.duration) || bg.readyState===0){
-    const loadSeek=()=>{
-      bg.removeEventListener('loadedmetadata', loadSeek);
-      setTimeout(()=>{ seek(e); },100);
-    };
-    bg.addEventListener('loadedmetadata', loadSeek);
-    bg.load();
-    return;
-  }
-  const r=b.getBoundingClientRect();
-  bg.currentTime=((e.clientX-r.left)/r.width)*bg.duration;
+// ===== 进度条拖动（鼠标拖动 + 手机手指拖动，统一用 Pointer Events）=====
+// 2026-09-10：原来只有 onclick 点击跳转，无法拖动；改为 pointerdown/move/up 全流程
+function _seekRatio(clientX){
+  const b = document.getElementById('playerBar'); if(!b) return null;
+  const r = b.getBoundingClientRect();
+  if(!r.width) return null;
+  return Math.min(1, Math.max(0, (clientX - r.left) / r.width));
 }
-window.seek=seek;
+function _seekVisual(ratio){
+  const p = document.getElementById('playerProgress');
+  const th = document.getElementById('playerThumb');
+  if(p) p.style.width = (ratio * 100) + '%';
+  if(th) th.style.left = (ratio * 100) + '%';
+}
+function initSeekBar(){
+  const bar = document.getElementById('playerBar');
+  if(!bar) return;
+
+  function onDown(e){
+    // 只响应主键/单指
+    if(e.button !== undefined && e.button !== 0) return;
+    const ratio = _seekRatio(e.clientX);
+    if(ratio === null) return;
+    isSeeking = true;
+    bar.classList.add('dragging');
+    try{ bar.setPointerCapture(e.pointerId); }catch(err){}
+    _seekVisual(ratio);
+    e.preventDefault();
+  }
+  function onMove(e){
+    if(!isSeeking) return;
+    const ratio = _seekRatio(e.clientX);
+    if(ratio === null) return;
+    _seekVisual(ratio);
+    e.preventDefault();
+  }
+  function onUp(e){
+    if(!isSeeking) return;
+    isSeeking = false;
+    bar.classList.remove('dragging');
+    try{ bar.releasePointerCapture(e.pointerId); }catch(err){}
+    const ratio = _seekRatio(e.clientX);
+    const bg = window.bgMusic;
+    if(ratio === null) return;
+    if(bg && bg.duration && !isNaN(bg.duration)){
+      bg.currentTime = ratio * bg.duration;
+    }else if(bg){
+      // 元数据还没加载完：等 loadedmetadata 后再跳转
+      const once = function(){
+        bg.removeEventListener('loadedmetadata', once);
+        if(bg.duration && !isNaN(bg.duration)) bg.currentTime = ratio * bg.duration;
+      };
+      bg.addEventListener('loadedmetadata', once);
+      bg.load();
+    }
+  }
+  bar.addEventListener('pointerdown', onDown);
+  bar.addEventListener('pointermove', onMove);
+  bar.addEventListener('pointerup', onUp);
+  bar.addEventListener('pointercancel', onUp);
+  // 拖动时禁止浏览器手势（双保险，CSS touch-action 已处理）
+  bar.addEventListener('touchmove', function(e){ if(isSeeking) e.preventDefault(); }, {passive:false});
+}
+window.initSeekBar = initSeekBar;
 function togglePlayer(){ $('#player').classList.toggle('collapsed'); }
 window.togglePlay=togglePlay; window.prevSong=prevSong; window.nextSong=nextSong;
 window.togglePlayer=togglePlayer;
