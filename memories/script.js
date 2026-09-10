@@ -82,30 +82,15 @@ function onScroll(){
 }
 window.addEventListener('scroll', onScroll, {passive:true});
 
-// ===== 主题切换（暗色 / 白色） =====
-const THEME_KEY = 'memories.theme';
-function applyTheme(theme){
-  // theme: 'dark' | 'light'
-  const t = (theme === 'light') ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', t);
-  // 同步按钮图标
-  const btn = document.getElementById('navTheme');
-  if(btn) btn.textContent = (t === 'light') ? '☾' : '☀';
-  try{ localStorage.setItem(THEME_KEY, t); }catch(e){}
-  // 通知其它组件（如 canvas 星空换色）
-  document.dispatchEvent(new CustomEvent('memories:theme', {detail:{theme:t}}));
-}
-function initThemeToggle(){
-  // 读取用户偏好（默认 dark）
-  let saved = 'dark';
-  try{ saved = localStorage.getItem(THEME_KEY) || 'dark'; }catch(e){}
-  applyTheme(saved);
-  const btn = document.getElementById('navTheme');
-  if(!btn) return;
-  btn.onclick = function(){
-    const cur = document.documentElement.getAttribute('data-theme') || 'dark';
-    applyTheme(cur === 'light' ? 'dark' : 'light');
-  };
+// ===== 主题：单一暗色模式（2026-09-10 移除白色模式切换）=====
+// 历史：曾支持暗色/白色双主题（tag: pre-theme-toggle 之前为无主题版本）
+// 用户决定只保留默认暗色 —— 深底更能衬托照片（相册为主角的网站）
+function clearLegacyTheme(){
+  // 清理旧版遗留的 localStorage 偏好，避免残留数据
+  try{
+    localStorage.removeItem('memories.theme');
+    document.documentElement.removeAttribute('data-theme');
+  }catch(e){}
 }
 
 // ===== Hero 星空 =====
@@ -115,15 +100,7 @@ function initHeroStars(){
   let W, H, stars, mouseX=0, mouseY=0;
   const N=80;
   // 颜色缓存（主题变化时更新）
-  let starColor = {r:232, g:228, b:218};  // 默认暗色
-  function refreshColor(){
-    const theme = document.documentElement.getAttribute('data-theme');
-    // 暗色用米白 (#E8E4DA)，白色用深灰 (#1A1A1A)，alpha 会相应调整
-    if(theme === 'light'){ starColor = {r:30, g:30, b:30}; }
-    else { starColor = {r:232, g:228, b:218}; }
-  }
-  document.addEventListener('memories:theme', refreshColor);
-  refreshColor();
+  let starColor = {r:232, g:228, b:218};  // 米白（暗色模式下唯一的配色）
   function resize(){
     W = c.parentElement.offsetWidth;
     H = c.parentElement.offsetHeight;
@@ -154,10 +131,7 @@ function initHeroStars(){
     for(const s of stars){
       // 闪烁
       const tw = Math.sin(t*s.twinkleSpeed + s.twinklePhase);
-      // 白色模式需要更深才看得见 → 放大 alpha
-      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-      const alphaBoost = isLight ? 1.3 : 1.0;
-      const alpha = Math.min(1, s.baseAlpha * (0.5 + 0.5*tw) * alphaBoost);
+      const alpha = Math.min(1, s.baseAlpha * (0.5 + 0.5*tw));
       // 鼠标视差：附近的星轻微漂移
       const dx = (mouseX - W/2) * 0.02 * s.driftX;
       const dy = (mouseY - H/2) * 0.02 * s.driftY;
@@ -1557,7 +1531,7 @@ function init(){
   if(gear) gear.onclick = () => { if(window.EDITOR && window.EDITOR.open) window.EDITOR.open(); };
 
   // 主题切换（2026-08-27：右上角 ☀/☾ 按钮）
-  initThemeToggle();
+  clearLegacyTheme();   // 清除旧版白色模式遗留的偏好
 
   // 同步 data.js → Supabase（让编辑器有真实数据）— 暴露 promise 给 editor 共享
   window.MemoriesReady = ensureSync();
