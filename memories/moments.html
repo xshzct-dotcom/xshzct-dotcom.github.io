@@ -112,13 +112,9 @@
   }
   function fmtTime(iso){
     var d=new Date(iso); if(isNaN(d.getTime())) return '';
-    var now=new Date();
-    function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
     var hh=('0'+d.getHours()).slice(-2), mm=('0'+d.getMinutes()).slice(-2);
-    if(sameDay(d,now)) return '今天 '+hh+':'+mm;
-    var y=new Date(now.getTime()-86400000);
-    if(sameDay(d,y)) return '昨天 '+hh+':'+mm;
-    return d.getFullYear()+'.'+(d.getMonth()+1)+'.'+d.getDate()+' '+hh+':'+mm;
+    // 2026-09-12 用户要求：统一用「年月日 + 时刻」，不再显示"今天/昨天"
+    return d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日 '+hh+':'+mm;
   }
   function renderImages(imgs){
     if(!imgs || !imgs.length) return '';
