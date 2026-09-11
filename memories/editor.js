@@ -1190,7 +1190,7 @@ function renderPostOldList(posts){
   el.innerHTML = list.map(function(p){
     var t = new Date(p.created_at);
     var ts = isNaN(t.getTime()) ? '' :
-      (t.getFullYear() + '.' + (t.getMonth() + 1) + '.' + t.getDate() + ' ' +
+      (t.getFullYear() + '年' + (t.getMonth() + 1) + '月' + t.getDate() + '日 ' +
        ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2));
     var txt = (p.content || '').replace(/\s+/g, ' ').slice(0, 40);
     var cnt = (p.images && p.images.length) ? ' 🖼' + p.images.length : '';
