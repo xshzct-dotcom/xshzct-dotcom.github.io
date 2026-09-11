@@ -66,6 +66,9 @@
   padding:20px;cursor:zoom-out;opacity:0;transition:opacity .25s}
 .mp-viewer.show{opacity:1}
 .mp-viewer img{max-width:100%;max-height:100%;object-fit:contain;border-radius:3px}
+/* 2026-09-12 关键修复：display:flex 会覆盖 HTML 的 hidden 属性，
+   导致这个透明全屏层常驻，挡住页面所有点击（表现为鼠标变 zoom-out 光标、什么都点不动） */
+.mp-viewer[hidden],.mp-empty[hidden]{display:none!important}
 </style>
 </head>
 <body>

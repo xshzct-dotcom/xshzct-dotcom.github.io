@@ -1090,7 +1090,7 @@ window.renderMusicTab=renderMusicTab;
 
 // ===== 主渲染分发 =====
 // ===== 「动态」帖子（2026-09-11 新增）=====
-var _postDraft = { images: [], music: null };
+var _postDraft = { images: [], existing: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
 
 // 图片压缩：最大边 1600px、质量 0.82（手机照片 3~5MB → 约 200~400KB）
 function compressImage(file, maxSide, quality){
@@ -1132,29 +1132,51 @@ async function uploadToStorage(path, blobOrFile){
   return path;
 }
 
+function _storageUrl(p){
+  if(!p) return '';
+  return /^https?:/i.test(p) ? p : (STORAGE_URL + '/' + p);
+}
+
 function renderPostAttachments(){
   var box = document.getElementById('postAttachments');
   if(!box) return;
+  var ex = _postDraft.existing || [];
   var html = '';
-  if(_postDraft.images.length){
-    html += '<div style="display:flex;gap:6px;flex-wrap:wrap">' + _postDraft.images.map(function(it, i){
+  if(ex.length || _postDraft.images.length){
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    html += ex.map(function(p, i){
       return '<div style="position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--border)">' +
-        '<img src="' + it.preview + '" style="width:100%;height:100%;object-fit:cover">' +
-        '<button data-rm-img="' + i + '" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:.7rem;line-height:1;display:flex;align-items:center;justify-content:center">×</button>' +
+        '<img src="' + _storageUrl(p) + '" style="width:100%;height:100%;object-fit:cover">' +
+        '<button data-rm-ex="' + i + '" title="移除这张" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:.7rem;line-height:1;display:flex;align-items:center;justify-content:center">×</button>' +
       '</div>';
-    }).join('') + '</div>';
+    }).join('');
+    html += _postDraft.images.map(function(it, i){
+      return '<div style="position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--accent)">' +
+        '<img src="' + it.preview + '" style="width:100%;height:100%;object-fit:cover">' +
+        '<button data-rm-img="' + i + '" title="移除这张" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:.7rem;line-height:1;display:flex;align-items:center;justify-content:center">×</button>' +
+      '</div>';
+    }).join('');
+    html += '</div>';
   }
   if(_postDraft.music){
     html += '<div style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--text-dim)">' +
-      '🎵 ' + _postDraft.music.name +
+      '🎵 ' + _postDraft.music.name + ' <span style="color:var(--accent);font-size:.72rem">(新)</span>' +
+      '<button data-rm-music="1" style="color:var(--danger);font-size:.75rem">移除</button></div>';
+  } else if(_postDraft.musicKeep){
+    html += '<div style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--text-dim)">' +
+      '🎵 ' + (_postDraft.musicKeepTitle || '已有音乐') +
       '<button data-rm-music="1" style="color:var(--danger);font-size:.75rem">移除</button></div>';
   }
   box.innerHTML = html;
   box.querySelectorAll('[data-rm-img]').forEach(function(b){
     b.onclick = function(){ _postDraft.images.splice(parseInt(b.getAttribute('data-rm-img')), 1); renderPostAttachments(); };
   });
-  var mb = box.querySelector('[data-rm-music]');
-  if(mb) mb.onclick = function(){ _postDraft.music = null; renderPostAttachments(); };
+  box.querySelectorAll('[data-rm-ex]').forEach(function(b){
+    b.onclick = function(){ _postDraft.existing.splice(parseInt(b.getAttribute('data-rm-ex')), 1); renderPostAttachments(); };
+  });
+  box.querySelectorAll('[data-rm-music]').forEach(function(b){
+    b.onclick = function(){ _postDraft.music = null; _postDraft.musicKeep = null; _postDraft.musicKeepTitle = null; renderPostAttachments(); };
+  });
 }
 
 function renderPostOldList(posts){
@@ -1180,9 +1202,19 @@ function renderPostOldList(posts){
         '<div style="font-size:.85rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (txt || '（无文字）') + cnt + '</div>' +
         (extra ? '<div style="font-size:.7rem;color:var(--text-muted);margin-top:2px">' + extra + '</div>' : '') +
       '</div>' +
-      '<button class="editor-btn-sm" data-del-post="' + p.id + '">删除</button>' +
+      '<div style="display:flex;gap:6px;flex-shrink:0">' +
+        '<button class="editor-btn-sm" data-edit-post="' + p.id + '">编辑</button>' +
+        '<button class="editor-btn-sm" data-del-post="' + p.id + '">删除</button>' +
+      '</div>' +
     '</div>';
   }).join('');
+  el.querySelectorAll('[data-edit-post]').forEach(function(b){
+    b.onclick = function(){
+      var id = b.getAttribute('data-edit-post');
+      var p = list.filter(function(x){ return String(x.id) === String(id); })[0];
+      if(p) startEditPost(p);
+    };
+  });
   el.querySelectorAll('[data-del-post]').forEach(function(b){
     b.onclick = async function(){
       var id = b.getAttribute('data-del-post');
@@ -1203,13 +1235,57 @@ function renderPostOldList(posts){
   });
 }
 
+// 进入编辑模式（2026-09-12 新增）
+function startEditPost(p){
+  _postDraft = {
+    images: [],
+    existing: (p.images || []).slice(),
+    music: null,
+    musicKeep: p.music_path || null,
+    musicKeepTitle: p.music_title || '已有音乐',
+    editingId: p.id
+  };
+  var t = document.getElementById('postText');      if(t) t.value = p.content || '';
+  var m = document.getElementById('postMood');       if(m) m.value = p.mood || '';
+  var w = document.getElementById('postWeather');    if(w) w.value = p.weather || '';
+  var l = document.getElementById('postLocation');   if(l) l.value = p.location || '';
+  var btn = document.getElementById('postPublish');
+  if(btn) btn.textContent = '保存修改';
+  var bar = document.getElementById('postEditBar');
+  if(bar){
+    bar.style.display = 'flex';
+    var info = bar.querySelector('.post-edit-info');
+    if(info) info.textContent = '正在编辑：' + ((p.content || '（无文字）').replace(/\s+/g,' ').slice(0, 20));
+  }
+  renderPostAttachments();
+  var body = document.getElementById('editorBody');
+  if(body) body.scrollTop = 0;
+  _postStatus('改完点「保存修改」', 'var(--accent)');
+}
+
+// 取消编辑，回到新建模式
+function cancelEditPost(){
+  _postDraft = { images: [], existing: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
+  ['postText','postMood','postWeather','postLocation'].forEach(function(id){
+    var e = document.getElementById(id); if(e) e.value = '';
+  });
+  var btn = document.getElementById('postPublish'); if(btn) btn.textContent = '发布动态';
+  var bar = document.getElementById('postEditBar'); if(bar) bar.style.display = 'none';
+  renderPostAttachments();
+  _postStatus('');
+}
+
 async function renderPostTab(){
   const body = $('#editorBody');
   const posts = await loadTabData('post');
-  _postDraft = { images: [], music: null };
+  _postDraft = { images: [], existing: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
 
   body.innerHTML = `
     <div>
+      <div id="postEditBar" style="display:none;align-items:center;gap:10px;padding:9px 12px;margin-bottom:10px;background:var(--accent-glow);border:1px solid var(--accent);border-radius:10px;font-size:.8rem">
+        <span class="post-edit-info" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)"></span>
+        <button id="postCancelEdit" class="editor-btn-sm" style="flex-shrink:0">取消编辑</button>
+      </div>
       <textarea id="postText" rows="4" placeholder="此刻在想什么…（文字、图片、音乐，随你）"></textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         <label class="editor-btn editor-btn-secondary" style="cursor:pointer">🖼 加图片
@@ -1231,6 +1307,8 @@ async function renderPostTab(){
       <div id="postOldList"></div>
     </div>
   `;
+  var cancelBtn = document.getElementById('postCancelEdit');
+  if(cancelBtn) cancelBtn.onclick = cancelEditPost;
 
   var imgInput = document.getElementById('postImgInput');
   var musicInput = document.getElementById('postMusicInput');
@@ -1264,18 +1342,20 @@ async function renderPostTab(){
 
   document.getElementById('postPublish').onclick = async function(){
     var btn = this;
+    var isEdit = !!_postDraft.editingId;
     var text = (document.getElementById('postText').value || '').trim();
     var mood = (document.getElementById('postMood').value || '').trim();
     var weather = (document.getElementById('postWeather').value || '').trim();
     var location = (document.getElementById('postLocation').value || '').trim();
 
-    if(!text && !_postDraft.images.length && !_postDraft.music){
+    var hasAny = text || _postDraft.images.length || (_postDraft.existing || []).length || _postDraft.music || _postDraft.musicKeep;
+    if(!hasAny){
       _postStatus('写点文字或加张图吧', 'var(--danger)'); return;
     }
-    btn.disabled = true; btn.textContent = '发布中…';
+    btn.disabled = true; btn.textContent = isEdit ? '保存中…' : '发布中…';
 
     try{
-      // 1) 上传图片
+      // 1) 上传新选的图片
       var paths = [];
       for(var i = 0; i < _postDraft.images.length; i++){
         _postStatus('上传图片 ' + (i + 1) + '/' + _postDraft.images.length + '…');
@@ -1283,8 +1363,9 @@ async function renderPostTab(){
         await uploadToStorage(it.path, it.blob);
         paths.push(it.path);
       }
-      // 2) 上传音乐
-      var musicPath = null, musicTitle = null;
+      // 2) 音乐：新选的先上传；没换则沿用原有
+      var musicPath = _postDraft.musicKeep || null;
+      var musicTitle = _postDraft.musicKeepTitle || null;
       if(_postDraft.music){
         _postStatus('上传音乐…');
         var mf = _postDraft.music.file;
@@ -1293,18 +1374,27 @@ async function renderPostTab(){
         await uploadToStorage(musicPath, mf);
         musicTitle = mf.name.replace(/\.[^.]+$/, '');
       }
-      // 3) 写数据库
+      // 3) 最终图片 = 原有保留的 + 新上传的
+      var finalImages = (_postDraft.existing || []).concat(paths);
+      // 4) 写数据库（新增 or 修改）
       _postStatus('保存…');
-      const res = await db().from('posts').insert({
+      var payload = {
         content: text,
-        images: paths,
+        images: finalImages,
         music_path: musicPath,
         music_title: musicTitle,
         mood: mood || null,
         weather: weather || null,
-        location: location || null,
-        created_at: new Date().toISOString()
-      });
+        location: location || null
+      };
+      var res;
+      if(isEdit){
+        payload.updated_at = new Date().toISOString();
+        res = await db().from('posts').update(payload).eq('id', _postDraft.editingId);
+      }else{
+        payload.created_at = new Date().toISOString();
+        res = await db().from('posts').insert(payload);
+      }
       if(res && res.error){
         var msg = res.error.message || '';
         if(/relation .* does not exist/i.test(msg) || /schema cache/i.test(msg)){
@@ -1313,11 +1403,12 @@ async function renderPostTab(){
         throw new Error(msg);
       }
       invalidateCache('post');
-      _postStatus('✅ 发布成功', 'var(--success)');
+      _postDraft.editingId = null;
+      _postStatus(isEdit ? '✅ 修改已保存' : '✅ 发布成功', 'var(--success)');
       renderTab();
     }catch(e){
-      _postStatus('❌ ' + (e.message || '发布失败'), 'var(--danger)');
-      btn.disabled = false; btn.textContent = '发布动态';
+      _postStatus('❌ ' + (e.message || '保存失败'), 'var(--danger)');
+      btn.disabled = false; btn.textContent = isEdit ? '保存修改' : '发布动态';
       return;
     }
     btn.disabled = false; btn.textContent = '发布动态';
