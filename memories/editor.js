@@ -147,14 +147,14 @@ $('#editorBackdrop').onclick=close;
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#editorPanel').classList.contains('open'))close()});
 
 // Tab 切换（带缓存）
-var _editorCache = {essay: null, album: null, music: null};
-var _cacheTime = {essay: 0, album: 0, music: 0};
+var _editorCache = {essay: null, album: null, music: null, post: null};
+var _cacheTime = {essay: 0, album: 0, music: 0, post: 0};
 var _CACHE_TTL = 180000; // 2026-09-11 优化：15秒 → 3分钟（编辑器内改动会 invalidateCache，延长安全）
-function invalidateCache(tab){ if(tab) _cacheTime[tab]=0; else{_cacheTime={essay:0,album:0,music:0};} }
+function invalidateCache(tab){ if(tab && _cacheTime[tab]!==undefined) _cacheTime[tab]=0; else{_cacheTime={essay:0,album:0,music:0,post:0};} }
 
 // ===== 2026-09-11 加载优化：统一加载入口（复用进行中的请求）+ 三 tab 并行预取 =====
 // 原来三个 tab 串行加载 + open() 等待同步流程，切换时每次都要等一个跨境往返
-var _pending = {essay: null, album: null, music: null};
+var _pending = {essay: null, album: null, music: null, post: null};
 function loadTabData(tab){
   const now = Date.now();
   // 1) 命中内存缓存
@@ -163,11 +163,11 @@ function loadTabData(tab){
   }
   // 2) 已有进行中的请求 → 复用（避免重复往返）
   if(_pending[tab]) return _pending[tab];
-  const q = (tab === 'essay')
-    ? db().from('essays').select('*')
-    : (tab === 'album')
-      ? db().from('albums').select('*').order('sort_order', {ascending: true})
-      : db().from('music').select('*').order('sort_order', {ascending: true});
+  var q;
+  if(tab === 'essay')      q = db().from('essays').select('*');
+  else if(tab === 'album') q = db().from('albums').select('*').order('sort_order', {ascending: true});
+  else if(tab === 'post')  q = db().from('posts').select('*').order('created_at', {ascending: false}).limit(200);
+  else                     q = db().from('music').select('*').order('sort_order', {ascending: true});
   _pending[tab] = Promise.resolve(q).then(function(r){
     const d = (r && r.data) || null;
     if(d){ _editorCache[tab] = d; _cacheTime[tab] = Date.now(); }
@@ -179,9 +179,9 @@ function loadTabData(tab){
   });
   return _pending[tab];
 }
-// 并行预取全部三个 tab（切 tab 秒开）
+// 并行预取全部 tab（切 tab 秒开）
 function prefetchAllTabs(){
-  return Promise.all([loadTabData('essay'), loadTabData('album'), loadTabData('music')]).catch(function(){});
+  return Promise.all([loadTabData('essay'), loadTabData('album'), loadTabData('music'), loadTabData('post')]).catch(function(){});
 }
 function afterMutation(tab, renderFn){
   invalidateCache(tab);
@@ -866,17 +866,31 @@ function renderList(){
         let ok=0, fail=0;
         for(const f of files){
           try{
-            var fname=Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-            console.log('[upload] starting', fname, 'size:', f.size);
-            var uploadPromise = sb.storage.from('photos').upload(fname, f, {upsert:true});
-            var timeoutPromise = new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('上传超时')); }, 12000); });
+            // 2026-09-12 新增：上传前自动压缩照片
+            // 手机原图 3~5MB → 约 300~600KB，肉眼几乎无差别，省 Supabase 免费额度（1GB）
+            var upFile = f;
+            try{
+              if(/^image\//i.test(f.type || '') || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)){
+                if(lbl) lbl.textContent = '⏳ 压缩 ' + (ok + fail + 1) + '/' + files.length + '…';
+                var compressed = await compressImage(f, 1920, 0.85);
+                if(compressed && compressed !== f) upFile = compressed;
+              }
+            }catch(cErr){ console.warn('[upload] compress failed, use original:', cErr); upFile = f; }
+            var isCompressed = (upFile !== f);
+            var fname = Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.' +
+                        (isCompressed ? 'jpg' : (f.name.split('.').pop() || 'jpg'));
+            console.log('[upload] starting', fname, 'orig:', f.size, 'upload:', upFile.size);
+            var uploadPromise = sb.storage.from('photos').upload(fname, upFile, {upsert:true});
+            // 超时按体积动态计算（每 MB 3 秒，最少 30 秒；原来固定 12 秒，大图容易误判失败）
+            var toMs = Math.max(30000, Math.ceil(upFile.size / 1048576) * 3000);
+            var timeoutPromise = new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('上传超时')); }, toMs); });
             var result=await Promise.race([uploadPromise, timeoutPromise]);
             if(!result || result.error){
               fail++; console.warn('[upload] upload error:', result&&result.error);
               continue;
             }
             console.log('[upload] insert album_photos', {album_id:album.id,filename:f.name,storage_path:fname});
-            var insResp = await db().from('album_photos').insert({album_id:album.id, filename:f.name, storage_path:fname, file_size:f.size, sort_order:Date.now()}).select();
+            var insResp = await db().from('album_photos').insert({album_id:album.id, filename:f.name, storage_path:fname, file_size:upFile.size, sort_order:Date.now()}).select();
             console.log('[upload] insert result:', JSON.stringify(insResp));
             if(!insResp || insResp.error || (insResp.data && insResp.data.length===0)){
               fail++; console.warn('[upload] insert failed:', insResp&&insResp.error);
@@ -1034,7 +1048,9 @@ async function renderMusicTab(){
             contentType: f.type || 'audio/mpeg',
             cacheControl: '3600'
           });
-          const timeoutPromise = new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('上传超时')); }, 15000); });
+          // 2026-09-12：超时改为按体积动态计算（每 MB 3 秒，最少 30 秒；原来固定 15 秒，稍大的歌会误判失败）
+          const toMs = Math.max(30000, Math.ceil(f.size / 1048576) * 3000);
+          const timeoutPromise = new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('上传超时')); }, toMs); });
           const {error:upErr} = await Promise.race([upPromise, timeoutPromise]);
           if(!upErr){
             // 新音乐放到最前面：全部已有 sort_order +1，新歌 = 0
@@ -1073,6 +1089,244 @@ async function renderMusicTab(){
 window.renderMusicTab=renderMusicTab;
 
 // ===== 主渲染分发 =====
+// ===== 「动态」帖子（2026-09-11 新增）=====
+var _postDraft = { images: [], music: null };
+
+// 图片压缩：最大边 1600px、质量 0.82（手机照片 3~5MB → 约 200~400KB）
+function compressImage(file, maxSide, quality){
+  return new Promise(function(resolve){
+    var url = null;
+    try{
+      url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function(){
+        try{
+          var w = img.naturalWidth, h = img.naturalHeight;
+          var scale = Math.min(1, (maxSide || 1600) / Math.max(w, h));
+          var cw = Math.round(w * scale), ch = Math.round(h * scale);
+          var cv = document.createElement('canvas');
+          cv.width = cw; cv.height = ch;
+          cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          if(url) URL.revokeObjectURL(url);
+          cv.toBlob(function(blob){
+            resolve(blob && blob.size && blob.size < file.size ? blob : file);
+          }, 'image/jpeg', quality || 0.82);
+        }catch(e){ if(url) URL.revokeObjectURL(url); resolve(file); }
+      };
+      img.onerror = function(){ if(url) URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    }catch(e){ resolve(file); }
+  });
+}
+
+function _postStatus(msg, color){
+  var el = document.getElementById('postStatus');
+  if(el){ el.textContent = msg || ''; el.style.color = color || 'var(--text-muted)'; }
+}
+
+async function uploadToStorage(path, blobOrFile){
+  var up = sb.storage.from('photos').upload(path, blobOrFile, {upsert: true, contentType: blobOrFile.type || undefined});
+  var to = new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('上传超时')); }, 45000); });
+  var r = await Promise.race([up, to]);
+  if(!r || r.error) throw new Error((r && r.error && r.error.message) || '上传失败');
+  return path;
+}
+
+function renderPostAttachments(){
+  var box = document.getElementById('postAttachments');
+  if(!box) return;
+  var html = '';
+  if(_postDraft.images.length){
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap">' + _postDraft.images.map(function(it, i){
+      return '<div style="position:relative;width:64px;height:64px;border-radius:8px;overflow:hidden;border:1px solid var(--border)">' +
+        '<img src="' + it.preview + '" style="width:100%;height:100%;object-fit:cover">' +
+        '<button data-rm-img="' + i + '" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;font-size:.7rem;line-height:1;display:flex;align-items:center;justify-content:center">×</button>' +
+      '</div>';
+    }).join('') + '</div>';
+  }
+  if(_postDraft.music){
+    html += '<div style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--text-dim)">' +
+      '🎵 ' + _postDraft.music.name +
+      '<button data-rm-music="1" style="color:var(--danger);font-size:.75rem">移除</button></div>';
+  }
+  box.innerHTML = html;
+  box.querySelectorAll('[data-rm-img]').forEach(function(b){
+    b.onclick = function(){ _postDraft.images.splice(parseInt(b.getAttribute('data-rm-img')), 1); renderPostAttachments(); };
+  });
+  var mb = box.querySelector('[data-rm-music]');
+  if(mb) mb.onclick = function(){ _postDraft.music = null; renderPostAttachments(); };
+}
+
+function renderPostOldList(posts){
+  var el = document.getElementById('postOldList');
+  if(!el) return;
+  var list = posts || [];
+  if(!list.length){
+    el.innerHTML = '<div style="font-size:.82rem;color:var(--text-muted);padding:10px 0">还没有动态，写第一条吧</div>';
+    return;
+  }
+  el.innerHTML = list.map(function(p){
+    var t = new Date(p.created_at);
+    var ts = isNaN(t.getTime()) ? '' :
+      (t.getFullYear() + '.' + (t.getMonth() + 1) + '.' + t.getDate() + ' ' +
+       ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2));
+    var txt = (p.content || '').replace(/\s+/g, ' ').slice(0, 40);
+    var cnt = (p.images && p.images.length) ? ' 🖼' + p.images.length : '';
+    if(p.music_path) cnt += ' 🎵';
+    var extra = [p.mood, p.weather, p.location].filter(Boolean).join(' · ');
+    return '<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:.72rem;color:var(--text-muted)">' + ts + '</div>' +
+        '<div style="font-size:.85rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (txt || '（无文字）') + cnt + '</div>' +
+        (extra ? '<div style="font-size:.7rem;color:var(--text-muted);margin-top:2px">' + extra + '</div>' : '') +
+      '</div>' +
+      '<button class="editor-btn-sm" data-del-post="' + p.id + '">删除</button>' +
+    '</div>';
+  }).join('');
+  el.querySelectorAll('[data-del-post]').forEach(function(b){
+    b.onclick = async function(){
+      var id = b.getAttribute('data-del-post');
+      if(!confirm('确定删除这条动态吗？（不可恢复）')) return;
+      b.textContent = '…';
+      var p = (list.filter(function(x){ return String(x.id) === String(id); })[0]) || {};
+      try{
+        await db().from('posts').delete().eq('id', id);
+        // 顺手清理存储里的附件
+        var rm = [];
+        (p.images || []).forEach(function(x){ rm.push(x); });
+        if(p.music_path) rm.push(p.music_path);
+        if(rm.length && sb) sb.storage.from('photos').remove(rm).catch(function(){});
+        invalidateCache('post');
+        renderTab();
+      }catch(e){ b.textContent = '删除'; alert('删除失败：' + e.message); }
+    };
+  });
+}
+
+async function renderPostTab(){
+  const body = $('#editorBody');
+  const posts = await loadTabData('post');
+  _postDraft = { images: [], music: null };
+
+  body.innerHTML = `
+    <div>
+      <textarea id="postText" rows="4" placeholder="此刻在想什么…（文字、图片、音乐，随你）"></textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <label class="editor-btn editor-btn-secondary" style="cursor:pointer">🖼 加图片
+          <input type="file" accept="image/*" multiple style="display:none" id="postImgInput"></label>
+        <label class="editor-btn editor-btn-secondary" style="cursor:pointer">🎵 加音乐
+          <input type="file" accept="audio/*" style="display:none" id="postMusicInput"></label>
+      </div>
+      <div id="postAttachments" style="margin-top:10px"></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">
+        <input id="postMood" class="editor-meta-input" placeholder="心情">
+        <input id="postWeather" class="editor-meta-input" placeholder="天气">
+        <input id="postLocation" class="editor-meta-input" placeholder="地点">
+      </div>
+      <button class="editor-btn editor-btn-primary" id="postPublish" style="width:100%;margin-top:12px">发布动态</button>
+      <div id="postStatus" style="font-size:.78rem;color:var(--text-muted);margin-top:8px;text-align:center"></div>
+    </div>
+    <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px">
+      <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:8px">已发布 ${(posts||[]).length} 条</div>
+      <div id="postOldList"></div>
+    </div>
+  `;
+
+  var imgInput = document.getElementById('postImgInput');
+  var musicInput = document.getElementById('postMusicInput');
+
+  imgInput.onchange = async function(){
+    var files = Array.prototype.slice.call(imgInput.files || []);
+    if(!files.length) return;
+    _postStatus('压缩图片中…');
+    for(var i = 0; i < files.length && _postDraft.images.length < 9; i++){
+      var f = files[i];
+      try{
+        var blob = await compressImage(f, 1600, 0.82);
+        var ext = (blob === f) ? (f.name.split('.').pop() || 'jpg') : 'jpg';
+        var path = 'posts/img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '.' + ext;
+        _postDraft.images.push({ blob: blob, path: path, preview: URL.createObjectURL(blob), name: f.name });
+      }catch(e){ console.warn('[post] compress failed', e); }
+    }
+    imgInput.value = '';
+    renderPostAttachments();
+    _postStatus('已选 ' + _postDraft.images.length + ' 张图（最多 9 张）');
+  };
+
+  musicInput.onchange = function(){
+    var f = musicInput.files && musicInput.files[0];
+    if(!f) return;
+    _postDraft.music = { file: f, name: f.name };
+    musicInput.value = '';
+    renderPostAttachments();
+    _postStatus('已选音乐：' + f.name);
+  };
+
+  document.getElementById('postPublish').onclick = async function(){
+    var btn = this;
+    var text = (document.getElementById('postText').value || '').trim();
+    var mood = (document.getElementById('postMood').value || '').trim();
+    var weather = (document.getElementById('postWeather').value || '').trim();
+    var location = (document.getElementById('postLocation').value || '').trim();
+
+    if(!text && !_postDraft.images.length && !_postDraft.music){
+      _postStatus('写点文字或加张图吧', 'var(--danger)'); return;
+    }
+    btn.disabled = true; btn.textContent = '发布中…';
+
+    try{
+      // 1) 上传图片
+      var paths = [];
+      for(var i = 0; i < _postDraft.images.length; i++){
+        _postStatus('上传图片 ' + (i + 1) + '/' + _postDraft.images.length + '…');
+        var it = _postDraft.images[i];
+        await uploadToStorage(it.path, it.blob);
+        paths.push(it.path);
+      }
+      // 2) 上传音乐
+      var musicPath = null, musicTitle = null;
+      if(_postDraft.music){
+        _postStatus('上传音乐…');
+        var mf = _postDraft.music.file;
+        var mext = (mf.name.split('.').pop() || 'mp3').toLowerCase();
+        musicPath = 'posts/music_' + Date.now() + '.' + mext;
+        await uploadToStorage(musicPath, mf);
+        musicTitle = mf.name.replace(/\.[^.]+$/, '');
+      }
+      // 3) 写数据库
+      _postStatus('保存…');
+      const res = await db().from('posts').insert({
+        content: text,
+        images: paths,
+        music_path: musicPath,
+        music_title: musicTitle,
+        mood: mood || null,
+        weather: weather || null,
+        location: location || null,
+        created_at: new Date().toISOString()
+      });
+      if(res && res.error){
+        var msg = res.error.message || '';
+        if(/relation .* does not exist/i.test(msg) || /schema cache/i.test(msg)){
+          throw new Error('posts 表还没建好（请先执行建表 SQL）');
+        }
+        throw new Error(msg);
+      }
+      invalidateCache('post');
+      _postStatus('✅ 发布成功', 'var(--success)');
+      renderTab();
+    }catch(e){
+      _postStatus('❌ ' + (e.message || '发布失败'), 'var(--danger)');
+      btn.disabled = false; btn.textContent = '发布动态';
+      return;
+    }
+    btn.disabled = false; btn.textContent = '发布动态';
+  };
+
+  renderPostAttachments();
+  renderPostOldList(posts);
+}
+
 function renderTab(){
   // 2026-09-10：Supabase SDK 未加载成功时明确提示（避免误以为数据丢了）
   if(!sb){
@@ -1089,6 +1343,7 @@ function renderTab(){
   if(currentTab==='essay') renderEssayTab();
   else if(currentTab==='album') renderAlbumTab();
   else if(currentTab==='music') renderMusicTab();
+  else if(currentTab==='post') renderPostTab();
 }
 
 // ===== 齿轮绑定（在 EDITOR 定义后执行） =====
