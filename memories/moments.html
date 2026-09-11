@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>动态 · 向天游</title>
+<meta name="theme-color" content="#0E1116">
+<meta name="description" content="随手记下的片段 — 文字、照片、音乐">
+<link rel="stylesheet" href="style.css?v=20260911-05">
+<style>
+/* ===== 动态页专属样式（2026-09-11） ===== */
+.mp-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:14px 18px;
+  background:rgba(14,17,22,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border)}
+.mp-back{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border);color:var(--text-dim);font-size:1rem;text-decoration:none;transition:all .2s;flex:0 0 auto}
+.mp-back:hover{border-color:var(--border-hover);color:var(--text)}
+.mp-head h1{font-family:var(--font-display);font-size:1.15rem;font-weight:500;letter-spacing:2px;flex:1;margin:0}
+.mp-head h1 em{font-style:normal;color:var(--accent)}
+.mp-stat{font-size:.75rem;color:var(--text-muted);font-family:var(--font-display)}
+
+.mp-list{max-width:640px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
+
+.mp-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 16px 14px;
+  animation:mpIn .4s var(--ease) both}
+@keyframes mpIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.mp-time{font-size:.72rem;color:var(--text-muted);letter-spacing:.5px;margin-bottom:9px}
+.mp-text{font-size:.95rem;line-height:1.85;color:var(--text);word-break:break-word}
+
+/* 图片网格：1张=大图 / 2张=两列 / 3-4张=两列 / 5-9张=三列 */
+.mp-imgs{display:grid;gap:5px;margin-top:12px}
+.mp-imgs.n1{grid-template-columns:1fr}
+.mp-imgs.n2,.mp-imgs.n3,.mp-imgs.n4{grid-template-columns:1fr 1fr}
+.mp-imgs.n5,.mp-imgs.n6,.mp-imgs.n7,.mp-imgs.n8,.mp-imgs.n9{grid-template-columns:repeat(3,1fr)}
+.mp-img{overflow:hidden;border-radius:6px;background:var(--bg-elevated);cursor:zoom-in}
+.mp-imgs.n1 .mp-img{max-height:420px}
+.mp-imgs.n2 .mp-img,.mp-imgs.n3 .mp-img,.mp-imgs.n4 .mp-img{aspect-ratio:1}
+.mp-imgs.n5 .mp-img,.mp-imgs.n6 .mp-img,.mp-imgs.n7 .mp-img,.mp-imgs.n8 .mp-img,.mp-imgs.n9 .mp-img{aspect-ratio:1}
+.mp-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s var(--ease)}
+.mp-img:hover img{transform:scale(1.04)}
+
+/* 音乐条 */
+.mp-music{display:flex;align-items:center;gap:10px;margin-top:12px;padding:9px 12px;
+  background:var(--bg-elevated);border:1px solid var(--border);border-radius:22px}
+.mp-music-btn{width:30px;height:30px;border-radius:50%;background:var(--accent-glow);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:.8rem;flex:0 0 auto;transition:all .2s}
+.mp-music-btn:hover{background:var(--accent);color:#0E1116}
+.mp-music-btn.playing{background:var(--accent);color:#0E1116}
+.mp-music-title{font-size:.82rem;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 标签 */
+.mp-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+.mp-tag{font-size:.72rem;padding:3px 10px;border-radius:14px;background:rgba(var(--fg-rgb),.05);
+  border:1px solid var(--border);color:var(--text-dim);letter-spacing:.3px}
+.mp-tag-loc{color:var(--accent-2);border-color:rgba(184,100,74,.3)}
+
+/* 空状态 / 提示 */
+.mp-empty{text-align:center;padding:90px 24px;color:var(--text-muted)}
+.mp-empty-icon{font-size:2.6rem;margin-bottom:16px;opacity:.6}
+.mp-empty p{margin:6px 0;font-size:.9rem;line-height:1.7}
+.mp-empty-sub{font-size:.78rem!important;opacity:.7}
+.mp-loading{text-align:center;padding:70px 0;color:var(--text-muted);font-size:.88rem}
+
+/* 图片全屏查看 */
+.mp-viewer{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;
+  padding:20px;cursor:zoom-out;opacity:0;transition:opacity .25s}
+.mp-viewer.show{opacity:1}
+.mp-viewer img{max-width:100%;max-height:100%;object-fit:contain;border-radius:3px}
+</style>
+</head>
+<body>
+
+<header class="mp-head">
+  <a class="mp-back" href="./" title="返回主页" aria-label="返回主页">←</a>
+  <h1>动<em>态</em></h1>
+  <span class="mp-stat" id="mpStat"></span>
+</header>
+
+<main class="mp-list" id="mpList">
+  <div class="mp-loading">加载中…</div>
+</main>
+
+<div class="mp-empty" id="mpEmpty" hidden>
+  <div class="mp-empty-icon">🌙</div>
+  <p>还没有留下什么</p>
+  <p class="mp-empty-sub">回到主页 → 点右下角 ⚙️ → 「动态」写下第一条</p>
+</div>
+
+<div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
+
+<script src="vendor/supabase.js?v=20260910-1"></script>
+<script>
+(function(){
+  'use strict';
+  var SB_URL='https://mvzbkuhwapdqcdkekczh.supabase.co';
+  var SB_KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
+  var STORAGE=SB_URL+'/storage/v1/object/public/photos/';
+  var sb=null;
+  try{ sb=supabase.createClient(SB_URL,SB_KEY); }catch(e){ sb=null; }
+
+  function esc(s){
+    return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function fileUrl(p){
+    if(!p) return '';
+    return /^https?:/i.test(p) ? p : STORAGE + p;
+  }
+  function fmtTime(iso){
+    var d=new Date(iso); if(isNaN(d.getTime())) return '';
+    var now=new Date();
+    function sameDay(a,b){ return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
+    var hh=('0'+d.getHours()).slice(-2), mm=('0'+d.getMinutes()).slice(-2);
+    if(sameDay(d,now)) return '今天 '+hh+':'+mm;
+    var y=new Date(now.getTime()-86400000);
+    if(sameDay(d,y)) return '昨天 '+hh+':'+mm;
+    return d.getFullYear()+'.'+(d.getMonth()+1)+'.'+d.getDate()+' '+hh+':'+mm;
+  }
+  function renderImages(imgs){
+    if(!imgs || !imgs.length) return '';
+    var n=Math.min(imgs.length,9);
+    return '<div class="mp-imgs n'+n+'">'+imgs.slice(0,9).map(function(p){
+      var u=esc(fileUrl(p));
+      return '<div class="mp-img" data-src="'+u+'"><img src="'+u+'" loading="lazy" decoding="async" alt=""></div>';
+    }).join('')+'</div>';
+  }
+  function renderPost(p){
+    var tags=[];
+    if(p.mood)     tags.push('<span class="mp-tag">'+esc(p.mood)+'</span>');
+    if(p.weather)  tags.push('<span class="mp-tag">'+esc(p.weather)+'</span>');
+    if(p.location) tags.push('<span class="mp-tag mp-tag-loc">📍'+esc(p.location)+'</span>');
+    var music = p.music_path ? (
+      '<div class="mp-music">'+
+        '<button class="mp-music-btn" data-src="'+esc(fileUrl(p.music_path))+'" data-title="'+esc(p.music_title||'')+'" aria-label="播放音乐">▶</button>'+
+        '<span class="mp-music-title">'+esc(p.music_title||'音乐')+'</span>'+
+      '</div>'
+    ) : '';
+    return '<article class="mp-card">'+
+      '<div class="mp-time">'+esc(fmtTime(p.created_at))+(p.pinned?' · 置顶':'')+'</div>'+
+      (p.content ? '<div class="mp-text">'+esc(p.content).replace(/\n/g,'<br>')+'</div>' : '')+
+      renderImages(p.images)+
+      music+
+      (tags.length ? '<div class="mp-tags">'+tags.join('')+'</div>' : '')+
+    '</article>';
+  }
+
+  // 单例音频（避免多条音乐同时播放）
+  var audio=null, curBtn=null;
+  function toggleMusic(btn){
+    var src=btn.getAttribute('data-src');
+    if(!src) return;
+    if(!audio){ audio=new Audio(); audio.preload='none'; }
+    if(curBtn===btn && !audio.paused){
+      audio.pause(); btn.textContent='▶'; btn.classList.remove('playing'); return;
+    }
+    if(curBtn && curBtn!==btn){ curBtn.textContent='▶'; curBtn.classList.remove('playing'); }
+    curBtn=btn;
+    if(audio.src!==src){ audio.src=src; }
+    btn.textContent='⏸'; btn.classList.add('playing');
+    audio.play().catch(function(){ btn.textContent='▶'; btn.classList.remove('playing'); });
+    audio.onended=function(){ btn.textContent='▶'; btn.classList.remove('playing'); };
+  }
+
+  var viewer=document.getElementById('mpViewer');
+  var viewerImg=document.getElementById('mpViewerImg');
+  function openViewer(src){
+    viewerImg.src=src; viewer.hidden=false;
+    requestAnimationFrame(function(){ viewer.classList.add('show'); });
+    document.body.style.overflow='hidden';
+  }
+  function closeViewer(){
+    viewer.classList.remove('show'); document.body.style.overflow='';
+    setTimeout(function(){ viewer.hidden=true; viewerImg.src=''; },250);
+  }
+  viewer.addEventListener('click', closeViewer);
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape' && !viewer.hidden) closeViewer(); });
+
+  function bindEvents(){
+    document.getElementById('mpList').addEventListener('click', function(e){
+      var musicBtn=e.target.closest('.mp-music-btn');
+      if(musicBtn){ toggleMusic(musicBtn); return; }
+      var imgWrap=e.target.closest('.mp-img');
+      if(imgWrap){ openViewer(imgWrap.getAttribute('data-src')); }
+    });
+  }
+
+  function showEmpty(msg){
+    document.getElementById('mpList').innerHTML='';
+    var el=document.getElementById('mpEmpty');
+    el.hidden=false;
+    if(msg){ el.querySelector('p').textContent=msg; el.querySelector('.mp-empty-sub').textContent=''; }
+  }
+
+  async function load(){
+    var listEl=document.getElementById('mpList');
+    if(!sb){
+      listEl.innerHTML='<div class="mp-loading">⚠️ 云端未连接，请刷新重试</div>';
+      return;
+    }
+    try{
+      var res=await sb.from('posts').select('*')
+        .order('pinned',{ascending:false})
+        .order('created_at',{ascending:false})
+        .limit(200);
+      if(res.error){
+        listEl.innerHTML='<div class="mp-loading">读取失败：'+esc(res.error.message)+'</div>';
+        return;
+      }
+      var list=res.data||[];
+      document.getElementById('mpStat').textContent=list.length?list.length+' 条':'';
+      if(!list.length){ showEmpty(); return; }
+      listEl.innerHTML=list.map(renderPost).join('');
+      bindEvents();
+    }catch(err){
+      listEl.innerHTML='<div class="mp-loading">加载出错，请刷新重试</div>';
+    }
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
