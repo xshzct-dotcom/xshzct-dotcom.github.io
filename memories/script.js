@@ -1550,11 +1550,11 @@ async function loadFromSupabase(){
     }
 
     console.log('[memories] loadFromSupabase done');
-    // 重新渲染相册 chips 和极地（DB sort_order 已同步）
+    // 重新渲染相册 chips 和河流（DB sort_order 已同步）
     if(typeof buildRiverFilters === 'function') buildRiverFilters();
     if(typeof renderRiver === 'function') renderRiver();
-    // 重新触发当前视图刷新
-    if(window._galleryFilterChanged) window._galleryFilterChanged();
+    // 注：原来这里会再调一次 window._galleryFilterChanged()（内部 renderRiver({forceReset:true})）
+    // 导致页面加载时河流被洗两次——看起来"刷一下"。2026-09-11 删除冗余调用。
     window._testReady = true;
   } catch(e){
     console.warn('[memories] loadFromSupabase failed:', e);
