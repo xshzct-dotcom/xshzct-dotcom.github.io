@@ -312,6 +312,14 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .editor-btn-danger:hover{background:rgba(216,123,107,.22)}
 .editor-btn-sm{padding:5px 12px;font-size:.8rem;border-radius:6px;border:1px solid var(--border);background:rgba(var(--fg-rgb),.04);color:var(--text-dim);transition:all .2s}
 .editor-btn-sm:hover{background:rgba(var(--fg-rgb),.1);color:var(--text)}
+
+/* ===== 编辑器 · 动态 tab（2026-09-11 新增）===== */
+#postText{width:100%;padding:12px 14px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:.92rem;line-height:1.7;resize:vertical;outline:none;transition:border-color .2s}
+#postText:focus{border-color:var(--accent)}
+#postText::placeholder{color:var(--text-muted)}
+.editor-meta-input{padding:9px 12px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;font-family:inherit;outline:none;min-width:0;transition:border-color .2s}
+.editor-meta-input:focus{border-color:var(--accent)}
+.editor-meta-input::placeholder{color:var(--text-muted)}
 .editor-btn-sm.del{border-color:rgba(216,123,107,.2);color:rgba(216,123,107,.7)}
 .editor-btn-sm.del:hover{background:rgba(216,123,107,.15);color:var(--danger)}
 .editor-form-group{margin-bottom:16px}
