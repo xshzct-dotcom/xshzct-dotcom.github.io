@@ -77,14 +77,28 @@ async function open(){
   $('#editorPanel').classList.add('open');
   $('#editorBackdrop').classList.add('active');
   document.body.style.overflow='hidden';
-  // 先确保 Supabase 有数据（script.js 的同步可能在跑，等它）
+  // 2026-09-11 性能优化：
+  // 原来这里 await 同步流程（MemoriesReady/ensureDataSync）才渲染 → 打开慢、切 tab 又要等
+  // 现在：立即渲染（命中缓存秒开，未命中只花 1 次往返），数据同步与另外两个 tab 的预取都放后台并行跑
   const body = $('#editorBody');
-  body.innerHTML = '<div class="editor-empty">⏳ 同步数据中…</div>';
-  try{
-    if(window.MemoriesReady) await window.MemoriesReady;
-    else if(sb) await ensureDataSync();
-  } catch(e){ console.warn(e); }
+  if(!body.innerHTML || body.querySelector('.editor-empty')){
+    body.innerHTML = '<div class="editor-empty">加载中…</div>';
+  }
+  if(sb){
+    const wasSynced = _synced;
+    (window.MemoriesReady || Promise.resolve())
+      .then(function(){ return ensureDataSync(); })
+      .then(function(){
+        // 仅当本次真正做了首次同步时，刷新一次视图
+        if(!wasSynced && $('#editorPanel').classList.contains('open')){
+          invalidateCache();
+          renderTab();
+        }
+      })
+      .catch(function(){});
+  }
   renderTab();
+  prefetchAllTabs();   // 并行预取三个 tab 的数据（切 tab 秒开）
 }
 function close(){ $('#editorPanel').classList.remove('open');$('#editorBackdrop').classList.remove('active');document.body.style.overflow=''; }
 window.EDITOR={open,close};
@@ -135,8 +149,40 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#editorPanel').c
 // Tab 切换（带缓存）
 var _editorCache = {essay: null, album: null, music: null};
 var _cacheTime = {essay: 0, album: 0, music: 0};
-var _CACHE_TTL = 15000; // 15秒内不重复请求
+var _CACHE_TTL = 180000; // 2026-09-11 优化：15秒 → 3分钟（编辑器内改动会 invalidateCache，延长安全）
 function invalidateCache(tab){ if(tab) _cacheTime[tab]=0; else{_cacheTime={essay:0,album:0,music:0};} }
+
+// ===== 2026-09-11 加载优化：统一加载入口（复用进行中的请求）+ 三 tab 并行预取 =====
+// 原来三个 tab 串行加载 + open() 等待同步流程，切换时每次都要等一个跨境往返
+var _pending = {essay: null, album: null, music: null};
+function loadTabData(tab){
+  const now = Date.now();
+  // 1) 命中内存缓存
+  if(_editorCache[tab] && now - _cacheTime[tab] < _CACHE_TTL){
+    return Promise.resolve(_editorCache[tab]);
+  }
+  // 2) 已有进行中的请求 → 复用（避免重复往返）
+  if(_pending[tab]) return _pending[tab];
+  const q = (tab === 'essay')
+    ? db().from('essays').select('*')
+    : (tab === 'album')
+      ? db().from('albums').select('*').order('sort_order', {ascending: true})
+      : db().from('music').select('*').order('sort_order', {ascending: true});
+  _pending[tab] = Promise.resolve(q).then(function(r){
+    const d = (r && r.data) || null;
+    if(d){ _editorCache[tab] = d; _cacheTime[tab] = Date.now(); }
+    _pending[tab] = null;
+    return d;
+  }).catch(function(){
+    _pending[tab] = null;
+    return null;
+  });
+  return _pending[tab];
+}
+// 并行预取全部三个 tab（切 tab 秒开）
+function prefetchAllTabs(){
+  return Promise.all([loadTabData('essay'), loadTabData('album'), loadTabData('music')]).catch(function(){});
+}
 function afterMutation(tab, renderFn){
   invalidateCache(tab);
   if(typeof renderFn==='function') renderFn();
@@ -151,7 +197,10 @@ $$('#editorTabs .editor-tab').forEach(tab=>{
     $$('#editorTabs .editor-tab').forEach(t=>t.classList.remove('active'));
     tab.classList.add('active');
     currentTab=tab.dataset.tab;
-    showTabLoading();
+    // 2026-09-11：已缓存（被预取过）则直接渲染，不闪"加载中"
+    if(!(_editorCache[currentTab] && Date.now()-_cacheTime[currentTab] < _CACHE_TTL)){
+      showTabLoading();
+    }
     renderTab();
   };
 });
@@ -161,15 +210,7 @@ async function renderEssayTab(){
   const body=$('#editorBody');
   const cats=['童年篇','初恋篇','日记','旅行见闻'];
   const catIds=['childhood','firstlove','thoughts','travel'];
-  var essays;
-  if(_editorCache.essay && Date.now()-_cacheTime.essay < _CACHE_TTL){
-    essays = _editorCache.essay;
-  } else {
-    const {data:d}=await db().from('essays').select('*');
-    essays = d;
-    _editorCache.essay = essays;
-    _cacheTime.essay = Date.now();
-  }
+  var essays = await loadTabData('essay');
   // 文章按日期降序（最新在前），无日期文章按sort_order排在最后
   const all=(essays||[]).slice().sort(function(a,b){
     return cmpDate(a.date, b.date);
@@ -383,15 +424,7 @@ window.renderEssayTab=renderEssayTab;
 async function renderAlbumTab(){
   window._aeGrid = null;  // 离开相册视图，释放灯箱引用
   const body=$('#editorBody');
-  var albums;
-  if(_editorCache.album && Date.now()-_cacheTime.album < _CACHE_TTL){
-    albums = _editorCache.album;
-  } else {
-    const {data:d}=await db().from('albums').select('*').order('sort_order',{ascending:true});
-    albums = d;
-    _editorCache.album = albums;
-    _cacheTime.album = Date.now();
-  }
+  var albums = await loadTabData('album');
   const list=albums||[];
   body.style.paddingTop = '';
   body.innerHTML=`
@@ -876,15 +909,7 @@ window.renderAlbumTab=renderAlbumTab;
 // ===== 音乐编辑 =====
 async function renderMusicTab(){
   const body=$('#editorBody');
-  var tracks;
-  if(_editorCache.music && Date.now()-_cacheTime.music < _CACHE_TTL){
-    tracks = _editorCache.music;
-  } else {
-    const {data:d}=await db().from('music').select('*').order('sort_order',{ascending:true});
-    tracks = d;
-    _editorCache.music = tracks;
-    _cacheTime.music = Date.now();
-  }
+  var tracks = await loadTabData('music');
   const list=tracks||[];
 
   body.innerHTML=`
