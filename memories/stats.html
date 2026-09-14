@@ -140,7 +140,7 @@ async function render(){
     var nextDay = addDays(currentDate, 1) + 'T00:00:00+08:00';
 
     // 当天记录（用 SDK，和主页同款）
-    var q1 = await SB.from('visits').select('id,path,ref,visited_at,left_at,duration')
+    var q1 = await SB.from('visits').select('id,path,ref,visited_at,left_at,duration,ua,is_authed,screen,lang,tz')
       .gte('visited_at', dayStart)
       .lt('visited_at', nextDay)
       .order('visited_at', {ascending:false})
@@ -155,6 +155,7 @@ async function render(){
 
     // 当天数据计算
     var hourly=new Array(24).fill(0), pageMap={}, refMap={}, durSum=0, durN=0;
+    var authedN=0, guestN=0, guestRows=[];
     (visits||[]).forEach(function(d){
       // visited_at 来自 Supabase timestamp with time zone：ISO UTC 字符串（如 "2026-07-25T03:31:01.000Z"）
       // 用户机器为北京时间（UTC+8），dt.getHours() 直接返回北京小时
@@ -163,6 +164,9 @@ async function render(){
       if(d.path) pageMap[d.path]=(pageMap[d.path]||0)+1;
       if(d.ref&&d.ref!='') refMap[d.ref]=(refMap[d.ref]||0)+1;
       if(d.duration){durSum+=d.duration; durN++;}
+      // 2026-09-15：区分"通过密码的自己人"和"没通过的访客"
+      if(d.is_authed) authedN++;
+      else { guestN++; guestRows.push(d); }
     });
     var avgDur=durN?Math.round(durSum/durN):0;
     var pages=Object.keys(pageMap).sort(function(a,b){return pageMap[b]-pageMap[a];}).slice(0,15);
@@ -178,6 +182,25 @@ async function render(){
     html+='<div class="overview"><div><div class="n">'+(total||0)+'</div><div class="l">总访问</div></div>';
     html+='<div><div class="n">'+(todayCount||0)+'</div><div class="l">'+(isToday?'今日':'当日')+'</div></div>';
     html+='<div><div class="n">'+(avgDur?fmt(avgDur):'--')+'</div><div class="l">平均停留</div></div></div>';
+
+    // 访客构成（2026-09-15 新增）：区分自己人与外人
+    if(authedN + guestN > 0){
+      html+='<div class="section"><h2>🔐 访客构成</h2><div class="overview">';
+      html+='<div><div class="n" style="color:#7C9B7E">'+authedN+'</div><div class="l">自己人（通过密码）</div></div>';
+      html+='<div><div class="n" style="color:#e6a23c">'+guestN+'</div><div class="l">外人（未通过密码）</div></div>';
+      html+='</div></div>';
+      if(guestRows.length){
+        html+='<div class="section"><h2>👀 未通过密码的访问（只看到密码页）</h2>';
+        html+='<div style="font-size:.82rem;line-height:1.9">';
+        guestRows.slice(0,20).forEach(function(d){
+          var dt=new Date(d.visited_at);
+          var t=(dt.getMonth()+1)+'/'+dt.getDate()+' '+('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2);
+          var dev=/Mobile|Android|iPhone|iPad/i.test(d.ua||'')?'📱手机':'💻电脑';
+          html+='<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">'+t+' · '+dev+' · 停留 '+(d.duration?fmt(d.duration):'--')+'</div>';
+        });
+        html+='</div></div>';
+      }
+    }
 
     // 时段分布
     html+='<div class="section"><h2>🕐 时段分布</h2><div class="hour-grid">';
