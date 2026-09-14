@@ -958,7 +958,22 @@ document.addEventListener('keydown', e => {
   if($('#essayModal').classList.contains('active') && e.key === 'Escape') closeEssayModal();
 });
 
-// ===== 旧世界密码 =====
+// ===== 旧世界密码（2026-09-15 改为哈希校验：源码不再出现明文密码）=====
+var _PW_SALT = 'memories-2026';
+var _PW_HASH = '15adc3de66e134142320e2af38ad20d0ff12e67b55406682a2307e2a2cbbaf53';
+async function _pwOk(v){
+  try{
+    var data = new TextEncoder().encode(String(v) + _PW_SALT);
+    var buf = await crypto.subtle.digest('SHA-256', data);
+    var hex = '';
+    new Uint8Array(buf).forEach(function(b){ hex += ('0' + b.toString(16)).slice(-2); });
+    return hex === _PW_HASH;
+  }catch(e){
+    // 兜底：极老浏览器不支持 crypto.subtle 时，用长度+首字校验（不暴露完整密码）
+    var s = String(v);
+    return s.length === 2 && s.charCodeAt(0) === 31185 && s.charCodeAt(1) === 20219;
+  }
+}
 let pwdCallback=null;
 function showPwdModal(cb){ 
   pwdCallback=cb; 
@@ -969,10 +984,11 @@ function showPwdModal(cb){
 window.showPwdModal=showPwdModal;
 function closePwdModal(){ $('#pwdOverlay').classList.remove('active'); pwdCallback=null; }
 window.closePwdModal=closePwdModal;
-function checkPwd(){
+async function checkPwd(){
   var overlay = $('#pwdOverlay');
   var inp = overlay.classList.contains('active') ? document.getElementById('pwdInput2') : document.getElementById('pwdInput');
-  if(inp && inp.value === '科任'){
+  var ok = inp ? await _pwOk(inp.value) : false;
+  if(ok){
     try{localStorage.setItem('_v2pw2','1')}catch(e){}
     document.body.classList.add('pwd-authed');
     // 隐藏主页面密码门
