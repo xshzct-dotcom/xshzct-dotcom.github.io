@@ -276,21 +276,36 @@
     '</div>';
   }
 
-  // 单例音频（避免多条音乐同时播放）
+  // 单例音频（避免多条音乐同时播放）2026-09-15 优化加载反馈
   var audio=null, curBtn=null;
   function toggleMusic(btn){
     var src=btn.getAttribute('data-src');
     if(!src) return;
-    if(!audio){ audio=new Audio(); audio.preload='none'; }
+    if(!audio){
+      audio=new Audio();
+      audio.preload='metadata';   // 预读元数据 → 点播放时更快出声
+    }
     if(curBtn===btn && !audio.paused){
       audio.pause(); btn.textContent='▶'; btn.classList.remove('playing'); return;
     }
     if(curBtn && curBtn!==btn){ curBtn.textContent='▶'; curBtn.classList.remove('playing'); }
     curBtn=btn;
     if(audio.src!==src){ audio.src=src; }
-    btn.textContent='⏸'; btn.classList.add('playing');
-    audio.play().catch(function(){ btn.textContent='▶'; btn.classList.remove('playing'); });
-    audio.onended=function(){ btn.textContent='▶'; btn.classList.remove('playing'); };
+    btn.textContent='⋯';           // 加载中
+    btn.classList.add('playing');
+    audio.onplaying = function(){ btn.textContent='⏸'; };
+    audio.onwaiting = function(){ btn.textContent='⋯'; };   // 缓冲中（网络慢时会闪）
+    audio.onended   = function(){ btn.textContent='▶'; btn.classList.remove('playing'); };
+    audio.onerror   = function(){
+      btn.textContent='▶'; btn.classList.remove('playing');
+      btn.title = '音乐加载失败（文件可能过大或格式不支持）';
+      console.warn('[music] load error:', src);
+    };
+    audio.play().catch(function(err){
+      btn.textContent='▶'; btn.classList.remove('playing');
+      btn.title = '播放失败：' + (err && err.message ? err.message : '请重试');
+      console.warn('[music] play failed', err);
+    });
   }
 
   var viewer=document.getElementById('mpViewer');
