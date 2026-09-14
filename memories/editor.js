@@ -1652,8 +1652,8 @@ async function renderPostTab(){
         <span class="post-edit-info" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)"></span>
         <button id="postCancelEdit" class="editor-btn-sm" style="flex-shrink:0">取消编辑</button>
       </div>
-      <input id="postTitle" class="post-title-input" placeholder="标题（会显示在列表里）">
-      <textarea id="postText" rows="12" placeholder="写你的文章吧。&#10;&#10;想在哪儿插照片，就把光标放到那里，再点下面的「插入照片」按钮。"></textarea>
+      <input id="postTitle" class="post-title-input" placeholder="标题">
+      <textarea id="postText" rows="12"></textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
         <button type="button" class="editor-btn editor-btn-secondary" id="postInsertImg">🖼 插入照片</button>
         <label class="editor-btn editor-btn-secondary" style="cursor:pointer">🎵 加音乐
@@ -1662,11 +1662,6 @@ async function renderPostTab(){
       </div>
       <div id="postMusicPreview" style="margin-top:8px"></div>
       <div id="postImgList" style="margin-top:12px"></div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">
-        <input id="postMood" class="editor-meta-input" placeholder="心情">
-        <input id="postWeather" class="editor-meta-input" placeholder="天气">
-        <input id="postLocation" class="editor-meta-input" placeholder="地点">
-      </div>
       <button class="editor-btn editor-btn-primary" id="postPublish" style="width:100%;margin-top:12px">发布</button>
       <div id="postStatus" style="font-size:.78rem;color:var(--text-muted);margin-top:8px;text-align:center"></div>
     </div>
@@ -1803,9 +1798,8 @@ async function renderPostTab(){
     var text = ta ? ta.value : '';
     var titleEl = document.getElementById('postTitle');
     var title = titleEl ? titleEl.value.trim() : '';
-    var mood = (document.getElementById('postMood').value || '').trim();
-    var weather = (document.getElementById('postWeather').value || '').trim();
-    var location = (document.getElementById('postLocation').value || '').trim();
+    // 心情/天气/地点输入框已于 2026-09-15 移除；字段保留以兼容旧数据展示
+    var mood = '', weather = '', location = '';
 
     var imgs = _postDraft.images || [];
     if(!text.trim() && !imgs.length && !_postDraft.music && !_postDraft.musicKeep){
