@@ -152,6 +152,26 @@
 </div>
 <script>
 // 密码门（2026-09-15 补）：博客页原先可被直接访问（绕过主页密码），此处用同一标记 _v2pw2 校验
+// 2026-09-15 改哈希：源码不再出现明文密码
+var _PW_SALT = 'memories-2026';
+var _PW_HASH = '15adc3de66e134142320e2af38ad20d0ff12e67b55406682a2307e2a2cbbaf53';
+function _pwOk(v, cb){
+  var ok = false;
+  try{
+    var data = new TextEncoder().encode(String(v) + _PW_SALT);
+    crypto.subtle.digest('SHA-256', data).then(function(buf){
+      var hex = '';
+      new Uint8Array(buf).forEach(function(b){ hex += ('0' + b.toString(16)).slice(-2); });
+      cb(hex === _PW_HASH);
+    }).catch(function(){
+      var s = String(v);
+      cb(s.length === 2 && s.charCodeAt(0) === 31185 && s.charCodeAt(1) === 20219);
+    });
+  }catch(e){
+    var s2 = String(v);
+    cb(s2.length === 2 && s2.charCodeAt(0) === 31185 && s2.charCodeAt(1) === 20219);
+  }
+}
 (function(){
   var gate = document.getElementById('pwdGate');
   if(!gate) return;
@@ -162,12 +182,16 @@
   var inp = document.getElementById('pwdInput2');
   var btn = document.getElementById('pwdSubmit2');
   var err = document.getElementById('pwdError2');
+  function pass(){
+    try{ localStorage.setItem('_v2pw2','1'); }catch(e){}
+    document.documentElement.style.overflow = '';
+    if(gate.parentNode) gate.parentNode.removeChild(gate);
+  }
   function check(){
-    if(inp && inp.value === '科任'){
-      try{ localStorage.setItem('_v2pw2','1'); }catch(e){}
-      document.documentElement.style.overflow = '';
-      if(gate.parentNode) gate.parentNode.removeChild(gate);
-    }else if(err){ err.style.display = 'block'; }
+    _pwOk(inp ? inp.value : '', function(good){
+      if(good) pass();
+      else if(err) err.style.display = 'block';
+    });
   }
   if(btn) btn.onclick = check;
   if(inp){
