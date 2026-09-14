@@ -1277,6 +1277,7 @@ function renderPostOldList(posts){
 function startEditPost(p){
   _postDraft = {
     images: [],
+    videos: [],
     music: null,
     musicKeep: p.music_path || null,
     musicKeepTitle: p.music_title || '已有音乐',
@@ -1284,6 +1285,8 @@ function startEditPost(p){
   };
   var art = pbArticleFromPost(p);
   _postDraft.images = art.images;
+  _postDraft.videos = art.videos;
+  pbRenderVideoList();
   var ti0 = document.getElementById('postTitle'); if(ti0) ti0.value = p.title || '';
   var ta = document.getElementById('postText');
   if(ta) ta.value = art.text;
@@ -1314,10 +1317,11 @@ function startEditPost(p){
 
 // 取消编辑，回到新建模式
 function cancelEditPost(){
-  _postDraft = { images: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
+  _postDraft = { images: [], videos: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
   var tiC = document.getElementById('postTitle'); if(tiC) tiC.value = '';
   var ta = document.getElementById('postText'); if(ta) ta.value = '';
   pbRenderImgList();
+  pbRenderVideoList();
   ['postMood','postWeather','postLocation'].forEach(function(id){
     var e = document.getElementById(id); if(e) e.value = '';
   });
@@ -1489,16 +1493,76 @@ function pbRenderImgList(){
   });
 }
 
-function pbParseArticle(text, images){
+// ===== 视频（2026-09-15）：粘贴链接即可，不占 Supabase 空间 =====
+function pbRenderVideoList(){
+  var box = document.getElementById('postVideoList');
+  if(!box) return;
+  var vids = _postDraft.videos || [];
+  if(!vids.length){ box.innerHTML = ''; return; }
+  box.innerHTML = '<div style="font-size:.78rem;color:var(--text-muted);margin-bottom:6px">文中已插入的视频</div>' +
+    vids.map(function(v, i){
+      var tag = v.kind === 'direct' ? '视频直链' : (v.kind === 'youtube' ? 'YouTube 播放器' : 'B站播放器');
+      return '<div class="pi-row">' +
+        '<div class="pi-info">' +
+          '<div class="pi-name">视频' + (i + 1) + '<span class="pi-file">' + tag + '</span></div>' +
+          '<div style="font-size:.72rem;color:var(--text-muted);word-break:break-all;line-height:1.5">' + esc(v.src) + '</div>' +
+        '</div>' +
+        '<button type="button" class="pb-op pb-op-del" data-rmv="' + i + '" title="移除">×</button>' +
+      '</div>';
+    }).join('');
+  box.querySelectorAll('[data-rmv]').forEach(function(btn){
+    btn.onclick = function(){
+      var i = +btn.getAttribute('data-rmv');
+      var ta = document.getElementById('postText');
+      var cur = ta ? ta.value : '';
+      var parts = cur.split(/\[视频\d+\]/);
+      var order = (cur.match(/\[视频(\d+)\]/g) || []).map(function(s){ return parseInt(s.match(/\d+/)[0], 10); });
+      (_postDraft.videos || []).splice(i, 1);
+      var newOrder = order.filter(function(_, k){ return k !== i; });
+      var out = parts[0] || '';
+      newOrder.forEach(function(oldN, k){ out += '[视频' + (k + 1) + ']' + (parts[k + 1] || ''); });
+      if(ta) ta.value = out;
+      pbRenderVideoList();
+      pbSaveDraftSoon();
+      _postStatus('已移除视频');
+    };
+  });
+}
+
+// 识别链接类型：YouTube / B站 自动转成嵌入播放器，其余按直链处理
+function pbVideoKind(url){
+  var u = String(url || '').trim();
+  if(/youtube\.com\/watch\?|youtu\.be\//i.test(u)) return 'youtube';
+  if(/bilibili\.com\/video\/|b23\.tv\//i.test(u)) return 'bilibili';
+  return 'direct';
+}
+function pbVideoEmbedUrl(url){
+  var u = String(url || '').trim(), m;
+  if((m = u.match(/youtube\.com\/watch\?v=([\w-]+)/i)) || (m = u.match(/youtu\.be\/([\w-]+)/i))){
+    return 'https://www.youtube.com/embed/' + m[1];
+  }
+  if((m = u.match(/bilibili\.com\/video\/(BV[\w]+)/i)) || (m = u.match(/b23\.tv\/(BV[\w]+)/i))){
+    return 'https://player.bilibili.com/player.html?bvid=' + m[1] + '&autoplay=0&high_quality=1';
+  }
+  return u;
+}
+
+function pbParseArticle(text, images, videos){
   var blocks = [];
-  var re = /\[照片(\d+)\]/g;
+  // 同时匹配 [照片N] 与 [视频N]，按出现顺序切分（2026-09-15 支持视频）
+  var re = /\[(照片|视频)(\d+)\]/g;
   var last = 0, m;
   while((m = re.exec(text)) !== null){
     var before = text.slice(last, m.index).trim();
     if(before) blocks.push({t:'p', text:before});
-    var idx = parseInt(m[1], 10) - 1;
-    var im = images[idx];
-    if(im) blocks.push({t:'img', _idx: idx, cap: (im.cap || '').trim()});
+    var idx = parseInt(m[2], 10) - 1;
+    if(m[1] === '照片'){
+      var im = images[idx];
+      if(im) blocks.push({t:'img', _idx: idx, cap: (im.cap || '').trim()});
+    }else{
+      var vd = (videos || [])[idx];
+      if(vd) blocks.push({t:'video', _vidx: idx});
+    }
     last = m.index + m[0].length;
   }
   var after = text.slice(last).trim();
@@ -1507,7 +1571,7 @@ function pbParseArticle(text, images){
 }
 
 function pbArticleFromPost(p){
-  var text = '', images = [];
+  var text = '', images = [], videos = [];
   var blocks = (p && p.blocks && p.blocks.length) ? p.blocks : [];
   if(!blocks.length && p){
     if(p.content) blocks.push({t:'p', text:p.content});
@@ -1517,11 +1581,14 @@ function pbArticleFromPost(p){
     if(b.t === 'img' && b.src){
       images.push({ src: b.src, preview: _storageUrl(b.src), cap: b.cap || '', name: '' });
       text += '[照片' + images.length + ']';
-    }else if(b.t !== 'img'){
+    }else if(b.t === 'video' && b.src){
+      videos.push({ src: b.src, kind: b.kind || pbVideoKind(b.src), embed: b.embed || pbVideoEmbedUrl(b.src) });
+      text += '[视频' + videos.length + ']';
+    }else if(b.t !== 'img' && b.t !== 'video'){
       text += (text && !/\n$/.test(text) ? '\n\n' : '') + (b.text || '');
     }
   });
-  return { text: text, images: images };
+  return { text: text, images: images, videos: videos };
 }
 
 // 生成缩略图 Blob（2026-09-15）：上传照片时同步生成 ~400px 小图，列表/网格加载更快
@@ -1617,6 +1684,9 @@ function pbSaveDraft(){
       images: (_postDraft.images || []).map(function(it){
         return { path: it.path || '', src: it.src || '', cap: it.cap || '', name: it.name || '' };
       }),
+      videos: (_postDraft.videos || []).map(function(v){
+        return { src: v.src || '', kind: v.kind || '', embed: v.embed || '' };
+      }),
       musicPath: _postDraft.musicKeep || null,
       musicTitle: _postDraft.musicKeepTitle || null,
       mood: moodEl ? moodEl.value : '',
@@ -1662,6 +1732,10 @@ function pbRestoreDraft(d){
       preview: _storageUrl(it.path || it.src || '')
     };
   });
+  _postDraft.videos = (d.videos || []).map(function(v){
+    return { src: v.src || '', kind: v.kind || pbVideoKind(v.src), embed: v.embed || pbVideoEmbedUrl(v.src) };
+  });
+  pbRenderVideoList();
   var tiR = document.getElementById('postTitle'); if(tiR) tiR.value = d.title || '';
   var ta = document.getElementById('postText'); if(ta) ta.value = d.text || '';
   var m = document.getElementById('postMood');    if(m) m.value = d.mood || '';
@@ -1673,7 +1747,7 @@ function pbRestoreDraft(d){
 async function renderPostTab(){
   const body = $('#editorBody');
   const posts = await loadTabData('post');
-  _postDraft = { images: [], existing: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
+  _postDraft = { images: [], existing: [], videos: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
 
   body.innerHTML = `
     <div>
@@ -1685,12 +1759,14 @@ async function renderPostTab(){
       <textarea id="postText" rows="12"></textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
         <button type="button" class="editor-btn editor-btn-secondary" id="postInsertImg">🖼 插入照片</button>
+        <button type="button" class="editor-btn editor-btn-secondary" id="postInsertVideo">🎬 插入视频</button>
         <label class="editor-btn editor-btn-secondary" style="cursor:pointer">🎵 加音乐
           <input type="file" accept="audio/*" style="display:none" id="postMusicInput"></label>
         <input type="file" accept="image/*" style="display:none" id="postImgInput">
       </div>
       <div id="postMusicPreview" style="margin-top:8px"></div>
       <div id="postImgList" style="margin-top:12px"></div>
+      <div id="postVideoList" style="margin-top:10px"></div>
       <button class="editor-btn editor-btn-primary" id="postPublish" style="width:100%;margin-top:12px">发布</button>
       <div id="postStatus" style="font-size:.78rem;color:var(--text-muted);margin-top:8px;text-align:center"></div>
     </div>
@@ -1707,6 +1783,28 @@ async function renderPostTab(){
       _pbCaret = ta ? (ta.selectionStart || 0) : null;
       var inp = document.getElementById('postImgInput');
       if(inp){ inp.value = ''; inp.click(); }
+    };
+  }
+  // 插入视频（2026-09-15）：粘贴链接即可，不占存储空间
+  var insertVidBtn = document.getElementById('postInsertVideo');
+  if(insertVidBtn){
+    insertVidBtn.onclick = function(){
+      var ta = document.getElementById('postText');
+      _pbCaret = ta ? (ta.selectionStart || 0) : null;
+      var url = prompt('粘贴视频链接：\n\n· YouTube / B站链接 → 自动变成播放器\n· 或 .mp4 直链（如 GitHub Releases 的地址）');
+      if(!url || !url.trim()) return;
+      var u = url.trim();
+      _postDraft.videos = _postDraft.videos || [];
+      _postDraft.videos.push({ src: u, kind: pbVideoKind(u), embed: pbVideoEmbedUrl(u) });
+      var n = _postDraft.videos.length;
+      var marker = '[视频' + n + ']';
+      if(ta){
+        var pos = (_pbCaret == null) ? ta.value.length : Math.min(_pbCaret, ta.value.length);
+        ta.value = ta.value.slice(0, pos) + marker + ta.value.slice(pos);
+      }
+      pbRenderVideoList();
+      pbSaveDraft();
+      _postStatus('视频' + n + ' 已插入 ✓');
     };
   }
   // 内容变动自动存草稿（防止手机选图/切后台被系统重载导致内容丢失）
@@ -1831,7 +1929,8 @@ async function renderPostTab(){
     var mood = '', weather = '', location = '';
 
     var imgs = _postDraft.images || [];
-    if(!text.trim() && !imgs.length && !_postDraft.music && !_postDraft.musicKeep){
+    var vids = _postDraft.videos || [];
+    if(!text.trim() && !imgs.length && !vids.length && !_postDraft.music && !_postDraft.musicKeep){
       _postStatus('写点内容或加张照片吧', 'var(--danger)'); return;
     }
     btn.disabled = true; btn.textContent = isEdit ? '保存中…' : '发布中…';
@@ -1843,11 +1942,16 @@ async function renderPostTab(){
           await uploadToStorage(imgs[i].path, imgs[i].blob);
         }
       }
-      var finalBlocks = pbParseArticle(text, imgs).map(function(b){
+      var finalBlocks = pbParseArticle(text, imgs, vids).map(function(b){
         if(b.t === 'img'){
           var im = imgs[b._idx];
           if(!im) return null;
           return {t:'img', src: im.path || im.src, cap: (im.cap || '').trim()};
+        }
+        if(b.t === 'video'){
+          var vd = vids[b._vidx];
+          if(!vd) return null;
+          return {t:'video', src: vd.src, kind: vd.kind || pbVideoKind(vd.src)};
         }
         return b;
       }).filter(function(x){ return !!x; });
@@ -1908,6 +2012,7 @@ async function renderPostTab(){
   };
 
   pbRenderImgList();
+  pbRenderVideoList();
   renderPostOldList(posts);
 }
 
