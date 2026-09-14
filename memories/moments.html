@@ -6,7 +6,7 @@
 <title>动态 · 向天游</title>
 <meta name="theme-color" content="#0E1116">
 <meta name="description" content="随手记下的片段 — 文字、照片、音乐">
-<link rel="stylesheet" href="style.css?v=20260911-05">
+<link rel="stylesheet" href="style.css?v=20260914-01">
 <style>
 /* ===== 动态页专属样式（2026-09-11） ===== */
 .mp-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:14px 18px;
@@ -26,6 +26,16 @@
 @keyframes mpIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .mp-time{font-size:.72rem;color:var(--text-muted);letter-spacing:.5px;margin-bottom:9px}
 .mp-text{font-size:.95rem;line-height:1.85;color:var(--text);word-break:break-word}
+
+/* ===== 块式图文排版（2026-09-14，参考 thelongestway.com）===== */
+.mp-body{font-size:.95rem;line-height:1.9;color:var(--text)}
+.mp-p{margin:0 0 14px;word-break:break-word}
+.mp-p:last-child{margin-bottom:0}
+.mp-h{font-family:var(--font-display);font-size:1.08rem;font-weight:500;margin:20px 0 10px;color:var(--text);letter-spacing:.5px}
+.mp-fig{margin:16px 0;padding:0}
+.mp-fig:first-child{margin-top:0}
+.mp-fig-img{width:100%;border-radius:6px;display:block;cursor:zoom-in;background:var(--bg-elevated)}
+.mp-figcap{font-size:.78rem;color:var(--text-muted);text-align:center;margin-top:8px;line-height:1.65;font-style:italic;letter-spacing:.3px}
 
 /* 图片网格：1张=大图 / 2张=两列 / 3-4张=两列 / 5-9张=三列 */
 .mp-imgs{display:grid;gap:5px;margin-top:12px}
@@ -124,6 +134,25 @@
       return '<div class="mp-img" data-src="'+u+'"><img src="'+u+'" loading="lazy" decoding="async" alt=""></div>';
     }).join('')+'</div>';
   }
+  function renderBlocks(p){
+    var blocks = p.blocks;
+    if(!blocks || !blocks.length){
+      blocks = [];
+      if(p.content) blocks.push({t:'p', text:p.content});
+      (p.images || []).forEach(function(s){ blocks.push({t:'img', src:s, cap:''}); });
+    }
+    return blocks.map(function(b){
+      if(b.t === 'img'){
+        if(!b.src) return '';
+        var u = esc(fileUrl(b.src));
+        return '<figure class="mp-fig"><img class="mp-fig-img" src="' + u + '" loading="lazy" decoding="async" alt="">' +
+               (b.cap ? '<figcaption class="mp-figcap">' + esc(b.cap) + '</figcaption>' : '') + '</figure>';
+      }
+      if(b.t === 'h') return '<h3 class="mp-h">' + esc(b.text || '') + '</h3>';
+      return '<p class="mp-p">' + esc(b.text || '').replace(/\n/g, '<br>') + '</p>';
+    }).join('');
+  }
+
   function renderPost(p){
     var tags=[];
     if(p.mood)     tags.push('<span class="mp-tag">'+esc(p.mood)+'</span>');
@@ -137,8 +166,7 @@
     ) : '';
     return '<article class="mp-card">'+
       '<div class="mp-time">'+esc(fmtTime(p.created_at))+(p.pinned?' · 置顶':'')+'</div>'+
-      (p.content ? '<div class="mp-text">'+esc(p.content).replace(/\n/g,'<br>')+'</div>' : '')+
-      renderImages(p.images)+
+      '<div class="mp-body">'+renderBlocks(p)+'</div>'+
       music+
       (tags.length ? '<div class="mp-tags">'+tags.join('')+'</div>' : '')+
     '</article>';
@@ -179,6 +207,8 @@
     document.getElementById('mpList').addEventListener('click', function(e){
       var musicBtn=e.target.closest('.mp-music-btn');
       if(musicBtn){ toggleMusic(musicBtn); return; }
+      var figImg = e.target.closest('.mp-fig-img');
+      if(figImg){ openViewer(figImg.getAttribute('src')); return; }
       var imgWrap=e.target.closest('.mp-img');
       if(imgWrap){ openViewer(imgWrap.getAttribute('data-src')); }
     });

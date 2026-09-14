@@ -1238,14 +1238,13 @@ function renderPostOldList(posts){
 // 进入编辑模式（2026-09-12 新增）
 function startEditPost(p){
   _postDraft = {
-    images: [],
-    existing: (p.images || []).slice(),
     music: null,
     musicKeep: p.music_path || null,
     musicKeepTitle: p.music_title || '已有音乐',
     editingId: p.id
   };
-  var t = document.getElementById('postText');      if(t) t.value = p.content || '';
+  postBlocksInit(p);
+  postBlocksRender();
   var m = document.getElementById('postMood');       if(m) m.value = p.mood || '';
   var w = document.getElementById('postWeather');    if(w) w.value = p.weather || '';
   var l = document.getElementById('postLocation');   if(l) l.value = p.location || '';
@@ -1257,7 +1256,14 @@ function startEditPost(p){
     var info = bar.querySelector('.post-edit-info');
     if(info) info.textContent = '正在编辑：' + ((p.content || '（无文字）').replace(/\s+/g,' ').slice(0, 20));
   }
-  renderPostAttachments();
+  var mp = document.getElementById('postMusicPreview');
+  if(mp){
+    mp.innerHTML = _postDraft.musicKeep
+      ? '<div style="font-size:.8rem;color:var(--text-dim)">🎵 ' + esc(_postDraft.musicKeepTitle || '已有音乐') + ' <button type="button" id="postRmMusic" style="color:var(--danger);font-size:.75rem">移除</button></div>'
+      : '';
+    var rm = document.getElementById('postRmMusic');
+    if(rm) rm.onclick = function(){ _postDraft.musicKeep = null; _postDraft.musicKeepTitle = null; mp.innerHTML = ''; };
+  }
   var body = document.getElementById('editorBody');
   if(body) body.scrollTop = 0;
   _postStatus('改完点「保存修改」', 'var(--accent)');
@@ -1265,14 +1271,121 @@ function startEditPost(p){
 
 // 取消编辑，回到新建模式
 function cancelEditPost(){
-  _postDraft = { images: [], existing: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
-  ['postText','postMood','postWeather','postLocation'].forEach(function(id){
+  _postDraft = { music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
+  postBlocksInit(null);
+  postBlocksRender();
+  ['postMood','postWeather','postLocation'].forEach(function(id){
     var e = document.getElementById(id); if(e) e.value = '';
   });
   var btn = document.getElementById('postPublish'); if(btn) btn.textContent = '发布动态';
   var bar = document.getElementById('postEditBar'); if(bar) bar.style.display = 'none';
-  renderPostAttachments();
+  var mp = document.getElementById('postMusicPreview'); if(mp) mp.innerHTML = '';
   _postStatus('');
+}
+
+// ===== 块式图文编辑（2026-09-14 新增，参考 thelongestway.com 杂志式排版）=====
+// 块类型：p=段落 / img=图片(可带说明) / h=小标题
+var _postBlocks = [];
+var _pbPickIndex = -1;
+
+function postBlocksInit(p){
+  _postBlocks = [];
+  if(p && p.blocks && p.blocks.length){
+    _postBlocks = JSON.parse(JSON.stringify(p.blocks)).map(function(b){
+      if(b.t === 'img' && b.src) b.url = _storageUrl(b.src);
+      return b;
+    });
+  }else if(p){
+    // 旧数据兼容：content → 段落块，images → 图片块
+    if(p.content) _postBlocks.push({t:'p', text:p.content});
+    (p.images || []).forEach(function(s){ _postBlocks.push({t:'img', src:s, url:_storageUrl(s), cap:''}); });
+  }
+  if(!_postBlocks.length) _postBlocks.push({t:'p', text:''});
+}
+
+function postBlocksCollect(){
+  var wrap = document.getElementById('postBlocks');
+  if(!wrap) return;
+  wrap.querySelectorAll('.pb-item').forEach(function(el){
+    var i = +el.getAttribute('data-i'); var b = _postBlocks[i]; if(!b) return;
+    if(b.t === 'p'){ var ta = el.querySelector('textarea'); if(ta) b.text = ta.value; }
+    else if(b.t === 'h'){ var inp = el.querySelector('input.pb-heading'); if(inp) b.text = inp.value; }
+    else if(b.t === 'img'){ var ci = el.querySelector('input.pb-cap'); if(ci) b.cap = ci.value; }
+  });
+}
+
+function postBlocksRender(){
+  var wrap = document.getElementById('postBlocks');
+  if(!wrap) return;
+  wrap.innerHTML = _postBlocks.map(function(b, i){
+    var bar = '<div class="pb-bar"><span class="pb-type">' +
+      (b.t === 'p' ? '段落' : b.t === 'h' ? '小标题' : '图片') + '</span>' +
+      '<span class="pb-ops">' +
+      '<button type="button" class="pb-op" data-op="up" data-i="' + i + '" title="上移">↑</button>' +
+      '<button type="button" class="pb-op" data-op="down" data-i="' + i + '" title="下移">↓</button>' +
+      '<button type="button" class="pb-op pb-op-del" data-op="del" data-i="' + i + '" title="删除">×</button>' +
+      '</span></div>';
+    if(b.t === 'p'){
+      return '<div class="pb-item" data-i="' + i + '" data-t="p">' + bar +
+        '<textarea class="pb-text" rows="3" placeholder="写一段文字…">' + esc(b.text || '') + '</textarea></div>';
+    }
+    if(b.t === 'h'){
+      return '<div class="pb-item pb-item-h" data-i="' + i + '" data-t="h">' + bar +
+        '<input class="pb-heading" placeholder="小标题，例如：它是什么" value="' + esc(b.text || '') + '"></div>';
+    }
+    var img = b.preview || b.url || '';
+    return '<div class="pb-item pb-item-img" data-i="' + i + '" data-t="img">' + bar +
+      (img ? '<img class="pb-thumb" src="' + img + '" alt="">'
+           : '<button type="button" class="pb-pick" data-i="' + i + '">点击选择图片</button>') +
+      '<input class="pb-cap" placeholder="图片说明（可留空）" value="' + esc(b.cap || '') + '"></div>';
+  }).join('');
+  postBlocksBind();
+}
+
+function postBlocksBind(){
+  var wrap = document.getElementById('postBlocks');
+  if(!wrap) return;
+  wrap.querySelectorAll('.pb-op').forEach(function(btn){
+    btn.onclick = function(){
+      postBlocksCollect();
+      var i = +btn.getAttribute('data-i'), op = btn.getAttribute('data-op');
+      if(op === 'del'){
+        _postBlocks.splice(i, 1);
+        if(!_postBlocks.length) _postBlocks.push({t:'p', text:''});
+      }else if(op === 'up' && i > 0){
+        var t1 = _postBlocks[i-1]; _postBlocks[i-1] = _postBlocks[i]; _postBlocks[i] = t1;
+      }else if(op === 'down' && i < _postBlocks.length - 1){
+        var t2 = _postBlocks[i+1]; _postBlocks[i+1] = _postBlocks[i]; _postBlocks[i] = t2;
+      }
+      postBlocksRender();
+    };
+  });
+  function pickImage(i){
+    postBlocksCollect();
+    _pbPickIndex = i;
+    var inp = document.getElementById('postImgInput');
+    if(inp){ inp.value = ''; inp.click(); }
+  }
+  wrap.querySelectorAll('.pb-pick').forEach(function(btn){
+    btn.onclick = function(){ pickImage(+btn.getAttribute('data-i')); };
+  });
+  wrap.querySelectorAll('.pb-thumb').forEach(function(im){
+    im.onclick = function(){
+      var el = im.closest('.pb-item');
+      if(el) pickImage(+el.getAttribute('data-i'));
+    };
+  });
+}
+
+function postBlocksAdd(t){
+  postBlocksCollect();
+  _postBlocks.push(t === 'img' ? {t:'img', src:'', cap:''} : {t:t, text:''});
+  postBlocksRender();
+  if(t !== 'img'){
+    var items = document.querySelectorAll('#postBlocks .pb-item');
+    var last = items[items.length - 1];
+    if(last){ var f = last.querySelector('textarea,input'); if(f) f.focus(); }
+  }
 }
 
 async function renderPostTab(){
@@ -1286,14 +1399,16 @@ async function renderPostTab(){
         <span class="post-edit-info" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)"></span>
         <button id="postCancelEdit" class="editor-btn-sm" style="flex-shrink:0">取消编辑</button>
       </div>
-      <textarea id="postText" rows="4" placeholder="此刻在想什么…（文字、图片、音乐，随你）"></textarea>
+      <div id="postBlocks"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        <label class="editor-btn editor-btn-secondary" style="cursor:pointer">🖼 加图片
-          <input type="file" accept="image/*" multiple style="display:none" id="postImgInput"></label>
+        <button type="button" class="editor-btn editor-btn-secondary" id="postAddP">+ 段落</button>
+        <button type="button" class="editor-btn editor-btn-secondary" id="postAddImg">+ 图片</button>
+        <button type="button" class="editor-btn editor-btn-secondary" id="postAddH">+ 小标题</button>
         <label class="editor-btn editor-btn-secondary" style="cursor:pointer">🎵 加音乐
           <input type="file" accept="audio/*" style="display:none" id="postMusicInput"></label>
+        <input type="file" accept="image/*" style="display:none" id="postImgInput">
       </div>
-      <div id="postAttachments" style="margin-top:10px"></div>
+      <div id="postMusicPreview" style="margin-top:8px"></div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">
         <input id="postMood" class="editor-meta-input" placeholder="心情">
         <input id="postWeather" class="editor-meta-input" placeholder="天气">
@@ -1307,6 +1422,21 @@ async function renderPostTab(){
       <div id="postOldList"></div>
     </div>
   `;
+  postBlocksInit(null);
+  postBlocksRender();
+  document.getElementById('postAddP').onclick = function(){ postBlocksAdd('p'); };
+  document.getElementById('postAddImg').onclick = function(){ postBlocksAdd('img'); };
+  document.getElementById('postAddH').onclick = function(){ postBlocksAdd('h'); };
+  var _previewMusic = function(){
+    var el = document.getElementById('postMusicPreview');
+    if(!el) return;
+    if(_postDraft.music){ el.innerHTML = '<div style="font-size:.8rem;color:var(--text-dim)">🎵 ' + esc(_postDraft.music.name) + ' <button type="button" id="postRmMusic" style="color:var(--danger);font-size:.75rem">移除</button></div>'; }
+    else if(_postDraft.musicKeep){ el.innerHTML = '<div style="font-size:.8rem;color:var(--text-dim)">🎵 ' + esc(_postDraft.musicKeepTitle || '已有音乐') + ' <button type="button" id="postRmMusic" style="color:var(--danger);font-size:.75rem">移除</button></div>'; }
+    else { el.innerHTML = ''; }
+    var rm = document.getElementById('postRmMusic');
+    if(rm) rm.onclick = function(){ _postDraft.music = null; _postDraft.musicKeep = null; _postDraft.musicKeepTitle = null; _previewMusic(); };
+  };
+  _previewMusic();
   var cancelBtn = document.getElementById('postCancelEdit');
   if(cancelBtn) cancelBtn.onclick = cancelEditPost;
 
@@ -1314,21 +1444,21 @@ async function renderPostTab(){
   var musicInput = document.getElementById('postMusicInput');
 
   imgInput.onchange = async function(){
-    var files = Array.prototype.slice.call(imgInput.files || []);
-    if(!files.length) return;
-    _postStatus('压缩图片中…');
-    for(var i = 0; i < files.length && _postDraft.images.length < 9; i++){
-      var f = files[i];
-      try{
-        var blob = await compressImage(f, 1600, 0.82);
-        var ext = (blob === f) ? (f.name.split('.').pop() || 'jpg') : 'jpg';
-        var path = 'posts/img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '.' + ext;
-        _postDraft.images.push({ blob: blob, path: path, preview: URL.createObjectURL(blob), name: f.name });
-      }catch(e){ console.warn('[post] compress failed', e); }
-    }
+    var f = imgInput.files && imgInput.files[0];
     imgInput.value = '';
-    renderPostAttachments();
-    _postStatus('已选 ' + _postDraft.images.length + ' 张图（最多 9 张）');
+    if(!f){ _pbPickIndex = -1; return; }
+    var idx = _pbPickIndex; _pbPickIndex = -1;
+    if(idx < 0 || !_postBlocks[idx]) return;
+    _postStatus('压缩图片中…');
+    try{
+      var blob = await compressImage(f, 1600, 0.85);
+      var ext = (blob === f) ? (f.name.split('.').pop() || 'jpg') : 'jpg';
+      var path = 'posts/img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '.' + ext;
+      var b = _postBlocks[idx];
+      b.blob = blob; b.path = path; b.preview = URL.createObjectURL(blob);
+      postBlocksRender();
+      _postStatus('图片已就绪，可填图说（也可留空）');
+    }catch(e){ _postStatus('图片处理失败', 'var(--danger)'); }
   };
 
   musicInput.onchange = function(){
@@ -1336,34 +1466,52 @@ async function renderPostTab(){
     if(!f) return;
     _postDraft.music = { file: f, name: f.name };
     musicInput.value = '';
-    renderPostAttachments();
+    _previewMusic();
     _postStatus('已选音乐：' + f.name);
   };
 
   document.getElementById('postPublish').onclick = async function(){
     var btn = this;
     var isEdit = !!_postDraft.editingId;
-    var text = (document.getElementById('postText').value || '').trim();
+    postBlocksCollect();
     var mood = (document.getElementById('postMood').value || '').trim();
     var weather = (document.getElementById('postWeather').value || '').trim();
     var location = (document.getElementById('postLocation').value || '').trim();
 
-    var hasAny = text || _postDraft.images.length || (_postDraft.existing || []).length || _postDraft.music || _postDraft.musicKeep;
-    if(!hasAny){
+    var hasContent = _postBlocks.some(function(b){
+      if(b.t === 'img') return !!(b.blob || b.src);
+      return !!(b.text || '').trim();
+    });
+    if(!hasContent && !_postDraft.music && !_postDraft.musicKeep){
       _postStatus('写点文字或加张图吧', 'var(--danger)'); return;
     }
     btn.disabled = true; btn.textContent = isEdit ? '保存中…' : '发布中…';
 
     try{
-      // 1) 上传新选的图片
-      var paths = [];
-      for(var i = 0; i < _postDraft.images.length; i++){
-        _postStatus('上传图片 ' + (i + 1) + '/' + _postDraft.images.length + '…');
-        var it = _postDraft.images[i];
-        await uploadToStorage(it.path, it.blob);
-        paths.push(it.path);
+      var finalBlocks = [];
+      var imgCount = _postBlocks.filter(function(b){ return b.t === 'img' && (b.blob || b.src); }).length;
+      var done = 0;
+      for(var i = 0; i < _postBlocks.length; i++){
+        var b = _postBlocks[i];
+        if(b.t === 'img'){
+          if(b.blob){
+            done++;
+            _postStatus('上传图片 ' + done + '/' + imgCount + '…');
+            await uploadToStorage(b.path, b.blob);
+            finalBlocks.push({t:'img', src:b.path, cap:(b.cap || '').trim()});
+          }else if(b.src){
+            finalBlocks.push({t:'img', src:b.src, cap:(b.cap || '').trim()});
+          }
+        }else{
+          var txt = (b.text || '').trim();
+          if(txt) finalBlocks.push({t:b.t, text:txt});
+        }
       }
-      // 2) 音乐：新选的先上传；没换则沿用原有
+      if(!finalBlocks.length && !_postDraft.music && !_postDraft.musicKeep){
+        _postStatus('内容是空的哦', 'var(--danger)');
+        btn.disabled = false; btn.textContent = isEdit ? '保存修改' : '发布动态';
+        return;
+      }
       var musicPath = _postDraft.musicKeep || null;
       var musicTitle = _postDraft.musicKeepTitle || null;
       if(_postDraft.music){
@@ -1374,13 +1522,15 @@ async function renderPostTab(){
         await uploadToStorage(musicPath, mf);
         musicTitle = mf.name.replace(/\.[^.]+$/, '');
       }
-      // 3) 最终图片 = 原有保留的 + 新上传的
-      var finalImages = (_postDraft.existing || []).concat(paths);
-      // 4) 写数据库（新增 or 修改）
+      var plainText = finalBlocks.filter(function(x){ return x.t !== 'img'; })
+                                 .map(function(x){ return x.text; }).join('\n\n');
+      var imgList = finalBlocks.filter(function(x){ return x.t === 'img'; })
+                               .map(function(x){ return x.src; });
       _postStatus('保存…');
       var payload = {
-        content: text,
-        images: finalImages,
+        blocks: finalBlocks,
+        content: plainText,
+        images: imgList,
         music_path: musicPath,
         music_title: musicTitle,
         mood: mood || null,
@@ -1397,9 +1547,7 @@ async function renderPostTab(){
       }
       if(res && res.error){
         var msg = res.error.message || '';
-        if(/relation .* does not exist/i.test(msg) || /schema cache/i.test(msg)){
-          throw new Error('posts 表还没建好（请先执行建表 SQL）');
-        }
+        if(/blocks/i.test(msg) && /column|field/i.test(msg)) throw new Error('posts 表缺少 blocks 字段');
         throw new Error(msg);
       }
       invalidateCache('post');
@@ -1414,7 +1562,6 @@ async function renderPostTab(){
     btn.disabled = false; btn.textContent = '发布动态';
   };
 
-  renderPostAttachments();
   renderPostOldList(posts);
 }
 

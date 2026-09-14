@@ -320,6 +320,23 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .editor-meta-input{padding:9px 12px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;font-family:inherit;outline:none;min-width:0;transition:border-color .2s}
 .editor-meta-input:focus{border-color:var(--accent)}
 .editor-meta-input::placeholder{color:var(--text-muted)}
+
+/* ===== 编辑器 · 块式图文编辑（2026-09-14 新增）===== */
+.pb-item{position:relative;margin-bottom:10px;background:rgba(var(--fg-rgb),.03);border:1px solid var(--border);border-radius:10px;padding:9px 12px 10px}
+.pb-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.pb-type{font-size:.7rem;color:var(--text-muted);letter-spacing:.5px}
+.pb-ops{display:flex;gap:4px}
+.pb-op{width:22px;height:22px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-size:.72rem;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+.pb-op:hover{background:rgba(var(--fg-rgb),.1);color:var(--text)}
+.pb-op-del:hover{background:rgba(200,60,60,.15);color:var(--danger);border-color:var(--danger)}
+.pb-text{width:100%;padding:6px 4px;background:transparent;border:0;color:var(--text);font-family:inherit;font-size:.9rem;line-height:1.75;resize:vertical;outline:none}
+.pb-heading{width:100%;padding:5px 4px;background:transparent;border:0;color:var(--text);font-family:var(--font-display);font-size:1.02rem;font-weight:500;outline:none}
+.pb-item-img{display:flex;flex-direction:column;gap:8px}
+.pb-thumb{width:100%;max-height:190px;object-fit:cover;border-radius:8px;cursor:pointer;display:block}
+.pb-pick{width:100%;padding:18px;border:1px dashed var(--border);border-radius:8px;background:transparent;color:var(--text-muted);font-size:.82rem;cursor:pointer;transition:all .2s}
+.pb-pick:hover{border-color:var(--accent);color:var(--accent)}
+.pb-cap{width:100%;padding:6px 10px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:6px;color:var(--text-dim);font-size:.8rem;font-family:inherit;outline:none;transition:border-color .2s}
+.pb-cap:focus{border-color:var(--accent)}
 .editor-btn-sm.del{border-color:rgba(216,123,107,.2);color:rgba(216,123,107,.7)}
 .editor-btn-sm.del:hover{background:rgba(216,123,107,.15);color:var(--danger)}
 .editor-form-group{margin-bottom:16px}
