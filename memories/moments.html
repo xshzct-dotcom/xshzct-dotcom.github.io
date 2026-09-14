@@ -236,7 +236,16 @@
     }
     return t.replace(/\s+/g, ' ').trim();
   }
+  // 列表用缩略图（2026-09-15）：上传时会同步生成 thumbs/ 小图，列表加载更快
   function thumbOf(p){
+    var blocks = p.blocks || [];
+    for(var i = 0; i < blocks.length; i++){
+      if(blocks[i].t === 'img' && blocks[i].src) return STORAGE + 'thumbs/' + blocks[i].src;
+    }
+    if(p.images && p.images.length) return STORAGE + 'thumbs/' + p.images[0];
+    return '';
+  }
+  function thumbFallback(p){
     var blocks = p.blocks || [];
     for(var i = 0; i < blocks.length; i++){
       if(blocks[i].t === 'img' && blocks[i].src) return fileUrl(blocks[i].src);
@@ -264,7 +273,11 @@
     var ex = excerptOf(p).slice(0, 90);
     var hasTitle = !!(p.title || '').trim();
     return '<a class="ml-item" href="?id=' + encodeURIComponent(p.id) + '">' +
-      (thumb ? '<div class="ml-thumb"><img src="' + esc(thumb) + '" loading="lazy" decoding="async" alt=""></div>' : '') +
+      (thumb
+        ? '<div class="ml-thumb"><img src="' + esc(thumb) + '" loading="lazy" decoding="async" alt="" '
+          + 'data-fb="' + esc(thumbFallback(p)) + '" '
+          + 'onerror="if(this.dataset.fb){this.src=this.dataset.fb;this.removeAttribute(\'data-fb\')}"></div>'
+        : '') +
       '<div class="ml-body">' +
         '<h2 class="ml-title' + (hasTitle ? '' : ' ml-title-empty') + '">' + esc(titleOf(p)) + '</h2>' +
         '<div class="ml-meta">' + dateOf(p) + (p.location ? ' · 📍' + esc(p.location) : '') + '</div>' +
