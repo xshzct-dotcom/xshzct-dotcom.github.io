@@ -1529,20 +1529,64 @@ function pbRenderVideoList(){
   });
 }
 
-// 识别链接类型：YouTube / B站 自动转成嵌入播放器，其余按直链处理
+// 识别链接类型（2026-09-15 扩展多平台）
 function pbVideoKind(url){
   var u = String(url || '').trim();
-  if(/youtube\.com\/watch\?|youtu\.be\//i.test(u)) return 'youtube';
+  if(/youtube\.com\/(watch|shorts)|youtu\.be\//i.test(u)) return 'youtube';
   if(/bilibili\.com\/video\/|b23\.tv\//i.test(u)) return 'bilibili';
+  if(/vimeo\.com\//i.test(u)) return 'vimeo';
+  if(/v\.qq\.com\//i.test(u)) return 'qq';
+  if(/youku\.com\//i.test(u)) return 'youku';
+  if(/iqiyi\.com\//i.test(u)) return 'iqiyi';
+  if(/ixigua\.com\//i.test(u)) return 'ixigua';
+  if(/weibo\.com\/|weibo\.cn\//i.test(u)) return 'weibo';
+  if(/\.(mp4|webm|ogv|m4v|mov)(\?|$)/i.test(u)) return 'direct';
+  if(/^<iframe/i.test(u)) return 'iframe';
   return 'direct';
 }
+
+// 各平台链接 → 可嵌入的播放器地址
 function pbVideoEmbedUrl(url){
   var u = String(url || '').trim(), m;
+  // YouTube
   if((m = u.match(/youtube\.com\/watch\?v=([\w-]+)/i)) || (m = u.match(/youtu\.be\/([\w-]+)/i))){
     return 'https://www.youtube.com/embed/' + m[1];
   }
+  if((m = u.match(/youtube\.com\/shorts\/([\w-]+)/i))){
+    return 'https://www.youtube.com/embed/' + m[1];
+  }
+  // B站
   if((m = u.match(/bilibili\.com\/video\/(BV[\w]+)/i)) || (m = u.match(/b23\.tv\/(BV[\w]+)/i))){
     return 'https://player.bilibili.com/player.html?bvid=' + m[1] + '&autoplay=0&high_quality=1';
+  }
+  // Vimeo
+  if((m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/i))){
+    return 'https://player.vimeo.com/video/' + m[1];
+  }
+  // 腾讯视频
+  if((m = u.match(/v\.qq\.com\/x\/cover\/[^/]+\/([\w]+)\.html/i)) || (m = u.match(/v\.qq\.com\/x\/page\/([\w]+)\.html/i))){
+    return 'https://v.qq.com/txp/iframe/player.html?vid=' + m[1];
+  }
+  // 优酷
+  if((m = u.match(/youku\.com\/v_show\/id_([\w=]+)\.html/i))){
+    return 'https://player.youku.com/embed/' + m[1];
+  }
+  // 爱奇艺
+  if((m = u.match(/iqiyi\.com\/v_([\w]+)\.html/i))){
+    return 'https://open.iqiyi.com/developer/player_js/coopPlayerIndex.html?vid=' + m[1];
+  }
+  // 西瓜视频
+  if((m = u.match(/ixigua\.com\/(\d+)/i))){
+    return 'https://www.ixigua.com/iframe/' + m[1];
+  }
+  // 微博视频
+  if((m = u.match(/weibo\.(?:com|cn)\/(?:tv\/show\/|detail\/|[^/]+\/[^/]+\/)([\w:]+)/i))){
+    return 'https://weibo.com/tv/show/' + m[1];
+  }
+  // 直接粘的 iframe 代码 → 抠出 src
+  if(/^<iframe/i.test(u)){
+    var s = u.match(/src\s*=\s*["']([^"']+)["']/i);
+    if(s) return s[1];
   }
   return u;
 }
