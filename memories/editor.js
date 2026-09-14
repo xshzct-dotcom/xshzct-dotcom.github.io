@@ -1220,15 +1220,21 @@ function renderPostOldList(posts){
     var ts = isNaN(t.getTime()) ? '' :
       (t.getFullYear() + '年' + (t.getMonth() + 1) + '月' + t.getDate() + '日 ' +
        ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2));
+    var title = (p.title || '').trim();
     var txt = (p.content || '').replace(/\s+/g, ' ').slice(0, 40);
     var cnt = (p.images && p.images.length) ? ' 🖼' + p.images.length : '';
     if(p.music_path) cnt += ' 🎵';
     var extra = [p.mood, p.weather, p.location].filter(Boolean).join(' · ');
+    // 有标题 → 主行显示标题（醒目），下面小字跟正文摘要；无标题 → 只显示摘要
+    var mainLine = title
+      ? ('<div style="font-size:.93rem;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(title) + cnt + '</div>' +
+         (txt ? '<div style="font-size:.74rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px">' + esc(txt) + '…</div>' : ''))
+      : ('<div style="font-size:.86rem;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (esc(txt) || '（无文字）') + cnt + '</div>');
     return '<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">' +
       '<div style="flex:1;min-width:0">' +
-        '<div style="font-size:.72rem;color:var(--text-muted)">' + ts + '</div>' +
-        '<div style="font-size:.85rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (txt || '（无文字）') + cnt + '</div>' +
-        (extra ? '<div style="font-size:.7rem;color:var(--text-muted);margin-top:2px">' + extra + '</div>' : '') +
+        '<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:3px">' + ts + '</div>' +
+        mainLine +
+        (extra ? '<div style="font-size:.7rem;color:var(--text-muted);margin-top:3px">' + extra + '</div>' : '') +
       '</div>' +
       '<div style="display:flex;gap:6px;flex-shrink:0">' +
         '<button class="editor-btn-sm" data-edit-post="' + p.id + '">编辑</button>' +
