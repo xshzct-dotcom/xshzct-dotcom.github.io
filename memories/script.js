@@ -1452,7 +1452,7 @@ async function loadFromSupabase(){
       // 按 category 分组，重建 essayCategories 结构
       const groups = {};
       essays.forEach(e => {
-        const cid = e.category || 'thoughts';
+        const cid = e.category || 'childhood';
         if(!groups[cid]) groups[cid] = {id: cid, title: e.category_title||cid, articles:[]};
         groups[cid].articles.push({title:e.title, date:e.date, body:e.body, sort_order:e.sort_order});
       });
