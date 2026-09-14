@@ -270,8 +270,8 @@
       '<div class="mp-body">' + renderBlocks(p) + '</div>' +
       (p.music_path ? renderMusicBar(p) : '') +
       '<div class="mp-detail-nav">' +
-        (prev ? '<a href="?id=' + encodeURIComponent(prev.id) + '">← ' + esc(shortTitle(prev)) + '</a>' : '<span></span>') +
-        (next ? '<a href="?id=' + encodeURIComponent(next.id) + '">' + esc(shortTitle(next)) + ' →</a>' : '<span></span>') +
+        (prev ? '<a href="?id=' + encodeURIComponent(prev.id) + '">← 上一篇：' + esc(shortTitle(prev)) + '</a>' : '<span></span>') +
+        (next ? '<a href="?id=' + encodeURIComponent(next.id) + '">下一篇：' + esc(shortTitle(next)) + ' →</a>' : '<span></span>') +
       '</div>' +
     '</div>';
   }
@@ -357,8 +357,11 @@
           return;
         }
         var idx = list.indexOf(p);
-        var prev = (idx + 1 < list.length) ? list[idx + 1] : null;
-        var next = (idx - 1 >= 0) ? list[idx - 1] : null;
+        // 列表按时间倒序（最新在最上）：
+        //   idx-1 → 列表里更靠上 = 更新的一篇 = 「上一篇」（放左边）
+        //   idx+1 → 列表里更靠下 = 更早的一篇 = 「下一篇」（放右边）
+        var prev = (idx - 1 >= 0) ? list[idx - 1] : null;
+        var next = (idx + 1 < list.length) ? list[idx + 1] : null;
         listEl.hidden = true;
         listEl.innerHTML = '';
         detailEl.innerHTML = renderDetailView(p, prev, next);
