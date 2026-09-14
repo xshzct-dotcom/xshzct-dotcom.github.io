@@ -352,6 +352,16 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .pi-file{color:var(--text-muted);font-size:.72rem;margin-left:6px}
 .pi-cap{width:100%;padding:6px 10px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:6px;color:var(--text-dim);font-size:.8rem;font-family:inherit;outline:none;transition:border-color .2s}
 .pi-cap:focus{border-color:var(--accent)}
+
+/* ===== 跨页面横向滑动过渡（2026-09-15）=====
+   点「博客」或返回主页时，不是白屏跳转，而是像横向翻页一样滑动
+   浏览器原生 View Transitions：自动判断前进/后退方向（Chrome 126+ / Safari 18+）
+   不支持的浏览器 → 自动降级为普通跳转，不影响使用 */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: vtSlideOut .34s cubic-bezier(.4,0,.2,1) both; }
+::view-transition-new(root) { animation: vtSlideIn  .34s cubic-bezier(.4,0,.2,1) both; }
+@keyframes vtSlideOut { to   { opacity: 0; transform: translateX(-22%); } }
+@keyframes vtSlideIn  { from { opacity: 0; transform: translateX(22%);  } }
 .editor-btn-sm.del{border-color:rgba(216,123,107,.2);color:rgba(216,123,107,.7)}
 .editor-btn-sm.del:hover{background:rgba(216,123,107,.15);color:var(--danger)}
 .editor-form-group{margin-bottom:16px}
