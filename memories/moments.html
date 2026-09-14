@@ -191,6 +191,32 @@
       return '<div class="mp-img" data-src="'+u+'"><img src="'+u+'" loading="lazy" decoding="async" alt=""></div>';
     }).join('')+'</div>';
   }
+  // 各平台视频链接 → 嵌入播放器地址（2026-09-15 与编辑器保持一致）
+  function embedUrlOf(src){
+    var u = String(src || '').trim(), m;
+    if((m = u.match(/youtube\.com\/watch\?v=([\w-]+)/i)) || (m = u.match(/youtu\.be\/([\w-]+)/i)) || (m = u.match(/youtube\.com\/shorts\/([\w-]+)/i)))
+      return 'https://www.youtube.com/embed/' + m[1];
+    if((m = u.match(/bilibili\.com\/video\/(BV[\w]+)/i)) || (m = u.match(/b23\.tv\/(BV[\w]+)/i)))
+      return 'https://player.bilibili.com/player.html?bvid=' + m[1] + '&autoplay=0&high_quality=1';
+    if((m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/i)))
+      return 'https://player.vimeo.com/video/' + m[1];
+    if((m = u.match(/v\.qq\.com\/x\/cover\/[^/]+\/([\w]+)\.html/i)) || (m = u.match(/v\.qq\.com\/x\/page\/([\w]+)\.html/i)))
+      return 'https://v.qq.com/txp/iframe/player.html?vid=' + m[1];
+    if((m = u.match(/youku\.com\/v_show\/id_([\w=]+)\.html/i)))
+      return 'https://player.youku.com/embed/' + m[1];
+    if((m = u.match(/iqiyi\.com\/v_([\w]+)\.html/i)))
+      return 'https://open.iqiyi.com/developer/player_js/coopPlayerIndex.html?vid=' + m[1];
+    if((m = u.match(/ixigua\.com\/(\d+)/i)))
+      return 'https://www.ixigua.com/iframe/' + m[1];
+    if((m = u.match(/weibo\.(?:com|cn)\/(?:tv\/show\/|detail\/|[^/]+\/[^/]+\/)([\w:]+)/i)))
+      return 'https://weibo.com/tv/show/' + m[1];
+    if(/^<iframe/i.test(u)){
+      var s = u.match(/src\s*=\s*["']([^"']+)["']/i);
+      if(s) return s[1];
+    }
+    return u;
+  }
+
   // 视频地址：GitHub Releases 的链接在国内直连不通，自动改走加速镜像（2026-09-15）
   function videoUrl(src, alt){
     var s = String(src || '');
@@ -222,16 +248,9 @@
             + 'onerror="if(this.dataset.alt){this.src=this.dataset.alt;this.removeAttribute(\'data-alt\')}" '
             + 'controls preload="metadata" playsinline></video></figure>';
         }
-        var embed = '';
-        if(kind === 'youtube'){
-          var m1 = b.src.match(/youtube\.com\/watch\?v=([\w-]+)/i) || b.src.match(/youtu\.be\/([\w-]+)/i);
-          if(m1) embed = 'https://www.youtube.com/embed/' + m1[1];
-        }else if(kind === 'bilibili'){
-          var m2 = b.src.match(/(BV[\w]+)/i);
-          if(m2) embed = 'https://player.bilibili.com/player.html?bvid=' + m2[1] + '&autoplay=0&high_quality=1';
-        }
+        var embed = embedUrlOf(b.src);
         if(!embed) return '';
-        return '<figure class="mp-fig"><div class="mp-embed"><iframe src="' + esc(embed) + '" allowfullscreen scrolling="no" frameborder="0"></iframe></div></figure>';
+        return '<figure class="mp-fig"><div class="mp-embed"><iframe src="' + esc(embed) + '" allowfullscreen scrolling="no" frameborder="0" allow="autoplay; fullscreen; picture-in-picture"></iframe></div></figure>';
       }
       return '<p class="mp-p">' + esc(b.text || '').replace(/\n/g, '<br>') + '</p>';
     }).join('');
