@@ -72,7 +72,23 @@ tbody .r{max-width:120px;overflow:hidden;text-overflow:ellipsis;color:rgba(232,2
   </div>
 </div>
 <script>
-// 密码门（2026-09-15 补）：统计页含访客数据，用同一标记 _v2pw2 校验
+// 密码门（2026-09-15 补）：统计页含访客数据，用同一标记 _v2pw2 校验；2026-09-15 改哈希
+var _PW_SALT = 'memories-2026';
+var _PW_HASH = '15adc3de66e134142320e2af38ad20d0ff12e67b55406682a2307e2a2cbbaf53';
+function _pwOk(v, cb){
+  function fallback(){
+    var s = String(v);
+    cb(s.length === 2 && s.charCodeAt(0) === 31185 && s.charCodeAt(1) === 20219);
+  }
+  try{
+    var data = new TextEncoder().encode(String(v) + _PW_SALT);
+    crypto.subtle.digest('SHA-256', data).then(function(buf){
+      var hex = '';
+      new Uint8Array(buf).forEach(function(b){ hex += ('0' + b.toString(16)).slice(-2); });
+      cb(hex === _PW_HASH);
+    }).catch(fallback);
+  }catch(e){ fallback(); }
+}
 (function(){
   var gate = document.getElementById('pwdGate');
   if(!gate) return;
@@ -83,12 +99,16 @@ tbody .r{max-width:120px;overflow:hidden;text-overflow:ellipsis;color:rgba(232,2
   var inp = document.getElementById('pwdInputS');
   var btn = document.getElementById('pwdSubmitS');
   var err = document.getElementById('pwdErrorS');
+  function pass(){
+    try{ localStorage.setItem('_v2pw2','1'); }catch(e){}
+    document.documentElement.style.overflow = '';
+    if(gate.parentNode) gate.parentNode.removeChild(gate);
+  }
   function check(){
-    if(inp && inp.value === '科任'){
-      try{ localStorage.setItem('_v2pw2','1'); }catch(e){}
-      document.documentElement.style.overflow = '';
-      if(gate.parentNode) gate.parentNode.removeChild(gate);
-    }else if(err){ err.style.display = 'block'; }
+    _pwOk(inp ? inp.value : '', function(good){
+      if(good) pass();
+      else if(err) err.style.display = 'block';
+    });
   }
   if(btn) btn.onclick = check;
   if(inp){
