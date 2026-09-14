@@ -337,6 +337,18 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .pb-pick:hover{border-color:var(--accent);color:var(--accent)}
 .pb-cap{width:100%;padding:6px 10px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:6px;color:var(--text-dim);font-size:.8rem;font-family:inherit;outline:none;transition:border-color .2s}
 .pb-cap:focus{border-color:var(--accent)}
+
+/* ===== 文章编辑 · 文中插入的照片列表（2026-09-14 简化版）===== */
+#postText{width:100%;padding:12px 14px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:.92rem;line-height:1.95;resize:vertical;outline:none;transition:border-color .2s}
+#postText:focus{border-color:var(--accent)}
+#postText::placeholder{color:var(--text-muted)}
+.pi-row{display:flex;gap:10px;align-items:flex-start;padding:10px;background:rgba(var(--fg-rgb),.03);border:1px solid var(--border);border-radius:10px;margin-bottom:8px}
+.pi-thumb{width:64px;height:64px;object-fit:cover;border-radius:8px;flex:0 0 auto;cursor:default}
+.pi-info{flex:1;min-width:0}
+.pi-name{font-size:.8rem;color:var(--text);margin-bottom:6px}
+.pi-file{color:var(--text-muted);font-size:.72rem;margin-left:6px}
+.pi-cap{width:100%;padding:6px 10px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:6px;color:var(--text-dim);font-size:.8rem;font-family:inherit;outline:none;transition:border-color .2s}
+.pi-cap:focus{border-color:var(--accent)}
 .editor-btn-sm.del{border-color:rgba(216,123,107,.2);color:rgba(216,123,107,.7)}
 .editor-btn-sm.del:hover{background:rgba(216,123,107,.15);color:var(--danger)}
 .editor-form-group{margin-bottom:16px}
