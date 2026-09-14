@@ -1186,7 +1186,7 @@ function renderPostOldList(posts){
   if(!el) return;
   var list = posts || [];
   if(!list.length){
-    el.innerHTML = '<div style="font-size:.82rem;color:var(--text-muted);padding:10px 0">还没有动态，写第一条吧</div>';
+    el.innerHTML = '<div style="font-size:.82rem;color:var(--text-muted);padding:10px 0">还没有博客，写第一篇吧</div>';
     return;
   }
   el.innerHTML = list.map(function(p){
@@ -1220,7 +1220,7 @@ function renderPostOldList(posts){
   el.querySelectorAll('[data-del-post]').forEach(function(b){
     b.onclick = async function(){
       var id = b.getAttribute('data-del-post');
-      if(!confirm('确定删除这条动态吗？（不可恢复）')) return;
+      if(!confirm('确定删除这篇博客吗？（不可恢复）')) return;
       b.textContent = '…';
       var p = (list.filter(function(x){ return String(x.id) === String(id); })[0]) || {};
       try{
@@ -1583,7 +1583,7 @@ async function renderPostTab(){
         <input id="postWeather" class="editor-meta-input" placeholder="天气">
         <input id="postLocation" class="editor-meta-input" placeholder="地点">
       </div>
-      <button class="editor-btn editor-btn-primary" id="postPublish" style="width:100%;margin-top:12px">发布动态</button>
+      <button class="editor-btn editor-btn-primary" id="postPublish" style="width:100%;margin-top:12px">发布</button>
       <div id="postStatus" style="font-size:.78rem;color:var(--text-muted);margin-top:8px;text-align:center"></div>
     </div>
     <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px">
