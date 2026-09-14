@@ -1520,6 +1520,58 @@ function pbArticleFromPost(p){
   return { text: text, images: images };
 }
 
+// ===== 音频转 MP3（2026-09-15）=====
+// 背景：用户上传的 WAV 是无压缩格式（6.9MB 仅约 40 秒），浏览器流式播放支持差 → 卡顿
+// 处理：非 mp3/m4a/aac/ogg 的音频 → 浏览器内转成 128kbps MP3 再上传（体积约缩到 1/6）
+function pAudioNeedsConvert(file){
+  var name = (file.name || '').toLowerCase();
+  var type = (file.type || '').toLowerCase();
+  if(/\.(mp3|m4a|aac|ogg|opus)$/.test(name)) return false;
+  if(/audio\/(mpeg|mp4|aac|ogg|opus)/.test(type)) return false;
+  return true;   // wav / flac / 其他 → 需要转
+}
+
+function pConvertToMp3(file, onProgress){
+  return new Promise(function(resolve, reject){
+    if(typeof lamejs === 'undefined'){ reject(new Error('转码组件未加载')); return; }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC){ reject(new Error('浏览器不支持音频转码')); return; }
+    file.arrayBuffer().then(function(buf){
+      var ctx = new AC();
+      var done = false;
+      function finish(fn, arg){ if(!done){ done = true; try{ ctx.close(); }catch(e){} fn(arg); } }
+      ctx.decodeAudioData(buf, function(audioBuf){
+        try{
+          var ch = Math.min(2, audioBuf.numberOfChannels);
+          var sr = audioBuf.sampleRate;
+          var enc = new lamejs.Mp3Encoder(ch, sr, 128);
+          var L = audioBuf.getChannelData(0);
+          var R = ch > 1 ? audioBuf.getChannelData(1) : null;
+          var n = L.length;
+          var l16 = new Int16Array(n), r16 = R ? new Int16Array(n) : null;
+          for(var i = 0; i < n; i++){
+            l16[i] = Math.max(-1, Math.min(1, L[i])) * 0x7FFF;
+            if(r16) r16[i] = Math.max(-1, Math.min(1, R[i])) * 0x7FFF;
+          }
+          var chunks = [];
+          var BS = 1152 * 20;
+          for(var k = 0; k < n; k += BS){
+            var lb = l16.subarray(k, k + BS);
+            var rb = r16 ? r16.subarray(k, k + BS) : null;
+            var m = rb ? enc.encodeBuffer(lb, rb) : enc.encodeBuffer(lb);
+            if(m.length) chunks.push(new Int8Array(m));
+            if(onProgress && (k % (BS * 20) === 0)){ try{ onProgress(Math.min(99, Math.round(k / n * 100))); }catch(e){} }
+          }
+          var tail = enc.flush();
+          if(tail.length) chunks.push(new Int8Array(tail));
+          if(onProgress){ try{ onProgress(100); }catch(e){} }
+          finish(resolve, new Blob(chunks, {type:'audio/mpeg'}));
+        }catch(err){ finish(reject, err); }
+      }, function(err){ finish(reject, err || new Error('音频解码失败')); });
+    }).catch(function(e){ reject(e); });
+  });
+}
+
 // ===== 草稿自动保存（2026-09-14）：防止手机选图后页面被系统重载导致内容丢失 =====
 var _PB_DRAFT_KEY = 'memories.post_draft';
 var _pbDraftTimer = null;
@@ -1704,13 +1756,44 @@ async function renderPostTab(){
     _pbCaret = null;
   };
 
-  musicInput.onchange = function(){
+  musicInput.onchange = async function(){
     var f = musicInput.files && musicInput.files[0];
     if(!f) return;
-    _postDraft.music = { file: f, name: f.name };
     musicInput.value = '';
-    _previewMusic();
-    _postStatus('已选音乐：' + f.name);
+    var sizeMB = f.size / 1024 / 1024;
+    var useFile = f;
+
+    // 1) 非 mp3/m4a 等可流式格式 → 先转成 MP3
+    if(pAudioNeedsConvert(f)){
+      _postStatus('正在转换音频格式…（' + sizeMB.toFixed(1) + ' MB，稍等）');
+      try{
+        var mp3blob = await pConvertToMp3(f, function(pct){
+          _postStatus('转换中… ' + pct + '%');
+        });
+        var base = (f.name || 'audio').replace(/\.[^.]+$/, '');
+        useFile = new File([mp3blob], base + '.mp3', {type: 'audio/mpeg'});
+        _postStatus('已转成 MP3：' + sizeMB.toFixed(1) + 'MB → ' + (useFile.size / 1024 / 1024).toFixed(1) + 'MB ✓');
+      }catch(err){
+        console.warn('[music] convert failed', err);
+        _postStatus('转换失败，改传原文件（可能播放较慢）', 'var(--danger)');
+        useFile = f;
+      }
+    }
+
+    // 2) 立即上传（和照片一致：选完就传，草稿里存路径，不怕页面重载）
+    var nameLow = (useFile.name || '').toLowerCase();
+    var mext = (nameLow.split('.').pop() || 'mp3').toLowerCase();
+    var path = 'posts/music_' + Date.now() + '.' + mext;
+    _postStatus('上传音乐中…（' + (useFile.size / 1024 / 1024).toFixed(1) + ' MB）');
+    try{
+      await uploadToStorage(path, useFile);
+      _postDraft.music = { path: path, name: useFile.name };
+      _previewMusic();
+      pbSaveDraft();
+      _postStatus('✅ 音乐已上传：' + useFile.name + '（' + (useFile.size / 1024 / 1024).toFixed(1) + ' MB）', 'var(--success)');
+    }catch(e){
+      _postStatus('❌ 音乐上传失败：' + (e.message || '请重试'), 'var(--danger)');
+    }
   };
 
   document.getElementById('postPublish').onclick = async function(){
@@ -1748,13 +1831,10 @@ async function renderPostTab(){
 
       var musicPath = _postDraft.musicKeep || null;
       var musicTitle = _postDraft.musicKeepTitle || null;
-      if(_postDraft.music){
-        _postStatus('上传音乐…');
-        var mf = _postDraft.music.file;
-        var mext = (mf.name.split('.').pop() || 'mp3').toLowerCase();
-        musicPath = 'posts/music_' + Date.now() + '.' + mext;
-        await uploadToStorage(musicPath, mf);
-        musicTitle = mf.name.replace(/\.[^.]+$/, '');
+      if(_postDraft.music && _postDraft.music.path){
+        // 2026-09-15：音乐在"选择时"已上传（含格式转换），这里直接引用路径
+        musicPath = _postDraft.music.path;
+        musicTitle = (_postDraft.music.name || '音乐').replace(/\.[^.]+$/, '');
       }
 
       var plainText = finalBlocks.filter(function(x){ return x.t !== 'img'; })
