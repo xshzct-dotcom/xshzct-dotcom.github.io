@@ -6,7 +6,11 @@
 <title>博客 · 向天游</title>
 <meta name="theme-color" content="#0E1116">
 <meta name="description" content="读与行 — 文字、照片与音乐">
-<link rel="stylesheet" href="style.css?v=20260914-06">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
+<link rel="stylesheet" href="style.css?v=20260914-07">
 <style>
 /* ===== 动态页专属样式（2026-09-11） ===== */
 .mp-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:14px 18px;
@@ -28,32 +32,32 @@
 .mp-text{font-size:.95rem;line-height:1.85;color:var(--text);word-break:break-word}
 
 /* ===== 块式图文排版（2026-09-14，参考 thelongestway.com）===== */
-.mp-body{font-size:.95rem;line-height:1.9;color:var(--text)}
-.mp-p{margin:0 0 14px;word-break:break-word}
+.mp-body{font-family:'Noto Serif SC','Songti SC','SimSun',Georgia,serif;font-size:1.08rem;line-height:2.05;color:var(--text);letter-spacing:.2px}
+.mp-p{margin:0 0 20px;word-break:break-word}
 .mp-p:last-child{margin-bottom:0}
-.mp-h{font-family:var(--font-display);font-size:1.08rem;font-weight:500;margin:20px 0 10px;color:var(--text);letter-spacing:.5px}
-.mp-fig{margin:16px 0;padding:0}
+.mp-h{font-family:'Noto Serif SC',var(--font-display);font-size:1.26rem;font-weight:600;margin:30px 0 15px;color:var(--text);letter-spacing:.5px}
+.mp-fig{margin:22px 0;padding:0}
 .mp-fig:first-child{margin-top:0}
 .mp-fig-img{width:100%;border-radius:6px;display:block;cursor:zoom-in;background:var(--bg-elevated)}
-.mp-figcap{font-size:.78rem;color:var(--text-muted);text-align:center;margin-top:8px;line-height:1.65;font-style:italic;letter-spacing:.3px}
+.mp-figcap{font-size:.88rem;color:var(--text-dim);text-align:center;margin-top:10px;line-height:1.75;letter-spacing:.3px;font-style:italic}
 
 /* ===== 列表页（2026-09-14：动态改为"列表 → 详情"）===== */
 .ml-list{max-width:680px;margin:0 auto;padding:16px 16px 70px;display:flex;flex-direction:column;gap:13px}
-.ml-item{display:flex;gap:14px;padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color .2s,transform .2s}
+.ml-item{display:flex;gap:16px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color .2s,transform .2s}
 .ml-item:hover{border-color:var(--border-hover);transform:translateY(-2px)}
-.ml-thumb{width:106px;height:106px;flex:0 0 auto;border-radius:8px;overflow:hidden;background:var(--bg-elevated)}
+.ml-thumb{width:124px;height:124px;flex:0 0 auto;border-radius:8px;overflow:hidden;background:var(--bg-elevated)}
 .ml-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .ml-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
-.ml-title{font-family:var(--font-display);font-size:1.06rem;font-weight:500;color:var(--text);margin:0 0 5px;line-height:1.45}
-.ml-title-empty{color:var(--text-dim);font-weight:400;font-size:.95rem}
-.ml-meta{font-size:.72rem;color:var(--text-muted);margin-bottom:7px;letter-spacing:.3px}
-.ml-excerpt{font-size:.85rem;color:var(--text-dim);line-height:1.7;margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ml-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.2rem;font-weight:600;color:var(--text);margin:0 0 5px;line-height:1.45}
+.ml-title-empty{color:var(--text-dim);font-weight:400;font-size:1.04rem}
+.ml-meta{font-size:.8rem;color:var(--text-muted);margin-bottom:7px;letter-spacing:.3px}
+.ml-excerpt{font-size:.94rem;color:var(--text-dim);line-height:1.85;margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 /* 详情页 */
-.mp-detail-wrap{max-width:640px;margin:0 auto;padding:18px 16px 80px}
-.ml-back{display:inline-flex;align-items:center;gap:6px;font-size:.84rem;color:var(--text-dim);text-decoration:none;margin-bottom:20px;transition:color .2s}
+.mp-detail-wrap{max-width:668px;margin:0 auto;padding:18px 16px 80px}
+.ml-back{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;color:var(--text-dim);text-decoration:none;margin-bottom:20px;transition:color .2s}
 .ml-back:hover{color:var(--accent)}
-.mp-detail-title{font-family:var(--font-display);font-size:1.55rem;font-weight:500;color:var(--text);margin:0 0 12px;line-height:1.45;letter-spacing:.5px}
-.mp-detail-meta{font-size:.76rem;color:var(--text-muted);margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border);letter-spacing:.3px}
+.mp-detail-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.95rem;font-weight:700;color:var(--text);margin:0 0 12px;line-height:1.45;letter-spacing:.5px}
+.mp-detail-meta{font-size:.86rem;color:var(--text-muted);margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border);letter-spacing:.3px}
 .mp-detail-nav{margin-top:34px;padding-top:18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:12px}
 .mp-detail-nav a{font-size:.84rem;color:var(--text-dim);text-decoration:none}
 .mp-detail-nav a:hover{color:var(--accent)}
