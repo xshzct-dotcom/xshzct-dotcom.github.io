@@ -991,6 +991,8 @@ async function checkPwd(){
   if(ok){
     try{localStorage.setItem('_v2pw2','1')}catch(e){}
     document.body.classList.add('pwd-authed');
+    // 2026-09-15：把本次访问标记为「自己人」（供访客统计区分）
+    try{ if(typeof window._markAuthed === 'function') window._markAuthed(); }catch(e){}
     // 隐藏主页面密码门
     var gate = document.getElementById('pwdGate');
     if(gate) gate.style.display = 'none';
