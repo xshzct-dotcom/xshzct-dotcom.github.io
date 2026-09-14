@@ -89,10 +89,12 @@ async function open(){
     (window.MemoriesReady || Promise.resolve())
       .then(function(){ return ensureDataSync(); })
       .then(function(){
-        // 仅当本次真正做了首次同步时，刷新一次视图
+        // 仅当本次真正做了首次同步时刷新视图；且用户已开始写内容时不重建（避免清空）
         if(!wasSynced && $('#editorPanel').classList.contains('open')){
+          var _ta = document.getElementById('postText');
+          var _busy = (_ta && _ta.value && _ta.value.trim()) || (_postDraft.images || []).length;
           invalidateCache();
-          renderTab();
+          if(!_busy) renderTab();
         }
       })
       .catch(function(){});
@@ -1424,6 +1426,7 @@ function pbRenderImgList(){
     inp.oninput = function(){
       var i = +inp.getAttribute('data-cap');
       if(_postDraft.images[i]) _postDraft.images[i].cap = inp.value;
+      pbSaveDraftSoon();
     };
   });
   box.querySelectorAll('[data-rm]').forEach(function(btn){
@@ -1483,6 +1486,73 @@ function pbArticleFromPost(p){
   return { text: text, images: images };
 }
 
+// ===== 草稿自动保存（2026-09-14）：防止手机选图后页面被系统重载导致内容丢失 =====
+var _PB_DRAFT_KEY = 'memories.post_draft';
+var _pbDraftTimer = null;
+
+function pbSaveDraft(){
+  try{
+    var ta = document.getElementById('postText');
+    var moodEl = document.getElementById('postMood');
+    var weaEl = document.getElementById('postWeather');
+    var locEl = document.getElementById('postLocation');
+    var d = {
+      text: ta ? ta.value : '',
+      images: (_postDraft.images || []).map(function(it){
+        return { path: it.path || '', src: it.src || '', cap: it.cap || '', name: it.name || '' };
+      }),
+      musicPath: _postDraft.musicKeep || null,
+      musicTitle: _postDraft.musicKeepTitle || null,
+      mood: moodEl ? moodEl.value : '',
+      weather: weaEl ? weaEl.value : '',
+      location: locEl ? locEl.value : '',
+      editingId: _postDraft.editingId || null,
+      savedAt: Date.now()
+    };
+    var hasAny = (d.text && d.text.trim()) || d.images.length || d.musicPath;
+    if(!hasAny){ localStorage.removeItem(_PB_DRAFT_KEY); return; }
+    localStorage.setItem(_PB_DRAFT_KEY, JSON.stringify(d));
+  }catch(e){}
+}
+
+function pbSaveDraftSoon(){
+  if(_pbDraftTimer) clearTimeout(_pbDraftTimer);
+  _pbDraftTimer = setTimeout(pbSaveDraft, 700);
+}
+
+function pbLoadDraft(){
+  try{
+    var raw = localStorage.getItem(_PB_DRAFT_KEY);
+    if(!raw) return null;
+    var d = JSON.parse(raw);
+    if(!d) return null;
+    if(!(d.text && d.text.trim()) && !(d.images || []).length) return null;
+    return d;
+  }catch(e){ return null; }
+}
+
+function pbClearDraft(){
+  try{ localStorage.removeItem(_PB_DRAFT_KEY); }catch(e){}
+}
+
+function pbRestoreDraft(d){
+  if(!d) return;
+  _postDraft.editingId = d.editingId || null;
+  _postDraft.musicKeep = d.musicPath || null;
+  _postDraft.musicKeepTitle = d.musicTitle || null;
+  _postDraft.images = (d.images || []).map(function(it){
+    return {
+      path: it.path || '', src: it.src || '', cap: it.cap || '', name: it.name || '',
+      preview: _storageUrl(it.path || it.src || '')
+    };
+  });
+  var ta = document.getElementById('postText'); if(ta) ta.value = d.text || '';
+  var m = document.getElementById('postMood');    if(m) m.value = d.mood || '';
+  var w = document.getElementById('postWeather'); if(w) w.value = d.weather || '';
+  var l = document.getElementById('postLocation');if(l) l.value = d.location || '';
+  pbRenderImgList();
+}
+
 async function renderPostTab(){
   const body = $('#editorBody');
   const posts = await loadTabData('post');
@@ -1526,6 +1596,25 @@ async function renderPostTab(){
       if(inp){ inp.value = ''; inp.click(); }
     };
   }
+  // 内容变动自动存草稿（防止手机选图/切后台被系统重载导致内容丢失）
+  var taMain = document.getElementById('postText');
+  if(taMain) taMain.oninput = pbSaveDraftSoon;
+  ['postMood','postWeather','postLocation'].forEach(function(id){
+    var e = document.getElementById(id); if(e) e.oninput = pbSaveDraftSoon;
+  });
+  // 检测到未完成的草稿 → 询问是否接着写
+  var _draft = pbLoadDraft();
+  if(_draft){
+    var st = new Date(_draft.savedAt || Date.now());
+    var hh = ('0' + st.getHours()).slice(-2), mm = ('0' + st.getMinutes()).slice(-2);
+    var when = (st.getMonth() + 1) + '月' + st.getDate() + '日 ' + hh + ':' + mm;
+    if(confirm('发现一篇没写完的内容（' + when + ' 保存的）\n\n要接着写吗？\n\n点「确定」恢复；点「取消」丢弃')){
+      pbRestoreDraft(_draft);
+      _postStatus('已恢复上次没写完的内容 ✓', 'var(--accent)');
+    }else{
+      pbClearDraft();
+    }
+  }
   var _previewMusic = function(){
     var el = document.getElementById('postMusicPreview');
     if(!el) return;
@@ -1546,12 +1635,14 @@ async function renderPostTab(){
     var f = imgInput.files && imgInput.files[0];
     imgInput.value = '';
     if(!f) return;
-    _postStatus('处理照片中…');
+    _postStatus('压缩照片中…');
     try{
       var blob = await compressImage(f, 1600, 0.85);
       var ext = (blob === f) ? (f.name.split('.').pop() || 'jpg') : 'jpg';
       var path = 'posts/img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '.' + ext;
-      _postDraft.images.push({ blob: blob, path: path, preview: URL.createObjectURL(blob), cap: '', name: f.name });
+      _postStatus('上传照片…（稍等，不要切走）');
+      await uploadToStorage(path, blob);
+      _postDraft.images.push({ path: path, cap: '', name: f.name, preview: URL.createObjectURL(blob) });
       var n = _postDraft.images.length;
       var ta = document.getElementById('postText');
       var marker = '[照片' + n + ']';
@@ -1561,8 +1652,9 @@ async function renderPostTab(){
         try{ ta.selectionStart = ta.selectionEnd = pos + marker.length; }catch(err){}
       }
       pbRenderImgList();
+      pbSaveDraft();
       _postStatus('照片' + n + ' 已插入 ✓ 可在下方填写说明');
-    }catch(e){ _postStatus('照片处理失败', 'var(--danger)'); }
+    }catch(e){ _postStatus('照片上传失败：' + (e.message || '请重试'), 'var(--danger)'); }
     _pbCaret = null;
   };
 
@@ -1652,6 +1744,7 @@ async function renderPostTab(){
       }
       invalidateCache('post');
       _postDraft.editingId = null;
+      pbClearDraft();
       _postStatus(isEdit ? '✅ 修改已保存' : '✅ 发布成功', 'var(--success)');
       renderTab();
     }catch(e){
