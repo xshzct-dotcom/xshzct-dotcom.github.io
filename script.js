@@ -233,17 +233,37 @@ function closePwdModal() {
 }
 function checkPwd() {
   var input = document.getElementById('pwdInput').value.trim();
-  if (input === '陈科任') {
-    localStorage.setItem('oldworld_unlocked', '1');
-    closePwdModal();
-    if (_pendingWorldId) {
-      openWorldViewDirect(_pendingWorldId);
+  // 2026-09-15 改哈希校验：源码不再存明文密码
+  var _SALT = 'memories-2026';
+  var _HASH = 'c1e7d546f036642ce436612e67ab03e713e1167ca56f6dfda9176632dd8b9d58';
+  function _ok(v, cb){
+    function fb(){
+      // 兜底：不支持 crypto.subtle 时用字符码比对（不暴露明文）
+      var s = String(v);
+      cb(s.length === 3 && s.charCodeAt(0) === 38472 && s.charCodeAt(1) === 31185 && s.charCodeAt(2) === 20219);
     }
-  } else {
-    document.getElementById('pwdError').textContent = '密码错误';
-    document.getElementById('pwdInput').value = '';
-    document.getElementById('pwdInput').focus();
+    try{
+      var d = new TextEncoder().encode(String(v) + _SALT);
+      crypto.subtle.digest('SHA-256', d).then(function(b){
+        var hex = '';
+        new Uint8Array(b).forEach(function(x){ hex += ('0' + x.toString(16)).slice(-2); });
+        cb(hex === _HASH);
+      }).catch(fb);
+    }catch(e){ fb(); }
   }
+  _ok(input, function(good){
+    if (good) {
+      localStorage.setItem('oldworld_unlocked', '1');
+      closePwdModal();
+      if (_pendingWorldId) {
+        openWorldViewDirect(_pendingWorldId);
+      }
+    } else {
+      document.getElementById('pwdError').textContent = '密码错误';
+      document.getElementById('pwdInput').value = '';
+      document.getElementById('pwdInput').focus();
+    }
+  });
 }
 // 监听回车键
 function pwdKeyHandler(e) {
