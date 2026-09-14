@@ -288,7 +288,10 @@
         }
         var embed = embedUrlOf(b.src);
         if(!embed) return '';
-        return '<figure class="mp-fig"><div class="mp-embed"><iframe src="' + esc(embed) + '" allowfullscreen scrolling="no" frameborder="0" allow="autoplay; fullscreen; picture-in-picture"></iframe></div></figure>';
+        // referrerpolicy=no-referrer（2026-09-15）：不向视频平台发送来源域名，保护网站隐私
+        return '<figure class="mp-fig"><div class="mp-embed"><iframe src="' + esc(embed) + '" '
+          + 'referrerpolicy="no-referrer" allowfullscreen scrolling="no" frameborder="0" '
+          + 'allow="autoplay; fullscreen; picture-in-picture"></iframe></div></figure>';
       }
       return '<p class="mp-p">' + esc(b.text || '').replace(/\n/g, '<br>') + '</p>';
     }).join('');
@@ -549,6 +552,52 @@
     el.hidden=false;
     if(msg){ el.querySelector('p').textContent=msg; el.querySelector('.mp-empty-sub').textContent=''; }
   }
+
+  // 访问上报（2026-09-15）：博客页也记录，含"是否通过密码"与设备信息
+  (function(){
+    try{
+      var key='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
+      var base='https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1/visits';
+      var cid = null;
+      try{ cid = localStorage.getItem('memories.cid'); }catch(e){}
+      if(!cid){
+        cid = 'c_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+        try{ localStorage.setItem('memories.cid', cid); }catch(e){}
+      }
+      var body = {
+        path: location.pathname + (location.search || ''),
+        ref: document.referrer || '',
+        visited_at: new Date().toISOString(),
+        session_id: cid,
+        ua: navigator.userAgent || '',
+        is_authed: (function(){ try{ return localStorage.getItem('_v2pw2') === '1'; }catch(e){ return false; } })(),
+        screen: (window.screen ? (screen.width + 'x' + screen.height) : ''),
+        lang: navigator.language || '',
+        tz: (function(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){ return ''; } })()
+      };
+      fetch(base, {
+        method: 'POST',
+        headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=representation'},
+        body: JSON.stringify(body)
+      }).then(function(r){ return r.json(); }).then(function(data){
+        var vid = data && data[0] && data[0].id;
+        if(!vid) return;
+        var t0 = Date.now();
+        function upd(){
+          var dur = Math.max(1, Math.round((Date.now() - t0) / 1000));
+          fetch(base + '?id=eq.' + vid, {
+            method: 'PATCH',
+            headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+            body: JSON.stringify({duration: dur, left_at: new Date().toISOString()}),
+            keepalive: true
+          }).catch(function(){});
+        }
+        setInterval(upd, 10000);
+        window.addEventListener('beforeunload', upd);
+        document.addEventListener('visibilitychange', function(){ if(document.hidden) upd(); });
+      }).catch(function(){});
+    }catch(e){}
+  })();
 
   async function load(){
     var listEl = document.getElementById('mpList');
