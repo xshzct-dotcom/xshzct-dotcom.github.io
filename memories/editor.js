@@ -210,8 +210,9 @@ $$('#editorTabs .editor-tab').forEach(tab=>{
 // ===== 文章编辑 =====
 async function renderEssayTab(){
   const body=$('#editorBody');
-  const cats=['童年篇','初恋篇','日记','旅行见闻'];
-  const catIds=['childhood','firstlove','thoughts','travel'];
+  // 2026-09-15：「日记」分类已迁移到博客（posts 表），此处移除
+  const cats=['童年篇','初恋篇','旅行见闻'];
+  const catIds=['childhood','firstlove','travel'];
   var essays = await loadTabData('essay');
   // 文章按日期降序（最新在前），无日期文章按sort_order排在最后
   const all=(essays||[]).slice().sort(function(a,b){
@@ -307,7 +308,7 @@ async function renderEssayTab(){
   // 编辑/新建
   function editEssay(a, defaultCat){
     const isNew=!a;
-    const category=a?a.category:(defaultCat||'thoughts');
+    const category=a?a.category:(defaultCat||'childhood');
     const articleTitle=a?a.title:'';
     const date=a?(a.date||''):new Date().toLocaleDateString('zh-CN').replace(/\//g,'.');
     const articleBody=a?a.body:'';
