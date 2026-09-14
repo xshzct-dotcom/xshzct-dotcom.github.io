@@ -883,6 +883,10 @@ function renderList(){
                         (isCompressed ? 'jpg' : (f.name.split('.').pop() || 'jpg'));
             console.log('[upload] starting', fname, 'orig:', f.size, 'upload:', upFile.size);
             var uploadPromise = sb.storage.from('photos').upload(fname, upFile, {upsert:true});
+            // 2026-09-15：同步生成并上传缩略图（thumbs/ 前缀，~400px）。异步执行，失败不影响主上传
+            makeThumbBlob(upFile, 400, 0.8).then(function(tb){
+              if(tb) return sb.storage.from('photos').upload('thumbs/' + fname, tb, {upsert:true, contentType:'image/jpeg'});
+            }).catch(function(e){ console.warn('[thumb] upload failed', e); });
             // 超时按体积动态计算（每 MB 3 秒，最少 30 秒；原来固定 12 秒，大图容易误判失败）
             var toMs = Math.max(30000, Math.ceil(upFile.size / 1048576) * 3000);
             var timeoutPromise = new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('上传超时')); }, toMs); });
@@ -1518,6 +1522,31 @@ function pbArticleFromPost(p){
     }
   });
   return { text: text, images: images };
+}
+
+// 生成缩略图 Blob（2026-09-15）：上传照片时同步生成 ~400px 小图，列表/网格加载更快
+function makeThumbBlob(fileOrBlob, maxSide, quality){
+  return new Promise(function(resolve){
+    try{
+      var url = URL.createObjectURL(fileOrBlob);
+      var img = new Image();
+      img.onload = function(){
+        try{
+          var w = img.naturalWidth, h = img.naturalHeight;
+          var scale = Math.min(1, (maxSide || 400) / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w * scale));
+          var ch = Math.max(1, Math.round(h * scale));
+          var cv = document.createElement('canvas');
+          cv.width = cw; cv.height = ch;
+          cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          URL.revokeObjectURL(url);
+          cv.toBlob(function(b){ resolve(b); }, 'image/jpeg', quality || 0.8);
+        }catch(e){ try{ URL.revokeObjectURL(url); }catch(_){} resolve(null); }
+      };
+      img.onerror = function(){ try{ URL.revokeObjectURL(url); }catch(_){} resolve(null); };
+      img.src = url;
+    }catch(e){ resolve(null); }
+  });
 }
 
 // ===== 音频转 MP3（2026-09-15）=====
