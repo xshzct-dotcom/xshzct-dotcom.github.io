@@ -1248,6 +1248,7 @@ function startEditPost(p){
   };
   var art = pbArticleFromPost(p);
   _postDraft.images = art.images;
+  var ti0 = document.getElementById('postTitle'); if(ti0) ti0.value = p.title || '';
   var ta = document.getElementById('postText');
   if(ta) ta.value = art.text;
   pbRenderImgList();
@@ -1278,6 +1279,7 @@ function startEditPost(p){
 // 取消编辑，回到新建模式
 function cancelEditPost(){
   _postDraft = { images: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
+  var tiC = document.getElementById('postTitle'); if(tiC) tiC.value = '';
   var ta = document.getElementById('postText'); if(ta) ta.value = '';
   pbRenderImgList();
   ['postMood','postWeather','postLocation'].forEach(function(id){
@@ -1497,6 +1499,7 @@ function pbSaveDraft(){
     var weaEl = document.getElementById('postWeather');
     var locEl = document.getElementById('postLocation');
     var d = {
+      title: (document.getElementById('postTitle') || {}).value || '',
       text: ta ? ta.value : '',
       images: (_postDraft.images || []).map(function(it){
         return { path: it.path || '', src: it.src || '', cap: it.cap || '', name: it.name || '' };
@@ -1546,6 +1549,7 @@ function pbRestoreDraft(d){
       preview: _storageUrl(it.path || it.src || '')
     };
   });
+  var tiR = document.getElementById('postTitle'); if(tiR) tiR.value = d.title || '';
   var ta = document.getElementById('postText'); if(ta) ta.value = d.text || '';
   var m = document.getElementById('postMood');    if(m) m.value = d.mood || '';
   var w = document.getElementById('postWeather'); if(w) w.value = d.weather || '';
@@ -1564,6 +1568,7 @@ async function renderPostTab(){
         <span class="post-edit-info" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)"></span>
         <button id="postCancelEdit" class="editor-btn-sm" style="flex-shrink:0">取消编辑</button>
       </div>
+      <input id="postTitle" class="post-title-input" placeholder="标题（会显示在列表里）">
       <textarea id="postText" rows="12" placeholder="写你的文章吧。&#10;&#10;想在哪儿插照片，就把光标放到那里，再点下面的「插入照片」按钮。"></textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
         <button type="button" class="editor-btn editor-btn-secondary" id="postInsertImg">🖼 插入照片</button>
@@ -1598,6 +1603,8 @@ async function renderPostTab(){
   }
   // 内容变动自动存草稿（防止手机选图/切后台被系统重载导致内容丢失）
   var taMain = document.getElementById('postText');
+  var tiMain = document.getElementById('postTitle');
+  if(tiMain) tiMain.oninput = pbSaveDraftSoon;
   if(taMain) taMain.oninput = pbSaveDraftSoon;
   ['postMood','postWeather','postLocation'].forEach(function(id){
     var e = document.getElementById(id); if(e) e.oninput = pbSaveDraftSoon;
@@ -1679,6 +1686,8 @@ async function renderPostTab(){
     var isEdit = !!_postDraft.editingId;
     var ta = document.getElementById('postText');
     var text = ta ? ta.value : '';
+    var titleEl = document.getElementById('postTitle');
+    var title = titleEl ? titleEl.value.trim() : '';
     var mood = (document.getElementById('postMood').value || '').trim();
     var weather = (document.getElementById('postWeather').value || '').trim();
     var location = (document.getElementById('postLocation').value || '').trim();
@@ -1727,6 +1736,7 @@ async function renderPostTab(){
       }
       _postStatus('保存…');
       var payload = {
+        title: title || null,
         blocks: finalBlocks,
         content: plainText,
         images: imgList,

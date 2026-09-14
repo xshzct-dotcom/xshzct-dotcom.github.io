@@ -6,7 +6,7 @@
 <title>动态 · 向天游</title>
 <meta name="theme-color" content="#0E1116">
 <meta name="description" content="随手记下的片段 — 文字、照片、音乐">
-<link rel="stylesheet" href="style.css?v=20260914-04">
+<link rel="stylesheet" href="style.css?v=20260914-05">
 <style>
 /* ===== 动态页专属样式（2026-09-11） ===== */
 .mp-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:14px 18px;
@@ -36,6 +36,33 @@
 .mp-fig:first-child{margin-top:0}
 .mp-fig-img{width:100%;border-radius:6px;display:block;cursor:zoom-in;background:var(--bg-elevated)}
 .mp-figcap{font-size:.78rem;color:var(--text-muted);text-align:center;margin-top:8px;line-height:1.65;font-style:italic;letter-spacing:.3px}
+
+/* ===== 列表页（2026-09-14：动态改为"列表 → 详情"）===== */
+.ml-list{max-width:680px;margin:0 auto;padding:16px 16px 70px;display:flex;flex-direction:column;gap:13px}
+.ml-item{display:flex;gap:14px;padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color .2s,transform .2s}
+.ml-item:hover{border-color:var(--border-hover);transform:translateY(-2px)}
+.ml-thumb{width:106px;height:106px;flex:0 0 auto;border-radius:8px;overflow:hidden;background:var(--bg-elevated)}
+.ml-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.ml-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.ml-title{font-family:var(--font-display);font-size:1.06rem;font-weight:500;color:var(--text);margin:0 0 5px;line-height:1.45}
+.ml-title-empty{color:var(--text-dim);font-weight:400;font-size:.95rem}
+.ml-meta{font-size:.72rem;color:var(--text-muted);margin-bottom:7px;letter-spacing:.3px}
+.ml-excerpt{font-size:.85rem;color:var(--text-dim);line-height:1.7;margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+/* 详情页 */
+.mp-detail-wrap{max-width:640px;margin:0 auto;padding:18px 16px 80px}
+.ml-back{display:inline-flex;align-items:center;gap:6px;font-size:.84rem;color:var(--text-dim);text-decoration:none;margin-bottom:20px;transition:color .2s}
+.ml-back:hover{color:var(--accent)}
+.mp-detail-title{font-family:var(--font-display);font-size:1.55rem;font-weight:500;color:var(--text);margin:0 0 12px;line-height:1.45;letter-spacing:.5px}
+.mp-detail-meta{font-size:.76rem;color:var(--text-muted);margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border);letter-spacing:.3px}
+.mp-detail-nav{margin-top:34px;padding-top:18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:12px}
+.mp-detail-nav a{font-size:.84rem;color:var(--text-dim);text-decoration:none}
+.mp-detail-nav a:hover{color:var(--accent)}
+@media(max-width:520px){
+  .ml-item{flex-direction:column;gap:10px}
+  .ml-thumb{width:100%;height:158px}
+}
+/* 兜底：display:flex 会覆盖 hidden 属性，必须显式处理（2026-09-12 踩过这个坑） */
+.ml-list[hidden],#mpDetail[hidden]{display:none!important}
 
 /* 图片网格：1张=大图 / 2张=两列 / 3-4张=两列 / 5-9张=三列 */
 .mp-imgs{display:grid;gap:5px;margin-top:12px}
@@ -89,9 +116,10 @@
   <span class="mp-stat" id="mpStat"></span>
 </header>
 
-<main class="mp-list" id="mpList">
+<main class="ml-list" id="mpList">
   <div class="mp-loading">加载中…</div>
 </main>
+<div id="mpDetail" hidden></div>
 
 <div class="mp-empty" id="mpEmpty" hidden>
   <div class="mp-empty-icon">🌙</div>
@@ -172,6 +200,78 @@
     '</article>';
   }
 
+  // ===== 列表页 / 详情页（2026-09-14）=====
+  function excerptOf(p){
+    var t = '';
+    var blocks = p.blocks || [];
+    if(blocks.length){
+      t = blocks.filter(function(b){ return b.t !== 'img'; })
+                .map(function(b){ return b.text || ''; }).join(' ');
+    }else{
+      t = p.content || '';
+    }
+    return t.replace(/\s+/g, ' ').trim();
+  }
+  function thumbOf(p){
+    var blocks = p.blocks || [];
+    for(var i = 0; i < blocks.length; i++){
+      if(blocks[i].t === 'img' && blocks[i].src) return fileUrl(blocks[i].src);
+    }
+    if(p.images && p.images.length) return fileUrl(p.images[0]);
+    return '';
+  }
+  function titleOf(p){
+    var t = (p.title || '').trim();
+    if(t) return t;
+    var ex = excerptOf(p);
+    return ex ? ex.slice(0, 18) : '（无标题）';
+  }
+  function shortTitle(p){
+    var t = titleOf(p);
+    return t.length > 8 ? t.slice(0, 8) + '…' : t;
+  }
+  function dateOf(p){
+    var d = new Date(p.created_at);
+    if(isNaN(d.getTime())) return '';
+    return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+  function renderListItem(p){
+    var thumb = thumbOf(p);
+    var ex = excerptOf(p).slice(0, 90);
+    var hasTitle = !!(p.title || '').trim();
+    return '<a class="ml-item" href="?id=' + encodeURIComponent(p.id) + '">' +
+      (thumb ? '<div class="ml-thumb"><img src="' + esc(thumb) + '" loading="lazy" decoding="async" alt=""></div>' : '') +
+      '<div class="ml-body">' +
+        '<h2 class="ml-title' + (hasTitle ? '' : ' ml-title-empty') + '">' + esc(titleOf(p)) + '</h2>' +
+        '<div class="ml-meta">' + dateOf(p) + (p.location ? ' · 📍' + esc(p.location) : '') + '</div>' +
+        (ex ? '<p class="ml-excerpt">' + esc(ex) + '</p>' : '') +
+      '</div>' +
+    '</a>';
+  }
+  function renderMusicBar(p){
+    return '<div class="mp-music">' +
+      '<button class="mp-music-btn" data-src="' + esc(fileUrl(p.music_path)) + '" data-title="' + esc(p.music_title || '') + '" aria-label="播放">▶</button>' +
+      '<span class="mp-music-title">' + esc(p.music_title || '音乐') + '</span>' +
+    '</div>';
+  }
+  function renderDetailView(p, prev, next){
+    return '<div class="mp-detail-wrap">' +
+      '<a class="ml-back" href="./moments.html">← 返回列表</a>' +
+      '<h1 class="mp-detail-title">' + esc(titleOf(p)) + '</h1>' +
+      '<div class="mp-detail-meta">' + dateOf(p) +
+        (p.mood ? ' · ' + esc(p.mood) : '') +
+        (p.weather ? ' · ' + esc(p.weather) : '') +
+        (p.location ? ' · 📍' + esc(p.location) : '') +
+      '</div>' +
+      '<div class="mp-body">' + renderBlocks(p) + '</div>' +
+      (p.music_path ? renderMusicBar(p) : '') +
+      '<div class="mp-detail-nav">' +
+        (prev ? '<a href="?id=' + encodeURIComponent(prev.id) + '">← ' + esc(shortTitle(prev)) + '</a>' : '<span></span>') +
+        (next ? '<a href="?id=' + encodeURIComponent(next.id) + '">' + esc(shortTitle(next)) + ' →</a>' : '<span></span>') +
+      '</div>' +
+    '</div>';
+  }
+
   // 单例音频（避免多条音乐同时播放）
   var audio=null, curBtn=null;
   function toggleMusic(btn){
@@ -204,12 +304,14 @@
   document.addEventListener('keydown', function(e){ if(e.key==='Escape' && !viewer.hidden) closeViewer(); });
 
   function bindEvents(){
-    document.getElementById('mpList').addEventListener('click', function(e){
-      var musicBtn=e.target.closest('.mp-music-btn');
+    if(bindEvents._done) return;
+    bindEvents._done = true;
+    document.addEventListener('click', function(e){
+      var musicBtn = e.target.closest('.mp-music-btn');
       if(musicBtn){ toggleMusic(musicBtn); return; }
       var figImg = e.target.closest('.mp-fig-img');
       if(figImg){ openViewer(figImg.getAttribute('src')); return; }
-      var imgWrap=e.target.closest('.mp-img');
+      var imgWrap = e.target.closest('.mp-img');
       if(imgWrap){ openViewer(imgWrap.getAttribute('data-src')); }
     });
   }
@@ -222,27 +324,58 @@
   }
 
   async function load(){
-    var listEl=document.getElementById('mpList');
+    var listEl = document.getElementById('mpList');
+    var detailEl = document.getElementById('mpDetail');
     if(!sb){
-      listEl.innerHTML='<div class="mp-loading">⚠️ 云端未连接，请刷新重试</div>';
+      listEl.innerHTML = '<div class="mp-loading">⚠️ 云端未连接，请刷新重试</div>';
       return;
     }
     try{
-      var res=await sb.from('posts').select('*')
-        .order('pinned',{ascending:false})
-        .order('created_at',{ascending:false})
+      var res = await sb.from('posts').select('*')
+        .order('pinned', {ascending:false})
+        .order('created_at', {ascending:false})
         .limit(200);
       if(res.error){
-        listEl.innerHTML='<div class="mp-loading">读取失败：'+esc(res.error.message)+'</div>';
+        listEl.innerHTML = '<div class="mp-loading">读取失败：' + esc(res.error.message) + '</div>';
         return;
       }
-      var list=res.data||[];
-      document.getElementById('mpStat').textContent=list.length?list.length+' 条':'';
+      var list = res.data || [];
+      var idParam = null;
+      try{ idParam = new URLSearchParams(location.search).get('id'); }catch(e){}
+
+      if(idParam){
+        var p = null;
+        for(var i = 0; i < list.length; i++){
+          if(String(list[i].id) === String(idParam)){ p = list[i]; break; }
+        }
+        if(!p){
+          listEl.innerHTML = '<div class="mp-loading">这篇内容不存在（可能已被删除）<br><br><a href="./moments.html" style="color:var(--accent);text-decoration:none">← 返回列表</a></div>';
+          return;
+        }
+        var idx = list.indexOf(p);
+        var prev = (idx + 1 < list.length) ? list[idx + 1] : null;
+        var next = (idx - 1 >= 0) ? list[idx - 1] : null;
+        listEl.hidden = true;
+        listEl.innerHTML = '';
+        detailEl.innerHTML = renderDetailView(p, prev, next);
+        detailEl.hidden = false;
+        var stat = document.getElementById('mpStat');
+        if(stat) stat.textContent = '';
+        document.title = titleOf(p) + ' · 向天游';
+        bindEvents();
+        window.scrollTo(0, 0);
+        return;
+      }
+
+      var stat2 = document.getElementById('mpStat');
+      if(stat2) stat2.textContent = list.length ? list.length + ' 篇' : '';
       if(!list.length){ showEmpty(); return; }
-      listEl.innerHTML=list.map(renderPost).join('');
+      listEl.innerHTML = list.map(renderListItem).join('');
+      listEl.hidden = false;
+      detailEl.hidden = true;
       bindEvents();
     }catch(err){
-      listEl.innerHTML='<div class="mp-loading">加载出错，请刷新重试</div>';
+      listEl.innerHTML = '<div class="mp-loading">加载出错，请刷新重试</div>';
     }
   }
 

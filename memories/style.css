@@ -339,6 +339,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .pb-cap:focus{border-color:var(--accent)}
 
 /* ===== 文章编辑 · 文中插入的照片列表（2026-09-14 简化版）===== */
+.post-title-input{width:100%;padding:12px 14px;margin-bottom:10px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font-display);font-size:1.12rem;font-weight:500;outline:none;transition:border-color .2s;letter-spacing:.5px}
+.post-title-input:focus{border-color:var(--accent)}
+.post-title-input::placeholder{color:var(--text-muted);font-weight:400;letter-spacing:0}
 #postText{width:100%;padding:12px 14px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit;font-size:.92rem;line-height:1.95;resize:vertical;outline:none;transition:border-color .2s}
 #postText:focus{border-color:var(--accent)}
 #postText::placeholder{color:var(--text-muted)}
