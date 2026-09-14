@@ -184,9 +184,9 @@ async function render(){
       if(d.path) pageMap[d.path]=(pageMap[d.path]||0)+1;
       if(d.ref&&d.ref!='') refMap[d.ref]=(refMap[d.ref]||0)+1;
       if(d.duration){durSum+=d.duration; durN++;}
-      // 2026-09-15：区分"通过密码的自己人"和"没通过的访客"
-      if(d.is_authed) authedN++;
-      else { guestN++; guestRows.push(d); }
+      // 2026-09-15：区分自己人/外人（is_authed 为 null 的是加字段前的旧记录，不计入）
+      if(d.is_authed === true) authedN++;
+      else if(d.is_authed === false){ guestN++; guestRows.push(d); }
     });
     var avgDur=durN?Math.round(durSum/durN):0;
     var pages=Object.keys(pageMap).sort(function(a,b){return pageMap[b]-pageMap[a];}).slice(0,15);
