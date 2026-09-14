@@ -388,6 +388,10 @@ function _pwOk(v, cb){
     var thumb = thumbOf(p);
     var ex = excerptOf(p).slice(0, 90);
     var hasTitle = !!(p.title || '').trim();
+    // 标题本身就是日期时（如 2024.8.26），不再重复显示下方日期（2026-09-15）
+    var titleLooksDate = /^\s*\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\s*$/.test((p.title || '').trim());
+    var meta = titleLooksDate ? '' : dateOf(p);
+    if(p.location) meta += (meta ? ' · ' : '') + '📍' + esc(p.location);
     return '<a class="ml-item" href="?id=' + encodeURIComponent(p.id) + '">' +
       (thumb
         ? '<div class="ml-thumb"><img src="' + esc(thumb) + '" loading="lazy" decoding="async" alt="" '
@@ -396,7 +400,7 @@ function _pwOk(v, cb){
         : '') +
       '<div class="ml-body">' +
         '<h2 class="ml-title' + (hasTitle ? '' : ' ml-title-empty') + '">' + esc(titleOf(p)) + '</h2>' +
-        '<div class="ml-meta">' + dateOf(p) + (p.location ? ' · 📍' + esc(p.location) : '') + '</div>' +
+        (meta ? '<div class="ml-meta">' + meta + '</div>' : '<div class="ml-meta" style="margin-bottom:0"></div>') +
         (ex ? '<p class="ml-excerpt">' + esc(ex) + '</p>' : '') +
       '</div>' +
     '</a>';
