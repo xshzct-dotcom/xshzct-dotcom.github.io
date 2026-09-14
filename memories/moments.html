@@ -191,6 +191,13 @@
       return '<div class="mp-img" data-src="'+u+'"><img src="'+u+'" loading="lazy" decoding="async" alt=""></div>';
     }).join('')+'</div>';
   }
+  // 视频地址：GitHub Releases 的链接在国内直连不通，自动改走加速镜像（2026-09-15）
+  function videoUrl(src, alt){
+    var s = String(src || '');
+    if(!/^https?:\/\/github\.com\/[^/]+\/[^/]+\/releases\/download\//i.test(s)) return s;
+    return (alt ? 'https://ghfast.top/' : 'https://gh-proxy.com/') + s;
+  }
+
   function renderBlocks(p){
     var blocks = p.blocks;
     if(!blocks || !blocks.length){
@@ -210,7 +217,10 @@
         if(!b.src) return '';
         var kind = b.kind || 'direct';
         if(kind === 'direct'){
-          return '<figure class="mp-fig"><video class="mp-video" src="' + esc(b.src) + '" controls preload="metadata" playsinline></video></figure>';
+          return '<figure class="mp-fig"><video class="mp-video" src="' + esc(videoUrl(b.src)) + '" '
+            + 'data-alt="' + esc(videoUrl(b.src, true)) + '" '
+            + 'onerror="if(this.dataset.alt){this.src=this.dataset.alt;this.removeAttribute(\'data-alt\')}" '
+            + 'controls preload="metadata" playsinline></video></figure>';
         }
         var embed = '';
         if(kind === 'youtube'){
