@@ -1104,15 +1104,41 @@ function compressImage(file, maxSide, quality){
       img.onload = function(){
         try{
           var w = img.naturalWidth, h = img.naturalHeight;
-          var scale = Math.min(1, (maxSide || 1600) / Math.max(w, h));
+          var longSide = Math.max(w, h);
+          var sizeKB = (file.size || 0) / 1024;
+
+          // ===== 2026-09-14 按原图大小分级：小图温柔、大图下手重 =====
+          var targetSide = maxSide || 1600;
+          var q = quality || 0.85;
+
+          if(longSide <= 1280 && sizeKB <= 400){
+            // ① 本来就小 → 原样上传，不损失画质
+            if(url) URL.revokeObjectURL(url);
+            resolve(file);
+            return;
+          }
+          if(longSide <= 2000 && sizeKB <= 1200){
+            // ② 中等 → 温柔处理（少缩、质量高）
+            targetSide = Math.max(targetSide, 1800);
+            q = Math.max(q, 0.92);
+          }else if(longSide > 4000 || sizeKB > 4000){
+            // ④ 超大（相机原片）→ 下手重一点，省额度
+            q = Math.min(q, 0.8);
+          }
+          // ③ 其余走调用方给的标准参数
+
+          var scale = Math.min(1, targetSide / longSide);
           var cw = Math.round(w * scale), ch = Math.round(h * scale);
           var cv = document.createElement('canvas');
           cv.width = cw; cv.height = ch;
           cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
           if(url) URL.revokeObjectURL(url);
+          // PNG 保持 PNG（避免丢透明/变糊），其余用 JPEG
+          var isPng = /png/i.test(file.type || '') || /\.png$/i.test(file.name || '');
           cv.toBlob(function(blob){
-            resolve(blob && blob.size && blob.size < file.size ? blob : file);
-          }, 'image/jpeg', quality || 0.82);
+            if(blob && blob.size && blob.size < file.size) resolve(blob);
+            else resolve(file);   // 压完反而更大 → 用原图
+          }, isPng ? 'image/png' : 'image/jpeg', q);
         }catch(e){ if(url) URL.revokeObjectURL(url); resolve(file); }
       };
       img.onerror = function(){ if(url) URL.revokeObjectURL(url); resolve(file); };
