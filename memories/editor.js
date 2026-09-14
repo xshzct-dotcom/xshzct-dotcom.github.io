@@ -1238,13 +1238,17 @@ function renderPostOldList(posts){
 // 进入编辑模式（2026-09-12 新增）
 function startEditPost(p){
   _postDraft = {
+    images: [],
     music: null,
     musicKeep: p.music_path || null,
     musicKeepTitle: p.music_title || '已有音乐',
     editingId: p.id
   };
-  postBlocksInit(p);
-  postBlocksRender();
+  var art = pbArticleFromPost(p);
+  _postDraft.images = art.images;
+  var ta = document.getElementById('postText');
+  if(ta) ta.value = art.text;
+  pbRenderImgList();
   var m = document.getElementById('postMood');       if(m) m.value = p.mood || '';
   var w = document.getElementById('postWeather');    if(w) w.value = p.weather || '';
   var l = document.getElementById('postLocation');   if(l) l.value = p.location || '';
@@ -1271,13 +1275,13 @@ function startEditPost(p){
 
 // 取消编辑，回到新建模式
 function cancelEditPost(){
-  _postDraft = { music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
-  postBlocksInit(null);
-  postBlocksRender();
+  _postDraft = { images: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
+  var ta = document.getElementById('postText'); if(ta) ta.value = '';
+  pbRenderImgList();
   ['postMood','postWeather','postLocation'].forEach(function(id){
     var e = document.getElementById(id); if(e) e.value = '';
   });
-  var btn = document.getElementById('postPublish'); if(btn) btn.textContent = '发布动态';
+  var btn = document.getElementById('postPublish'); if(btn) btn.textContent = '发布';
   var bar = document.getElementById('postEditBar'); if(bar) bar.style.display = 'none';
   var mp = document.getElementById('postMusicPreview'); if(mp) mp.innerHTML = '';
   _postStatus('');
@@ -1388,6 +1392,97 @@ function postBlocksAdd(t){
   }
 }
 
+// ===== 文章式编辑（2026-09-14 简化版）：一个大文本框 + 在光标处插入照片 =====
+// 文本里用 [照片1] [照片2] 标记图片位置，发布时解析成 blocks 存储（前端仍按 blocks 渲染）
+function pbInsertAtCursor(ta, str){
+  if(!ta) return;
+  var s = ta.selectionStart || 0, e = ta.selectionEnd || 0;
+  var v = ta.value;
+  ta.value = v.slice(0, s) + str + v.slice(e);
+  var pos = s + str.length;
+  try{ ta.selectionStart = ta.selectionEnd = pos; }catch(err){}
+  ta.focus();
+}
+
+function pbRenderImgList(){
+  var box = document.getElementById('postImgList');
+  if(!box) return;
+  var imgs = _postDraft.images || [];
+  if(!imgs.length){ box.innerHTML = ''; return; }
+  box.innerHTML = '<div style="font-size:.78rem;color:var(--text-muted);margin-bottom:6px">文中已插入的照片（可填说明）</div>' +
+    imgs.map(function(it, i){
+      return '<div class="pi-row">' +
+        '<img class="pi-thumb" src="' + it.preview + '" alt="">' +
+        '<div class="pi-info">' +
+          '<div class="pi-name">照片' + (i + 1) + '<span class="pi-file">' + esc(it.name || '') + '</span></div>' +
+          '<input class="pi-cap" data-cap="' + i + '" placeholder="照片说明（可留空）" value="' + esc(it.cap || '') + '">' +
+        '</div>' +
+        '<button type="button" class="pb-op pb-op-del" data-rm="' + i + '" title="移除这张">×</button>' +
+      '</div>';
+    }).join('');
+  box.querySelectorAll('[data-cap]').forEach(function(inp){
+    inp.oninput = function(){
+      var i = +inp.getAttribute('data-cap');
+      if(_postDraft.images[i]) _postDraft.images[i].cap = inp.value;
+    };
+  });
+  box.querySelectorAll('[data-rm]').forEach(function(btn){
+    btn.onclick = function(){
+      var i = +btn.getAttribute('data-rm');
+      var ta = document.getElementById('postText');
+      var cur = ta ? ta.value : '';
+      var parts = cur.split(/\[照片\d+\]/);
+      var order = (cur.match(/\[照片(\d+)\]/g) || []).map(function(s){ return parseInt(s.match(/\d+/)[0], 10); });
+      _postDraft.images.splice(i, 1);
+      var newOrder = order.filter(function(n){ return n !== (i + 1); });
+      if(newOrder.length !== order.length - 1){
+        // 该照片没有在文中插过，只需重排剩余
+        newOrder = order.filter(function(_, k){ return k !== i; });
+      }
+      var out = parts[0] || '';
+      newOrder.forEach(function(oldN, k){ out += '[照片' + (k + 1) + ']' + (parts[k + 1] || ''); });
+      if(ta) ta.value = out;
+      pbRenderImgList();
+      _postStatus('已移除照片');
+    };
+  });
+}
+
+function pbParseArticle(text, images){
+  var blocks = [];
+  var re = /\[照片(\d+)\]/g;
+  var last = 0, m;
+  while((m = re.exec(text)) !== null){
+    var before = text.slice(last, m.index).trim();
+    if(before) blocks.push({t:'p', text:before});
+    var idx = parseInt(m[1], 10) - 1;
+    var im = images[idx];
+    if(im) blocks.push({t:'img', _idx: idx, cap: (im.cap || '').trim()});
+    last = m.index + m[0].length;
+  }
+  var after = text.slice(last).trim();
+  if(after) blocks.push({t:'p', text:after});
+  return blocks;
+}
+
+function pbArticleFromPost(p){
+  var text = '', images = [];
+  var blocks = (p && p.blocks && p.blocks.length) ? p.blocks : [];
+  if(!blocks.length && p){
+    if(p.content) blocks.push({t:'p', text:p.content});
+    (p.images || []).forEach(function(s){ blocks.push({t:'img', src:s, cap:''}); });
+  }
+  blocks.forEach(function(b){
+    if(b.t === 'img' && b.src){
+      images.push({ src: b.src, preview: _storageUrl(b.src), cap: b.cap || '', name: '' });
+      text += '[照片' + images.length + ']';
+    }else if(b.t !== 'img'){
+      text += (text && !/\n$/.test(text) ? '\n\n' : '') + (b.text || '');
+    }
+  });
+  return { text: text, images: images };
+}
+
 async function renderPostTab(){
   const body = $('#editorBody');
   const posts = await loadTabData('post');
@@ -1399,16 +1494,15 @@ async function renderPostTab(){
         <span class="post-edit-info" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)"></span>
         <button id="postCancelEdit" class="editor-btn-sm" style="flex-shrink:0">取消编辑</button>
       </div>
-      <div id="postBlocks"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        <button type="button" class="editor-btn editor-btn-secondary" id="postAddP">+ 段落</button>
-        <button type="button" class="editor-btn editor-btn-secondary" id="postAddImg">+ 图片</button>
-        <button type="button" class="editor-btn editor-btn-secondary" id="postAddH">+ 小标题</button>
+      <textarea id="postText" rows="12" placeholder="写你的文章吧。&#10;&#10;想在哪儿插照片，就把光标放到那里，再点下面的「插入照片」按钮。"></textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
+        <button type="button" class="editor-btn editor-btn-secondary" id="postInsertImg">🖼 插入照片</button>
         <label class="editor-btn editor-btn-secondary" style="cursor:pointer">🎵 加音乐
           <input type="file" accept="audio/*" style="display:none" id="postMusicInput"></label>
         <input type="file" accept="image/*" style="display:none" id="postImgInput">
       </div>
       <div id="postMusicPreview" style="margin-top:8px"></div>
+      <div id="postImgList" style="margin-top:12px"></div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">
         <input id="postMood" class="editor-meta-input" placeholder="心情">
         <input id="postWeather" class="editor-meta-input" placeholder="天气">
@@ -1422,11 +1516,16 @@ async function renderPostTab(){
       <div id="postOldList"></div>
     </div>
   `;
-  postBlocksInit(null);
-  postBlocksRender();
-  document.getElementById('postAddP').onclick = function(){ postBlocksAdd('p'); };
-  document.getElementById('postAddImg').onclick = function(){ postBlocksAdd('img'); };
-  document.getElementById('postAddH').onclick = function(){ postBlocksAdd('h'); };
+  var _pbCaret = null;
+  var insertBtn = document.getElementById('postInsertImg');
+  if(insertBtn){
+    insertBtn.onclick = function(){
+      var ta = document.getElementById('postText');
+      _pbCaret = ta ? (ta.selectionStart || 0) : null;
+      var inp = document.getElementById('postImgInput');
+      if(inp){ inp.value = ''; inp.click(); }
+    };
+  }
   var _previewMusic = function(){
     var el = document.getElementById('postMusicPreview');
     if(!el) return;
@@ -1446,19 +1545,25 @@ async function renderPostTab(){
   imgInput.onchange = async function(){
     var f = imgInput.files && imgInput.files[0];
     imgInput.value = '';
-    if(!f){ _pbPickIndex = -1; return; }
-    var idx = _pbPickIndex; _pbPickIndex = -1;
-    if(idx < 0 || !_postBlocks[idx]) return;
-    _postStatus('压缩图片中…');
+    if(!f) return;
+    _postStatus('处理照片中…');
     try{
       var blob = await compressImage(f, 1600, 0.85);
       var ext = (blob === f) ? (f.name.split('.').pop() || 'jpg') : 'jpg';
       var path = 'posts/img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '.' + ext;
-      var b = _postBlocks[idx];
-      b.blob = blob; b.path = path; b.preview = URL.createObjectURL(blob);
-      postBlocksRender();
-      _postStatus('图片已就绪，可填图说（也可留空）');
-    }catch(e){ _postStatus('图片处理失败', 'var(--danger)'); }
+      _postDraft.images.push({ blob: blob, path: path, preview: URL.createObjectURL(blob), cap: '', name: f.name });
+      var n = _postDraft.images.length;
+      var ta = document.getElementById('postText');
+      var marker = '[照片' + n + ']';
+      if(ta){
+        var pos = (_pbCaret == null) ? ta.value.length : Math.min(_pbCaret, ta.value.length);
+        ta.value = ta.value.slice(0, pos) + marker + ta.value.slice(pos);
+        try{ ta.selectionStart = ta.selectionEnd = pos + marker.length; }catch(err){}
+      }
+      pbRenderImgList();
+      _postStatus('照片' + n + ' 已插入 ✓ 可在下方填写说明');
+    }catch(e){ _postStatus('照片处理失败', 'var(--danger)'); }
+    _pbCaret = null;
   };
 
   musicInput.onchange = function(){
@@ -1473,45 +1578,34 @@ async function renderPostTab(){
   document.getElementById('postPublish').onclick = async function(){
     var btn = this;
     var isEdit = !!_postDraft.editingId;
-    postBlocksCollect();
+    var ta = document.getElementById('postText');
+    var text = ta ? ta.value : '';
     var mood = (document.getElementById('postMood').value || '').trim();
     var weather = (document.getElementById('postWeather').value || '').trim();
     var location = (document.getElementById('postLocation').value || '').trim();
 
-    var hasContent = _postBlocks.some(function(b){
-      if(b.t === 'img') return !!(b.blob || b.src);
-      return !!(b.text || '').trim();
-    });
-    if(!hasContent && !_postDraft.music && !_postDraft.musicKeep){
-      _postStatus('写点文字或加张图吧', 'var(--danger)'); return;
+    var imgs = _postDraft.images || [];
+    if(!text.trim() && !imgs.length && !_postDraft.music && !_postDraft.musicKeep){
+      _postStatus('写点内容或加张照片吧', 'var(--danger)'); return;
     }
     btn.disabled = true; btn.textContent = isEdit ? '保存中…' : '发布中…';
 
     try{
-      var finalBlocks = [];
-      var imgCount = _postBlocks.filter(function(b){ return b.t === 'img' && (b.blob || b.src); }).length;
-      var done = 0;
-      for(var i = 0; i < _postBlocks.length; i++){
-        var b = _postBlocks[i];
-        if(b.t === 'img'){
-          if(b.blob){
-            done++;
-            _postStatus('上传图片 ' + done + '/' + imgCount + '…');
-            await uploadToStorage(b.path, b.blob);
-            finalBlocks.push({t:'img', src:b.path, cap:(b.cap || '').trim()});
-          }else if(b.src){
-            finalBlocks.push({t:'img', src:b.src, cap:(b.cap || '').trim()});
-          }
-        }else{
-          var txt = (b.text || '').trim();
-          if(txt) finalBlocks.push({t:b.t, text:txt});
+      for(var i = 0; i < imgs.length; i++){
+        if(imgs[i].blob){
+          _postStatus('上传照片 ' + (i + 1) + '/' + imgs.length + '…');
+          await uploadToStorage(imgs[i].path, imgs[i].blob);
         }
       }
-      if(!finalBlocks.length && !_postDraft.music && !_postDraft.musicKeep){
-        _postStatus('内容是空的哦', 'var(--danger)');
-        btn.disabled = false; btn.textContent = isEdit ? '保存修改' : '发布动态';
-        return;
-      }
+      var finalBlocks = pbParseArticle(text, imgs).map(function(b){
+        if(b.t === 'img'){
+          var im = imgs[b._idx];
+          if(!im) return null;
+          return {t:'img', src: im.path || im.src, cap: (im.cap || '').trim()};
+        }
+        return b;
+      }).filter(function(x){ return !!x; });
+
       var musicPath = _postDraft.musicKeep || null;
       var musicTitle = _postDraft.musicKeepTitle || null;
       if(_postDraft.music){
@@ -1522,10 +1616,16 @@ async function renderPostTab(){
         await uploadToStorage(musicPath, mf);
         musicTitle = mf.name.replace(/\.[^.]+$/, '');
       }
+
       var plainText = finalBlocks.filter(function(x){ return x.t !== 'img'; })
                                  .map(function(x){ return x.text; }).join('\n\n');
       var imgList = finalBlocks.filter(function(x){ return x.t === 'img'; })
                                .map(function(x){ return x.src; });
+      if(!finalBlocks.length && !musicPath){
+        _postStatus('内容是空的哦', 'var(--danger)');
+        btn.disabled = false; btn.textContent = isEdit ? '保存修改' : '发布';
+        return;
+      }
       _postStatus('保存…');
       var payload = {
         blocks: finalBlocks,
@@ -1556,12 +1656,13 @@ async function renderPostTab(){
       renderTab();
     }catch(e){
       _postStatus('❌ ' + (e.message || '保存失败'), 'var(--danger)');
-      btn.disabled = false; btn.textContent = isEdit ? '保存修改' : '发布动态';
+      btn.disabled = false; btn.textContent = isEdit ? '保存修改' : '发布';
       return;
     }
-    btn.disabled = false; btn.textContent = '发布动态';
+    btn.disabled = false; btn.textContent = '发布';
   };
 
+  pbRenderImgList();
   renderPostOldList(posts);
 }
 
