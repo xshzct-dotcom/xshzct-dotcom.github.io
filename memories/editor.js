@@ -1605,14 +1605,21 @@ async function renderPostTab(){
   // 检测到未完成的草稿 → 询问是否接着写
   var _draft = pbLoadDraft();
   if(_draft){
-    var st = new Date(_draft.savedAt || Date.now());
-    var hh = ('0' + st.getHours()).slice(-2), mm = ('0' + st.getMinutes()).slice(-2);
-    var when = (st.getMonth() + 1) + '月' + st.getDate() + '日 ' + hh + ':' + mm;
-    if(confirm('发现一篇没写完的内容（' + when + ' 保存的）\n\n要接着写吗？\n\n点「确定」恢复；点「取消」丢弃')){
+    var _age = Date.now() - (_draft.savedAt || 0);
+    if(_age < 30 * 60 * 1000){
+      // 30 分钟内（典型场景：写文章时切了个 tab 又切回来）→ 静默自动恢复，不打扰
       pbRestoreDraft(_draft);
-      _postStatus('已恢复上次没写完的内容 ✓', 'var(--accent)');
+      _postStatus('已自动恢复刚才写的内容 ✓', 'var(--accent)');
     }else{
-      pbClearDraft();
+      var st = new Date(_draft.savedAt || Date.now());
+      var hh = ('0' + st.getHours()).slice(-2), mm = ('0' + st.getMinutes()).slice(-2);
+      var when = (st.getMonth() + 1) + '月' + st.getDate() + '日 ' + hh + ':' + mm;
+      if(confirm('发现一篇没写完的内容（' + when + ' 保存的）\n\n要接着写吗？\n\n点「确定」恢复；点「取消」丢弃')){
+        pbRestoreDraft(_draft);
+        _postStatus('已恢复上次没写完的内容 ✓', 'var(--accent)');
+      }else{
+        pbClearDraft();
+      }
     }
   }
   var _previewMusic = function(){
