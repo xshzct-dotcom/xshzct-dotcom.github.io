@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260916-9">
+<link rel="stylesheet" href="style.css?v=20260916-18">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -46,7 +46,7 @@
   .ml-item:active .ml-bgimg{
     filter:brightness(.95) !important;
     transform:scale(1.02);
-    transition:filter .28s ease, opacity .28s ease, transform .3s ease;
+    transition:filter .14s ease, opacity .14s ease, transform .14s ease;
   }
   .ml-item:active{ background:var(--bg-card-hover) }
 }
@@ -68,7 +68,7 @@
 
 /* 触屏"按到哪张显现哪张"（与桌面 hover 同效，都是 70%） */
 @media (hover: none){
-  .ml-item.touch-show .ml-bgimg{ filter:brightness(.95) !important; transform:scale(1.02) }
+  .ml-item.touch-show .ml-bgimg{ filter:brightness(.95) !important; transform:scale(1.02); transition:filter .14s ease, opacity .14s ease, transform .14s ease }
   [data-theme="light"] .ml-item.touch-show .ml-bgimg{ filter:brightness(1.02) saturate(1) !important; opacity:.70 }
   .ml-item.touch-show{ background:var(--bg-card-hover) }
 }
@@ -407,7 +407,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260916-9"></script>
+<script src="vendor/supabase.js?v=20260916-18"></script>
 <script>
 (function(){
   'use strict';
@@ -1005,8 +1005,8 @@ function _pwOk(v, cb){
       clearAll();
       it.classList.add('touch-show');
     }, {passive:true});
-    document.addEventListener('touchend', function(){ setTimeout(clearAll, 220); }, {passive:true});
-    document.addEventListener('touchcancel', function(){ clearAll(); }, {passive:true});
+    document.addEventListener('touchend', function(){ setTimeout(clearAll, 700); }, {passive:true});
+    document.addEventListener('touchcancel', function(){ setTimeout(clearAll, 350); }, {passive:true});
   })();
   bindEvents();   // 2026-09-15：事件委托只绑一次（含无刷新路由的点击拦截）
   load();
