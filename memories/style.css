@@ -99,10 +99,10 @@
 [data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.30}
 [data-theme="light"] .ml-item{background:#FFFFFF}
 [data-theme="light"] .ml-item::after{background:linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.18) 60%,rgba(255,255,255,.30) 100%)}
-[data-theme="light"] .ml-title{color:#15181A}
+[data-theme="light"] .ml-title{color:#0F1113;font-weight:700}
 [data-theme="light"] .ml-title-empty{color:rgba(32,35,40,.80)}
-[data-theme="light"] .ml-date{color:rgba(32,35,40,.62)}
-[data-theme="light"] .ml-excerpt{color:rgba(32,35,40,.76)}
+[data-theme="light"] .ml-date{color:rgba(32,35,40,.76);font-weight:500}
+[data-theme="light"] .ml-excerpt{color:rgba(32,35,40,.88);font-weight:450}
 [data-theme="light"] .ml-item.no-bg{
   background:radial-gradient(120% 90% at 12% 8%,rgba(32,35,40,.045),transparent 58%),
              linear-gradient(155deg,rgba(32,35,40,.02),transparent 55%),#FFFFFF;
