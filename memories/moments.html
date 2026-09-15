@@ -19,8 +19,10 @@
   padding:14px 18px;
   background:rgba(14,17,22,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-bottom:1px solid var(--border)}
-.mp-back{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  border:1px solid var(--border);color:var(--text-dim);font-size:1rem;text-decoration:none;transition:all .2s;flex:0 0 auto}
+/* 2026-09-15：列表页返回 = 带文字的链接（与详情页「← 返回列表」同款） */
+.mp-back{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;color:var(--text-dim);
+  text-decoration:none;transition:color .2s;flex:0 0 auto;width:auto;height:auto;
+  border:none;border-radius:0}
 
 /* 2026-09-15：博客页顶栏与主页导航重复，精简为「只有返回箭头」
    —— 去掉「博客」标题与「53 篇」统计；详情页整条隐藏（那里已有「← 返回列表」） */
@@ -105,15 +107,13 @@
 /* 详情页 */
 /* 2026-09-15：容器不再做定位锚点，让 .ml-back 相对视口贴左上角 */
 .mp-detail-wrap{max-width:668px;margin:0 auto;padding:56px 16px 80px}
-/* 2026-09-15：详情页返回按钮 = 圆形边框箭头（恢复前几版样式，与列表页 .mp-back 一致） */
+/* 2026-09-15：详情页返回 = 带文字的链接，贴屏幕左上角 */
 .ml-back{position:absolute;left:18px;top:14px;margin:0;z-index:5;
-  width:34px;height:34px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  border:1px solid var(--border);color:var(--text-dim);
-  font-size:1rem;text-decoration:none;line-height:1;
-  transition:border-color .2s,color .2s}
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:.9rem;color:var(--text-dim);text-decoration:none;
+  transition:color .2s}
 @media (hover: hover) and (pointer: fine){
-  .ml-back:hover{border-color:var(--border-hover);color:var(--text)}
+  .ml-back:hover{color:var(--text)}
 }
 
 .mp-detail-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.95rem;font-weight:700;color:var(--text);margin:0 0 12px;line-height:1.45;letter-spacing:.5px}
@@ -293,7 +293,7 @@ function _pwOk(v, cb){
 </script>
 
 <header class="mp-head">
-  <a class="mp-back" href="./" title="返回主页" aria-label="返回主页">←</a>
+  <a class="mp-back" href="./" title="返回主页" aria-label="返回主页">← 返回主页</a>
   <h1>博<em>客</em></h1>
   <span class="mp-stat" id="mpStat"></span>
 </header>
@@ -510,7 +510,7 @@ function _pwOk(v, cb){
     // 这里只需在点击时同步告知主页恢复背景音乐
     var backJs = "try{window.parent.postMessage('blog-music-stop','*')}catch(e){}";
     return '<div class="mp-detail-wrap">' +
-      '<a class="ml-back" href="./moments.html" title="返回列表" aria-label="返回列表" onclick="' + backJs + '">←</a>' +
+      '<a class="ml-back" href="./moments.html" onclick="' + backJs + '">← 返回列表</a>' +
       '<h1 class="mp-detail-title">' + esc(titleOf(p)) + '</h1>' +
       '<div class="mp-detail-meta">' + dateOf(p) +
         (p.mood ? ' · ' + esc(p.mood) : '') +
