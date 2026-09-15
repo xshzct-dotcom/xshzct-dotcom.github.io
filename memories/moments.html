@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-63">
+<link rel="stylesheet" href="style.css?v=20260915-65">
 <style>
   /* 2026-09-15：浅色主题（与主页同步，通过 postMessage 切换） */
   [data-theme="light"]{
@@ -355,7 +355,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-63"></script>
+<script src="vendor/supabase.js?v=20260915-65"></script>
 <script>
 (function(){
   'use strict';
@@ -925,3 +925,21 @@ function _pwOk(v, cb){
 </script>
 </body>
 </html>
+
+/* 2026-09-15：触屏设备的"照片显现"效果
+   手机没有 hover，改用 :active —— 手指按住卡片时照片浮现，松开淡回。
+   过渡时间调短（.28s），避免手指滑动时闪得太明显。 */
+@media (hover: none){
+  .ml-item:active .ml-bgimg{
+    filter:brightness(.70) !important;
+    transform:scale(1.02);
+    transition:filter .28s ease, opacity .28s ease, transform .3s ease;
+  }
+  .ml-item:active{ background:var(--bg-card-hover) }
+}
+@media (hover: none){
+  [data-theme="light"] .ml-item:active .ml-bgimg{
+    filter:brightness(1.02) saturate(1) !important;
+    opacity:.70;
+  }
+}
