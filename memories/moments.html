@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<script>
+/* 2026-09-15：主题在首帧前应用，避免闪白。
+   规则：有记录用记录；无记录默认暗色。 */
+(function(){
+  try{
+    if(localStorage.getItem('memories.theme') === 'light'){
+      document.documentElement.setAttribute('data-theme','light');
+    }
+  }catch(e){}
+})();
+</script>
 <meta charset="UTF-8">
 <meta http-equiv="Cache-Control" content="no-cache,must-revalidate">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -11,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-56">
+<link rel="stylesheet" href="style.css?v=20260915-57">
 <style>
   /* 2026-09-15：浅色主题（与主页同步，通过 postMessage 切换） */
   [data-theme="light"]{
@@ -30,14 +41,14 @@
     --danger: #C2564A;
   }
   /* 2026-09-15 修正：不加白色遮罩（会把文字洗白），改为照片淡化 + 深色文字 */
-  [data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.30}
+  [data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.22}
   [data-theme="light"] .ml-item{background:#FFFFFF}
   [data-theme="light"] .ml-item::after{background:linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.18) 60%,rgba(255,255,255,.30) 100%)}
   /* 2026-09-15：浅色下加深加粗（原来偏细偏淡，白底上发虚看不清） */
-  [data-theme="light"] .ml-title{color:#0F1113;font-weight:700}
+  [data-theme="light"] .ml-title{color:#08090A;font-weight:700}
   [data-theme="light"] .ml-title-empty{color:rgba(32,35,40,.86);font-weight:500}
-  [data-theme="light"] .ml-date{color:rgba(32,35,40,.76);font-weight:500}
-  [data-theme="light"] .ml-excerpt{color:rgba(32,35,40,.88);font-weight:450}
+  [data-theme="light"] .ml-date{color:rgba(24,26,28,.84);font-weight:600}
+  [data-theme="light"] .ml-excerpt{color:rgba(16,18,20,.93);font-weight:500}
   [data-theme="light"] .ml-item{background:#FFFFFF}
   [data-theme="light"] .ml-item.no-bg{background:#FFFFFF}
   [data-theme="light"] .ml-item.no-bg{background:radial-gradient(120% 90% at 12% 8%,rgba(32,35,40,.045),transparent 58%),linear-gradient(155deg,rgba(32,35,40,.02),transparent 55%),#FFFFFF}
@@ -344,7 +355,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-56"></script>
+<script src="vendor/supabase.js?v=20260915-57"></script>
 <script>
 (function(){
   'use strict';
@@ -828,8 +839,13 @@ function _pwOk(v, cb){
       else document.documentElement.removeAttribute('data-theme');
     }
   });
-  // 2026-09-15：默认暗色（不读本地存储）；浅色只由父页面的 postMessage 在本次会话内同步
-  document.documentElement.removeAttribute('data-theme');
+  // 2026-09-15：按记录应用主题（无记录=暗色）；父页面还会 postMessage 同步
+  (function(){
+    try{
+      if(localStorage.getItem('memories.theme') === 'light') document.documentElement.setAttribute('data-theme','light');
+      else document.documentElement.removeAttribute('data-theme');
+    }catch(e){}
+  })();
 
   // 访问上报（2026-09-15）：博客页也记录，含"是否通过密码"与设备信息
   (function(){
