@@ -74,6 +74,26 @@
   .ml-item:hover{background:var(--bg-card-hover)}
   .ml-item:hover .ml-bgimg{opacity:.26;transform:scale(1.035)}
 }
+/* 2026-09-15：没有照片的文章 → 用极淡的渐层+光晕替代（避免大片死板的纯色） */
+.ml-item.no-bg{
+  background:
+    radial-gradient(120% 90% at 12% 8%, rgba(var(--fg-rgb),.055), transparent 58%),
+    linear-gradient(155deg, rgba(var(--fg-rgb),.028), rgba(var(--fg-rgb),.008) 55%, transparent),
+    var(--bg-card);
+}
+.ml-item.no-bg::after{
+  content:'';
+  position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.10));
+}
+@media (hover: hover) and (pointer: fine){
+  .ml-item.no-bg:hover{
+    background:
+      radial-gradient(120% 90% at 12% 8%, rgba(var(--fg-rgb),.085), transparent 58%),
+      linear-gradient(155deg, rgba(var(--fg-rgb),.045), rgba(var(--fg-rgb),.015) 55%, transparent),
+      var(--bg-card-hover);
+  }
+}
 /* 详情页 */
 .mp-detail-wrap{max-width:668px;margin:0 auto;padding:18px 16px 80px}
 .ml-back{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;color:var(--text-dim);text-decoration:none;margin-bottom:20px;transition:color .2s}
@@ -160,6 +180,16 @@
 .mp-empty{text-align:center;padding:90px 24px;color:var(--text-muted)}
 .mp-empty-icon{font-size:2.6rem;margin-bottom:16px;opacity:.6}
 .mp-empty p{margin:6px 0;font-size:.9rem;line-height:1.7}
+/* 2026-09-15 ⑧：空状态加极淡水印（参考"淡化图像铺底"手法） */
+.mp-empty{position:relative;overflow:hidden}
+.mp-empty::before{
+  content:'✦';
+  position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);
+  font-size:20rem;line-height:1;color:rgba(var(--fg-rgb),.022);
+  pointer-events:none;user-select:none;z-index:0;
+}
+.mp-empty>*{position:relative;z-index:1}
+
 .mp-empty-sub{font-size:.78rem!important;opacity:.7}
 .mp-loading{text-align:center;padding:70px 0;color:var(--text-muted);font-size:.88rem}
 
@@ -429,7 +459,7 @@ function _pwOk(v, cb){
     if(p.location) meta += (meta ? ' · ' : '') + '📍' + esc(p.location);
     // 2026-09-15：照片淡化铺底（参考 thelongestway）；文字顺序改为 日期→标题→摘要
     var bgStyle = thumb ? "background-image:url('" + String(thumb).replace(/'/g, '%27') + "')" : '';
-    return '<a class="ml-item" href="?id=' + encodeURIComponent(p.id) + '">' +
+    return '<a class="ml-item' + (thumb ? '' : ' no-bg') + '" href="?id=' + encodeURIComponent(p.id) + '">' +
       (thumb ? '<span class="ml-bgimg" style="' + bgStyle + '" aria-hidden="true"></span>' : '') +
       '<div class="ml-body">' +
         '<div class="ml-date">' + meta + '</div>' +
