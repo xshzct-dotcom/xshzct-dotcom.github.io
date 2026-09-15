@@ -1133,19 +1133,9 @@ function initMusic(){
   // 进度条拖动支持（鼠标 + 触摸）
   initSeekBar();
 }
-/* ===== 2026-09-16：刷新后延续上次播放 =====
-   浏览器不允许"无用户交互就出声"，所以：
-   ① 先尝试直接 play()（浏览器可能因媒体参与度而放行）
-   ② 被拒就显示"▶ 继续播放上次的歌"提示，用户点一下即接上（含原进度） */
-function hideResumeTip(){
-  var tip = document.getElementById('resumeTip');
-  if(tip) tip.hidden = true;
-}
-function showResumeTip(){
-  var tip = document.getElementById('resumeTip');
-  if(!tip || window._userStarted) return;
-  tip.hidden = false;
-}
+/* ===== 2026-09-16：刷新后尝试延续上次播放 =====
+   浏览器不允许"无用户交互就出声"：先尝试 play()，被拒就静默等用户点页面
+   （_grant 会在用户首次交互时自动续播，并带上原进度） */
 function maybeResumePlay(){
   try{
     if(!bgMusic || !bgMusic.src || bgMusic.src === window.location.href) return;
@@ -1153,18 +1143,9 @@ function maybeResumePlay(){
     if(!saved) return;
     var o = JSON.parse(saved);
     if(!o || !o.ts || (Date.now() - o.ts) >= 3600000) return;
-    bgMusic.play().then(function(){ hideResumeTip(); })
-                 .catch(function(){ showResumeTip(); });
+    bgMusic.play().catch(function(){});   // 被拒静默，等用户交互
   }catch(e){}
 }
-document.addEventListener('DOMContentLoaded', function(){
-  var tip = document.getElementById('resumeTip');
-  if(tip) tip.addEventListener('click', function(){
-    window._userStarted = true;
-    hideResumeTip();
-    if(bgMusic && bgMusic.paused) bgMusic.play().catch(function(){});
-  });
-});
 
 function _grant(){ 
   if(window._userStarted) return;
