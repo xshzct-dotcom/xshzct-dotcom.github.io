@@ -1403,7 +1403,6 @@ async function ensureSync(){
     // === 2. 相册：表空 bulk insert，否则不动 ===
     if(Array.isArray(albums)){
       const {count:albumsCount} = await SB.from('albums').select('*', {count:'exact', head:true});
-      console.log('[memories] albums count before sync:', albumsCount);
       // albums 表当前 schema: id, title, cover, sort_order, created_at（无 photo_count）
       const allAlbums = albums.map((a, i) => ({
         title: a.title, sort_order: i,
@@ -1412,7 +1411,6 @@ async function ensureSync(){
       if(!albumsCount || albumsCount === 0){
         try{
           const r = await SB.from('albums').insert(allAlbums);
-          console.log('[memories] albums insert result:', JSON.stringify(r));
         } catch(e){
           console.warn('[memories] albums insert error:', e.message, e.details);
         }
@@ -1453,7 +1451,6 @@ async function ensureSync(){
     }
     // 标记已完成首次同步，以后不再跑同步逻辑
     try{ localStorage.setItem('memories.didFirstSync2', '1'); }catch(e){}
-    console.log('[memories] ensureSync done');
   } catch(e){
     console.warn('[memories] ensureSync failed:', e);
   }
@@ -1581,8 +1578,6 @@ async function loadFromSupabase(){
       // 更新播放器列表但不播放（编辑器拖拽排序后不中断当前歌）
       window._currentSongs = newPlaylist;
     }
-
-    console.log('[memories] loadFromSupabase done');
     // 重新渲染相册 chips 和河流（DB sort_order 已同步）
     if(typeof buildRiverFilters === 'function') buildRiverFilters();
     if(typeof renderRiver === 'function') renderRiver();
@@ -1595,7 +1590,6 @@ async function loadFromSupabase(){
 }
 window.reloadFromSupabase = loadFromSupabase;
 function init(){
-  console.log('[memories] init() start');
   // 刷新即从头开始：禁用浏览器自动恢复滚动位置
   if('scrollRestoration' in history) history.scrollRestoration = 'manual';
   window.scrollTo(0, 0);
