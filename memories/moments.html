@@ -53,16 +53,27 @@
 .mp-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 
 /* ===== 列表页（2026-09-14：动态改为"列表 → 详情"）===== */
-.ml-list{max-width:680px;margin:0 auto;padding:16px 16px 70px;display:flex;flex-direction:column;gap:13px}
-.ml-item{display:flex;gap:16px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color .2s,transform .2s}
-
-.ml-thumb{width:124px;height:124px;flex:0 0 auto;border-radius:8px;overflow:hidden;background:var(--bg-elevated)}
-.ml-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.ml-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
-.ml-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.2rem;font-weight:600;color:var(--text);margin:0 0 5px;line-height:1.45}
-.ml-title-empty{color:var(--text-dim);font-weight:400;font-size:1.04rem}
-.ml-meta{font-size:.8rem;color:var(--text-muted);margin-bottom:7px;letter-spacing:.3px}
-.ml-excerpt{font-size:.94rem;color:var(--text-dim);line-height:1.85;margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ml-list{max-width:700px;margin:0 auto;padding:16px 16px 70px;display:flex;flex-direction:column;gap:14px}
+/* 2026-09-15 视觉升级（参考 thelongestway 风格）：
+   照片【淡化】后铺满卡片作背景 → 日期(小灰字)/标题(大字)/摘要(灰字) 叠在上面。
+   无边框、小圆角，靠底色与图像层次区分层次。 */
+.ml-item{position:relative;display:block;padding:24px 22px 22px;background:var(--bg-card);
+  border:none;border-radius:5px;overflow:hidden;text-decoration:none;
+  transition:background .3s ease}
+.ml-bgimg{position:absolute;inset:0;background-size:cover;background-position:center;
+  opacity:.13;pointer-events:none;filter:saturate(.9);
+  transition:opacity .45s ease,transform .7s ease}
+.ml-body{position:relative;z-index:1}
+.ml-date{font-size:.72rem;color:var(--text-muted);letter-spacing:.7px;margin-bottom:10px}
+.ml-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.17rem;font-weight:600;
+  color:var(--text);margin:0 0 10px;line-height:1.45;letter-spacing:.2px}
+.ml-title-empty{color:var(--text-dim);font-weight:400;font-size:1.05rem}
+.ml-excerpt{font-size:.86rem;color:var(--text-dim);line-height:1.88;margin:0;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+@media (hover: hover) and (pointer: fine){
+  .ml-item:hover{background:var(--bg-card-hover)}
+  .ml-item:hover .ml-bgimg{opacity:.26;transform:scale(1.035)}
+}
 /* 详情页 */
 .mp-detail-wrap{max-width:668px;margin:0 auto;padding:18px 16px 80px}
 .ml-back{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;color:var(--text-dim);text-decoration:none;margin-bottom:20px;transition:color .2s}
@@ -73,8 +84,10 @@
 .mp-detail-nav a{font-size:.84rem;color:var(--text-dim);text-decoration:none}
 
 @media(max-width:520px){
-  .ml-item{flex-direction:column;gap:10px}
-  .ml-thumb{width:100%;height:158px}
+  .ml-item{padding:20px 18px 18px}
+  .ml-title{font-size:1.1rem}
+  .ml-excerpt{-webkit-line-clamp:3}
+  .ml-bgimg{opacity:.10}
 }
 /* 兜底：display:flex 会覆盖 hidden 属性，必须显式处理（2026-09-12 踩过这个坑） */
 .ml-list[hidden],#mpDetail[hidden]{display:none!important}
@@ -414,15 +427,13 @@ function _pwOk(v, cb){
     // 2026-09-15：标题与日期分开显示（统一保留日期，不因标题是日期而隐藏）
     var meta = dateOf(p);
     if(p.location) meta += (meta ? ' · ' : '') + '📍' + esc(p.location);
+    // 2026-09-15：照片淡化铺底（参考 thelongestway）；文字顺序改为 日期→标题→摘要
+    var bgStyle = thumb ? "background-image:url('" + String(thumb).replace(/'/g, '%27') + "')" : '';
     return '<a class="ml-item" href="?id=' + encodeURIComponent(p.id) + '">' +
-      (thumb
-        ? '<div class="ml-thumb"><img src="' + esc(thumb) + '" loading="lazy" decoding="async" alt="" '
-          + 'data-fb="' + esc(thumbFallback(p)) + '" '
-          + 'onerror="if(this.dataset.fb){this.src=this.dataset.fb;this.removeAttribute(\'data-fb\')}"></div>'
-        : '') +
+      (thumb ? '<span class="ml-bgimg" style="' + bgStyle + '" aria-hidden="true"></span>' : '') +
       '<div class="ml-body">' +
+        '<div class="ml-date">' + meta + '</div>' +
         '<h2 class="ml-title' + (hasTitle ? '' : ' ml-title-empty') + '">' + esc(titleOf(p)) + '</h2>' +
-        '<div class="ml-meta">' + meta + '</div>' +
         (ex ? '<p class="ml-excerpt">' + esc(ex) + '</p>' : '') +
       '</div>' +
     '</a>';
