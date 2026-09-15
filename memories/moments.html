@@ -14,7 +14,9 @@
 <link rel="stylesheet" href="style.css?v=20260914-07">
 <style>
 /* ===== 动态页专属样式（2026-09-11） ===== */
-.mp-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:14px 18px;
+/* 2026-09-15：与详情页 .mp-detail-wrap 同宽同边距，使返回箭头垂直对齐（统一左上角） */
+.mp-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;
+  max-width:668px;margin:0 auto;padding:16px;
   background:rgba(14,17,22,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-bottom:1px solid var(--border)}
 .mp-back{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
@@ -22,7 +24,7 @@
 
 /* 2026-09-15：博客页顶栏与主页导航重复，精简为「只有返回箭头」
    —— 去掉「博客」标题与「53 篇」统计；详情页整条隐藏（那里已有「← 返回列表」） */
-.mp-head{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-bottom:none!important;padding:10px 18px}
+.mp-head{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-bottom:none!important;padding:16px}
 .mp-head h1, .mp-head .mp-stat{display:none!important}
 .mp-head.detail{display:none!important}
 .mp-head h1{font-family:var(--font-display);font-size:1.15rem;font-weight:500;letter-spacing:2px;flex:1;margin:0}
@@ -667,7 +669,13 @@ function _pwOk(v, cb){
       // （原来是靠整页跳转自然停止，改成无刷新后必须主动暂停）
       try{ if(audio && !audio.paused) audio.pause(); }catch(e){}
       // 关键：恢复进入文章前的滚动位置
+      // 2026-09-15：临时关掉全局 smooth，做到"无感"（否则会看到滚下去的过程）
+      var _prevSB = document.documentElement.style.scrollBehavior;
+      document.documentElement.style.scrollBehavior = 'auto';
       window.scrollTo(0, _listScrollY);
+      requestAnimationFrame(function(){
+        document.documentElement.style.scrollBehavior = _prevSB || '';
+      });
     }
     try{ if(typeof observeFadeUps === 'function') observeFadeUps(); }catch(e){}
   }
