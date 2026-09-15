@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260916-22">
+<link rel="stylesheet" href="style.css?v=20260916-23">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -407,7 +407,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260916-22"></script>
+<script src="vendor/supabase.js?v=20260916-23"></script>
 <script>
 (function(){
   'use strict';
@@ -1007,47 +1007,6 @@ function _pwOk(v, cb){
     }, {passive:true});
     document.addEventListener('touchend', function(){ setTimeout(clearAll, 220); }, {passive:true});
     document.addEventListener('touchcancel', function(){ clearAll(); }, {passive:true});
-  })();
-  // 2026-09-16：触屏专属 —— 横向滑动时让"画面中央那张"自动浮现
-  // 原因：手机上"按住"会立刻变成点击（跳转），根本没有观察时间 ✗
-  //      所以改用"滚动即显现"，让滑动浏览时自然能看到照片浮现的效果 ✓
-  (function(){
-    var wrap = document.getElementById('mpList');
-    if(!wrap) return;
-    var timer = null, ticking = false;
-
-    function pickCenter(){
-      var items = wrap.querySelectorAll('.ml-item');
-      if(!items.length) return;
-      var mid = window.innerWidth / 2;
-      var best = null, bestDist = 1e9, bestRect = null;
-      for(var i=0;i<items.length;i++){
-        var r = items[i].getBoundingClientRect();
-        if(r.bottom < 0 || r.top > window.innerHeight) continue;   // 屏外的跳过
-        var cx = r.left + r.width/2;
-        var d = Math.abs(cx - mid);
-        if(d < bestDist){ bestDist = d; best = items[i]; bestRect = r; }
-      }
-      for(var j=0;j<items.length;j++) items[j].classList.remove('touch-show');
-      if(best) best.classList.add('touch-show');
-    }
-
-    function onScroll(){
-      if(ticking) return;
-      ticking = true;
-      requestAnimationFrame(function(){
-        ticking = false;
-        pickCenter();
-        if(timer) clearTimeout(timer);
-        // 停止滚动 900ms 后，慢慢收回（给足观察时间）
-        timer = setTimeout(function(){
-          var els = wrap.querySelectorAll('.ml-item.touch-show');
-          for(var i=0;i<els.length;i++) els[i].classList.remove('touch-show');
-        }, 900);
-      });
-    }
-    window.addEventListener('scroll', onScroll, {passive:true});
-    window.addEventListener('resize', onScroll, {passive:true});
   })();
   bindEvents();   // 2026-09-15：事件委托只绑一次（含无刷新路由的点击拦截）
   load();
