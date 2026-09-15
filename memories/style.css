@@ -683,3 +683,12 @@ img{background-color:rgba(var(--fg-rgb),.04)}
   }
 }
 
+/* 2026-09-16：hero 只留一行标题（「至少留下过些东西」）
+   —— 8 个汉字，原 -1px 紧排会挤，字号也收敛一档更从容 */
+.hero-title-solo{
+  font-size:clamp(1.7rem,4.6vw,3.4rem);
+  font-weight:600;
+  letter-spacing:.06em;
+  line-height:1.28;
+  margin-bottom:0;
+}
