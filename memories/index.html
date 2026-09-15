@@ -506,7 +506,7 @@
 // Service Worker 注册（2026-08-11 启用：加速二次访问 + 离线回退）
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js?v=20260915').catch(function(e){
+    navigator.serviceWorker.register('sw.js?v=2026091518').catch(function(e){
       console.warn('[SW] register failed:', e);
     });
   });
