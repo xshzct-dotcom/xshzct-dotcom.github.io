@@ -634,3 +634,16 @@ img{background-color:rgba(var(--fg-rgb),.04)}
     opacity:.70;
   }
 }
+
+/* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
+   —— 之前只让照片变亮，但卡片上那层黑色渐变压着它，所以看不出变化 */
+.ml-item::after{ transition:opacity .6s cubic-bezier(.22,.61,.36,1) }
+@media (hover: hover) and (pointer: fine){
+  .ml-item:hover::after{ opacity:.30 }          /* 暗色：遮罩减到三成 */
+}
+@media (hover: none){
+  .ml-item:active::after{ opacity:.30 }
+  .ml-item.touch-show::after{ opacity:.30 }
+}
+[data-theme="light"] .ml-item:hover::after{ opacity:.55 }   /* 浅色本来就是浅遮罩，略减即可 */
+[data-theme="light"] .ml-item.touch-show::after{ opacity:.55 }
