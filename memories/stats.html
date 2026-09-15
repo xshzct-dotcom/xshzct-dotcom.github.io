@@ -23,6 +23,16 @@ h1 em{font-style:italic;color:#7C9B7E;font-weight:400}
 
 .overview{display:flex;gap:10px;margin-bottom:18px}
 .overview>div{flex:1;background:rgba(232,228,218,.03);border:1px solid rgba(232,228,218,.07);border-radius:10px;padding:14px 8px;text-align:center;position:relative;overflow:hidden}
+/* 2026-09-15 ⑦：数字卡加极淡网格纹理作底（同样的"淡化图像"思路，用数据图形代替照片） */
+.overview>div::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(90deg,rgba(232,228,218,.05) 1px,transparent 1px),
+                   linear-gradient(rgba(232,228,218,.05) 1px,transparent 1px);
+  background-size:13px 13px;
+  -webkit-mask-image:linear-gradient(155deg,#000 8%,transparent 70%);
+  mask-image:linear-gradient(155deg,#000 8%,transparent 70%);
+}
+.overview>div>*{position:relative;z-index:1}
 .overview .n{font-size:1.8rem;font-weight:700;line-height:1.2}
 .overview .l{font-size:.72rem;margin-top:3px;color:rgba(232,228,218,.4);text-transform:uppercase;letter-spacing:.5px}
 
