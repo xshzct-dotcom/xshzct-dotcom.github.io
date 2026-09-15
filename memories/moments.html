@@ -22,14 +22,14 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-68">
+<link rel="stylesheet" href="style.css?v=20260915-69">
 <style>
 /* 2026-09-15：触屏设备的"照片显现"效果
    手机没有 hover，改用 :active —— 手指按住卡片时照片浮现，松开淡回。
    过渡时间调短（.28s），避免手指滑动时闪得太明显。 */
 @media (hover: none){
   .ml-item:active .ml-bgimg{
-    filter:brightness(.70) !important;
+    filter:brightness(.95) !important;
     transform:scale(1.02);
     transition:filter .28s ease, opacity .28s ease, transform .3s ease;
   }
@@ -53,7 +53,7 @@
 
 /* 触屏"按到哪张显现哪张"（与桌面 hover 同效，都是 70%） */
 @media (hover: none){
-  .ml-item.touch-show .ml-bgimg{ filter:brightness(.70) !important; transform:scale(1.02) }
+  .ml-item.touch-show .ml-bgimg{ filter:brightness(.95) !important; transform:scale(1.02) }
   [data-theme="light"] .ml-item.touch-show .ml-bgimg{ filter:brightness(1.02) saturate(1) !important; opacity:.70 }
   .ml-item.touch-show{ background:var(--bg-card-hover) }
 }
@@ -163,7 +163,7 @@
 @media (hover: hover) and (pointer: fine){
   .ml-item:hover{background:var(--bg-card-hover)}
   /* 悬停：照片亮到原图 80% */
-  .ml-item:hover .ml-bgimg{filter:brightness(.70);transform:scale(1.02)}
+  .ml-item:hover .ml-bgimg{filter:brightness(.95);transform:scale(1.02)}
 }
 /* 2026-09-15：没有照片的文章 → 用极淡的渐层+光晕替代（避免大片死板的纯色） */
 .ml-item.no-bg{
@@ -392,7 +392,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-68"></script>
+<script src="vendor/supabase.js?v=20260915-69"></script>
 <script>
 (function(){
   'use strict';
