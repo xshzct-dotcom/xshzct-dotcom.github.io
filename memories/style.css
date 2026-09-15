@@ -108,7 +108,7 @@
              linear-gradient(155deg,rgba(32,35,40,.02),transparent 55%),#FFFFFF;
 }
 @media (hover: hover) and (pointer: fine){
-  [data-theme="light"] .ml-item:hover .ml-bgimg{filter:brightness(1.02) saturate(1); opacity:.30; transform:scale(1.025)}
+  [data-theme="light"] .ml-item:hover .ml-bgimg{filter:brightness(1.02) saturate(1); opacity:.80; transform:scale(1.02)}
 }
 
 
