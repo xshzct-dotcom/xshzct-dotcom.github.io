@@ -381,28 +381,32 @@
       _visitId = rows[0].id;
       return;
     }
-    // 2026-09-15：查询 IP 归属地（失败/超时不影响主流程）
+    // 2026-09-15：查询 IP 归属地（多源 + 6 秒超时，失败不影响主流程）
     function _geo(){
       return new Promise(function(res){
         var done = false;
-        var t = setTimeout(function(){ if(!done){ done = true; res({}); } }, 4000);
+        var t = setTimeout(function(){ if(!done){ done = true; res({}); } }, 6000);
+        function ok(g){
+          if(done) return;
+          done = true; clearTimeout(t);
+          res({
+            ip: (g && g.ip) || '',
+            country: (g && (g.country || (g.location && g.location.country))) || '',
+            region: (g && (g.region || g.province || (g.location && g.location.state))) || '',
+            city: (g && (g.city || (g.location && g.location.city))) || ''
+          });
+        }
+        function fail(){ if(!done){ done = true; clearTimeout(t); res({}); } }
+        // 主源：ipwho.is（CORS 友好）
         fetch('https://ipwho.is/', {cache:'no-store'})
           .then(function(r){ return r.json(); })
-          .then(function(g){
-            if(done) return;
-            done = true; clearTimeout(t);
-            res({ ip: (g && g.ip) || '', country: (g && g.country) || '', region: (g && g.region) || '', city: (g && g.city) || '' });
-          })
+          .then(function(g){ if(g && g.success !== false && g.ip) ok(g); else throw new Error('bad'); })
           .catch(function(){
-            // 备用源
-            fetch('https://api.ip.sb/geoip', {cache:'no-store'})
+            // 备源：api.ipapi.is（国内可达，字段在 location 下）
+            fetch('https://api.ipapi.is/', {cache:'no-store'})
               .then(function(r){ return r.json(); })
-              .then(function(g){
-                if(done) return;
-                done = true; clearTimeout(t);
-                res({ ip: (g && g.ip) || '', country: (g && g.country) || '', region: (g && g.region) || '', city: (g && g.city) || '' });
-              })
-              .catch(function(){ if(!done){ done = true; clearTimeout(t); res({}); } });
+              .then(function(g){ if(g && g.ip) ok(g); else throw new Error('bad'); })
+              .catch(fail);
           });
       });
     }
