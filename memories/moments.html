@@ -420,8 +420,11 @@ function _pwOk(v, cb){
     '</div>';
   }
   function renderDetailView(p, prev, next){
+    // 2026-09-15：返回列表是整页跳转，必须在跳转【之前】同步告知主页恢复背景音乐
+    var backJs = "try{window.parent.postMessage('blog-music-stop','*')}catch(e){}"
+               + "setTimeout(function(){location.href='./moments.html'},80);return false;";
     return '<div class="mp-detail-wrap">' +
-      '<a class="ml-back" href="./moments.html">← 返回列表</a>' +
+      '<a class="ml-back" href="./moments.html" onclick="' + backJs + '">← 返回列表</a>' +
       '<h1 class="mp-detail-title">' + esc(titleOf(p)) + '</h1>' +
       '<div class="mp-detail-meta">' + dateOf(p) +
         (p.mood ? ' · ' + esc(p.mood) : '') +
@@ -609,6 +612,14 @@ function _pwOk(v, cb){
     window.addEventListener('pagehide', notifyStop);
     window.addEventListener('beforeunload', notifyStop);
   })();
+
+  // 2026-09-15：接收主页指令（关闭博客画布时停掉正在播放的文章音乐）
+  window.addEventListener('message', function(e){
+    if(!e || !e.data) return;
+    if(e.data === 'stop-iframe-music'){
+      try{ if(audio){ audio.pause(); } }catch(err){}
+    }
+  });
 
   // 访问上报（2026-09-15）：博客页也记录，含"是否通过密码"与设备信息
   (function(){
