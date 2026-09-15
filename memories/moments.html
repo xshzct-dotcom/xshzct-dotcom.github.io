@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260916-23">
+<link rel="stylesheet" href="style.css?v=20260916-24">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -44,7 +44,7 @@
    过渡时间调短（.28s），避免手指滑动时闪得太明显。 */
 @media (hover: none){
   .ml-item:active .ml-bgimg{
-    filter:brightness(1.55) contrast(1.06) saturate(1.08) !important;
+    opacity:1 !important;
     transform:scale(1.02);
     transition:filter .14s ease, opacity .14s ease, transform .14s ease;
   }
@@ -68,7 +68,7 @@
 
 /* 触屏"按到哪张显现哪张"（与桌面 hover 同效，都是 70%） */
 @media (hover: none){
-  .ml-item.touch-show .ml-bgimg{ filter:brightness(1.55) contrast(1.06) saturate(1.08) !important; transform:scale(1.02); transition:filter .3s ease, opacity .3s ease, transform .3s ease }
+  .ml-item.touch-show .ml-bgimg{ opacity:1 !important; transform:scale(1.02); transition:filter .3s ease, opacity .3s ease, transform .3s ease }
   [data-theme="light"] .ml-item.touch-show .ml-bgimg{ filter:brightness(1.02) saturate(1) !important; opacity:.70 }
   .ml-item.touch-show{ background:var(--bg-card-hover) }
 }
@@ -163,7 +163,7 @@
   background:var(--bg-card);border:none;border-radius:3px;overflow:hidden;text-decoration:none;
   transition:background .3s ease}
 .ml-bgimg{position:absolute;inset:0;background-size:cover;background-position:center;
-  filter:brightness(.28);pointer-events:none;
+  opacity:.34;pointer-events:none;
   transition:filter .6s cubic-bezier(.22,.61,.36,1),opacity .6s cubic-bezier(.22,.61,.36,1),transform .7s cubic-bezier(.22,.61,.36,1)}
 /* 渐层遮罩：保证暗色主题下文字始终可读 */
 .ml-item::after{content:'';position:absolute;inset:0;pointer-events:none;
@@ -178,7 +178,7 @@
 @media (hover: hover) and (pointer: fine){
   .ml-item:hover{background:var(--bg-card-hover)}
   /* 悬停：照片亮到原图 80% */
-  .ml-item:hover .ml-bgimg{filter:brightness(1.55) contrast(1.06) saturate(1.08);transform:scale(1.02)}
+  .ml-item:hover .ml-bgimg{opacity:1;transform:scale(1.02)}
 }
 /* 2026-09-15：没有照片的文章 → 用极淡的渐层+光晕替代（避免大片死板的纯色） */
 .ml-item.no-bg{
@@ -225,7 +225,7 @@
   .ml-item{min-height:0;padding:18px 18px 20px}
   .ml-title{font-size:1.14rem}
   .ml-excerpt{-webkit-line-clamp:4}
-  .ml-bgimg{opacity:.26}
+  .ml-bgimg{opacity:.34}
   .ml-item::after{background:linear-gradient(180deg,rgba(14,17,22,.26) 0%,rgba(14,17,22,.62) 62%,rgba(14,17,22,.78) 100%)}
 }
 /* 无图卡片（纯文字日记）不加照片块，保持简洁底纹 */
@@ -407,7 +407,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260916-23"></script>
+<script src="vendor/supabase.js?v=20260916-24"></script>
 <script>
 (function(){
   'use strict';
