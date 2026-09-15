@@ -147,7 +147,7 @@ function _pwOk(v, cb){
 <div id="content"><div class="msg ld">加载中···</div></div>
 
 <!-- Supabase SDK：本地托管（同主页），避免外部 CDN 加载失败 -->
-<script src="vendor/supabase.js?v=20260916-15"></script>
+<script src="vendor/supabase.js?v=20260916-17"></script>
 <script>
   if (typeof supabase === 'undefined') {
     document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
@@ -271,32 +271,6 @@ async function render(){
       html+='<div class="hour-cell'+(pct>.6?' hot':pct>.3?' warm':'')+'"><span class="hc">'+(hourly[i]||0)+'</span>'+(i<10?'0':'')+i+':00</div>';
     }
     html+='</div></div>';
-
-    // 页面排名（2026-09-16：合并带 ?v= 版本号的 URL，避免同一个页面被拆成多条）
-    var normMap = {};
-    (pages||[]).forEach(function(p){
-      var key = String(p).split('?')[0];                 // 去掉全部查询参数
-      if(!key || key === '/') key = '/（首页）';
-      normMap[key] = (normMap[key] || 0) + pageMap[p];
-    });
-    var normPages = Object.keys(normMap).sort(function(a,b){ return normMap[b]-normMap[a]; });
-    html+='<div class="section"><h2>📄 哪些页面被看得多</h2>';
-    if(normPages.length){
-      normPages.forEach(function(p){
-        html+='<div class="list-item"><span class="p">'+esc(p)+'</span><span class="c">'+normMap[p]+'</span></div>';
-      });
-    }else{html+='<div class="empty">这一天没人访问过</div>';}
-    html+='</div>';
-
-    // 来源
-    var refs=Object.keys(refMap).sort(function(a,b){return refMap[b]-refMap[a];}).slice(0,10);
-    if(refs.length){
-      html+='<div class="section"><h2>🔗 访客是从哪点进来的</h2>';
-      refs.forEach(function(r){
-        html+='<div class="list-item"><span class="p" style="font-size:.8rem;color:rgba(232,228,218,.5)">'+r+'</span><span class="c">'+refMap[r]+'</span></div>';
-      });
-      html+='</div>';
-    }
 
     // 详情
     html+='<div class="section"><h2>📋 每一次访问（含访客信息）</h2><div class="scroll"><table><thead><tr><th>时间</th><th>页面</th><th>停留</th><th>访客地区</th><th>来源</th></tr></thead><tbody>';
