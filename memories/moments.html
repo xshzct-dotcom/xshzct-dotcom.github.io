@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-62">
+<link rel="stylesheet" href="style.css?v=20260915-63">
 <style>
   /* 2026-09-15：浅色主题（与主页同步，通过 postMessage 切换） */
   [data-theme="light"]{
@@ -112,7 +112,7 @@
   transition:background .3s ease}
 .ml-bgimg{position:absolute;inset:0;background-size:cover;background-position:center;
   filter:brightness(.44);pointer-events:none;
-  transition:filter .38s ease,transform .6s ease}
+  transition:filter .6s cubic-bezier(.22,.61,.36,1),opacity .6s cubic-bezier(.22,.61,.36,1),transform .7s cubic-bezier(.22,.61,.36,1)}
 /* 渐层遮罩：保证暗色主题下文字始终可读 */
 .ml-item::after{content:'';position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(180deg,rgba(14,17,22,.34) 0%,rgba(14,17,22,.62) 55%,rgba(14,17,22,.76) 100%)}
@@ -126,7 +126,7 @@
 @media (hover: hover) and (pointer: fine){
   .ml-item:hover{background:var(--bg-card-hover)}
   /* 悬停：照片亮到原图 80% */
-  .ml-item:hover .ml-bgimg{filter:brightness(.80);transform:scale(1.02)}
+  .ml-item:hover .ml-bgimg{filter:brightness(.70);transform:scale(1.02)}
 }
 /* 2026-09-15：没有照片的文章 → 用极淡的渐层+光晕替代（避免大片死板的纯色） */
 .ml-item.no-bg{
@@ -355,7 +355,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-62"></script>
+<script src="vendor/supabase.js?v=20260915-63"></script>
 <script>
 (function(){
   'use strict';
