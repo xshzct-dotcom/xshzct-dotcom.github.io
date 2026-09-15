@@ -68,7 +68,13 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .nav-brand{font-family:var(--font-display);font-size:1.25rem;font-weight:700;color:var(--text);letter-spacing:.5px;cursor:pointer;user-select:none}
 .nav-brand em{font-style:italic;color:var(--accent);font-weight:400}
 .nav-right{display:flex;align-items:center;gap:6px}
-.nav-links{display:flex;gap:24px;align-items:center}
+/* 2026-09-15：导航项在屏幕正中（绝对居中，不受左右元素宽度影响） */
+.nav-links{display:flex;gap:24px;align-items:center;
+  position:absolute;left:50%;transform:translateX(-50%)}
+@media(max-width:820px){
+  /* 窄屏：恢复流式排布，避免与品牌/按钮重叠 */
+  .nav-links{position:static;transform:none}
+}
 .nav-links a{font-size:.9rem;color:var(--text-dim);font-weight:500;letter-spacing:.3px;position:relative;padding:4px 0}
 .nav-links a::after{content:'';position:absolute;bottom:-2px;left:0;width:0;height:1.5px;background:var(--accent);transition:width .3s var(--ease)}
 .nav-links a:hover,.nav-links a.active{color:var(--text)}
