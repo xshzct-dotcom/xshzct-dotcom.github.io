@@ -1133,9 +1133,43 @@ function initMusic(){
   // 进度条拖动支持（鼠标 + 触摸）
   initSeekBar();
 }
+/* ===== 2026-09-16：刷新后延续上次播放 =====
+   浏览器不允许"无用户交互就出声"，所以：
+   ① 先尝试直接 play()（浏览器可能因媒体参与度而放行）
+   ② 被拒就显示"▶ 继续播放上次的歌"提示，用户点一下即接上（含原进度） */
+function hideResumeTip(){
+  var tip = document.getElementById('resumeTip');
+  if(tip) tip.hidden = true;
+}
+function showResumeTip(){
+  var tip = document.getElementById('resumeTip');
+  if(!tip || window._userStarted) return;
+  tip.hidden = false;
+}
+function maybeResumePlay(){
+  try{
+    if(!bgMusic || !bgMusic.src || bgMusic.src === window.location.href) return;
+    var saved = localStorage.getItem('musicResume_lastSong');
+    if(!saved) return;
+    var o = JSON.parse(saved);
+    if(!o || !o.ts || (Date.now() - o.ts) >= 3600000) return;
+    bgMusic.play().then(function(){ hideResumeTip(); })
+                 .catch(function(){ showResumeTip(); });
+  }catch(e){}
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var tip = document.getElementById('resumeTip');
+  if(tip) tip.addEventListener('click', function(){
+    window._userStarted = true;
+    hideResumeTip();
+    if(bgMusic && bgMusic.paused) bgMusic.play().catch(function(){});
+  });
+});
+
 function _grant(){ 
   if(window._userStarted) return;
   window._userStarted = true;
+  hideResumeTip();
   // 如果 switchPlaylist 已加载好歌，立即播放（恢复 paused 检查）
   if(bgMusic && bgMusic.src && bgMusic.src !== window.location.href && bgMusic.paused){
     bgMusic.play().catch(function(){});
@@ -1169,6 +1203,8 @@ function switchPlaylist(songs){
 
   currentSongIdx = (resumeIdx >= 0 && resumeIdx < window._currentSongs.length) ? resumeIdx : 0;
   playSong(currentSongIdx, true); // 传入 true 表示需要从 localStorage 恢复进度
+  // 2026-09-16：加载完歌之后尝试自动续播（失败则出提示条）
+  setTimeout(maybeResumePlay, 300);
 }
 function playSong(idx, seekFromStorage){
   const s=window._currentSongs;
