@@ -75,8 +75,8 @@
   --border: rgba(0,0,0,.09);
   --border-hover: rgba(0,0,0,.18);
   --text: #1F2226;                 /* 墨色 */
-  --text-dim: rgba(32,35,40,.74);
-  --text-muted: rgba(32,35,40,.56);
+  --text-dim: rgba(32,35,40,.80);
+  --text-muted: rgba(32,35,40,.62);
   --accent: #5E7D60;               /* 深一点的鼠尾草绿，浅底更清晰 */
   --accent-2: #B06A4C;
   --accent-glow: rgba(94,125,96,.14);
