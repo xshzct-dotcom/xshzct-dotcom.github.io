@@ -214,7 +214,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .river-filter.active{background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
 
 .river{overflow:hidden;padding:20px 0;position:relative}
-.river-stream{display:flex;gap:60px;padding:20px 50px;overflow-x:auto;scroll-behavior:smooth;scrollbar-width:thin;cursor:grab;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;touch-action:pan-x}
+.river-stream{display:flex;gap:60px;padding:20px 50px;overflow-x:auto;scroll-behavior:smooth;scrollbar-width:thin;cursor:grab;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
 .river-stream::after{content:'';flex:0 0 30px}
 .river-stream:active{cursor:grabbing}
 .river-stream::-webkit-scrollbar{height:4px}
@@ -652,16 +652,11 @@ img{background-color:rgba(var(--fg-rgb),.04)}
 @media (hover: none), (pointer: coarse){
   .river-stream{
     scroll-behavior:auto !important;   /* 触屏关掉平滑滚动：它会和手指滑动打架 */
-    touch-action:pan-x !important;     /* 明确只响应横向平移，避免被判定为缩放手势 */
+    touch-action:manipulation;         /* 允许横竖滑动与缩放，仅禁用双击缩放（不要用 pan-x，那会禁掉上下滚） */
     cursor:auto !important;            /* 触屏不需要 grab 光标 */
     -webkit-overflow-scrolling:touch;
   }
   .river-stream:active{cursor:auto}
-  /* 触屏去掉卡片过渡与 hover 大效果 —— 滑动时重绘开销大，会"卡住"手指 */
+  /* 触屏：只去掉过渡（减少重绘），不动 transform（避免干扰手势判定） */
   .polaroid{transition:none !important}
-  .polaroid:hover, .polaroid:active{
-    transform:none !important;
-    box-shadow:var(--shadow-md) !important;
-  }
-  .polaroid:hover .polaroid-caption{opacity:0}
 }
