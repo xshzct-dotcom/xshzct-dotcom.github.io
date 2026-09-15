@@ -96,7 +96,7 @@
 [data-theme="light"] .nav.scrolled{background:rgba(247,245,240,.88);border-bottom-color:rgba(32,35,40,.08)}
 /* 2026-09-15 修正：浅色下【不再用白色遮罩】（那会把文字洗白看不清）
    改为：照片用不透明度淡化，文字保持深色直接压在上面 —— 与参考站一致 */
-[data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.22}
+[data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.14}
 [data-theme="light"] .ml-item{background:#FFFFFF}
 [data-theme="light"] .ml-item::after{background:linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.18) 60%,rgba(255,255,255,.30) 100%)}
 [data-theme="light"] .ml-title{color:#08090A;font-weight:700}
@@ -108,7 +108,7 @@
              linear-gradient(155deg,rgba(32,35,40,.02),transparent 55%),#FFFFFF;
 }
 @media (hover: hover) and (pointer: fine){
-  [data-theme="light"] .ml-item:hover .ml-bgimg{filter:brightness(1.02) saturate(1); opacity:.44; transform:scale(1.025)}
+  [data-theme="light"] .ml-item:hover .ml-bgimg{filter:brightness(1.02) saturate(1); opacity:.06; transform:scale(1.025)}
 }
 
 
