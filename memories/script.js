@@ -1445,8 +1445,15 @@ async function ensureSync(){
       });
     }
     if(!essaysCount || essaysCount === 0){
-      for(let i=0; i<allEssays.length; i+=50){
-        await SB.from('essays').insert(allEssays.slice(i, i+50));
+      // 2026-09-16 修复：插入前按标题查重，避免"误判表空"导致整批重复插入
+      let existTitles = new Set();
+      try{
+        const {data: existRows} = await SB.from('essays').select('title');
+        existTitles = new Set((existRows||[]).map(r => String(r.title||'').trim()));
+      }catch(e){ console.warn('[sync] essays 查重失败，跳过插入以防重复', e); }
+      const toInsertEssays = allEssays.filter(a => !existTitles.has(String(a.title||'').trim()));
+      for(let i=0; i<toInsertEssays.length; i+=50){
+        await SB.from('essays').insert(toInsertEssays.slice(i, i+50));
       }
     }
     // 有数据 → 不再补缺（用户删了就是删了，DB 是 source of truth）
@@ -1461,7 +1468,11 @@ async function ensureSync(){
       }));
       if(!albumsCount || albumsCount === 0){
         try{
-          const r = await SB.from('albums').insert(allAlbums);
+          // 2026-09-16 修复：插入前查重，避免误判表空导致整批重复
+          const {data:_exA} = await SB.from('albums').select('title');
+          const _existA = new Set((_exA||[]).map(x => String(x.title||'').trim()));
+          const _insA = allAlbums.filter(x => !_existA.has(String(x.title||'').trim()));
+          const r = await SB.from('albums').insert(_insA);
         } catch(e){
           console.warn('[memories] albums insert error:', e.message, e.details);
         }
@@ -1496,7 +1507,11 @@ async function ensureSync(){
       })).filter(m => m.title);
       if(allMusic.length === 0) return;
       if(!musicCount || musicCount === 0){
-        await SB.from('music').insert(allMusic);
+        // 2026-09-16 修复：插入前查重
+          const {data:_exM} = await SB.from('music').select('title');
+          const _existM = new Set((_exM||[]).map(x => String(x.title||'').trim()));
+          const _insM = allMusic.filter(x => !_existM.has(String(x.title||'').trim()));
+          await SB.from('music').insert(_insM);
       }
       // 有数据 → 不再补缺，DB 是 source of truth
     }
