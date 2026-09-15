@@ -1,18 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script>
-/* 2026-09-15：主题必须在【首次渲染前】应用，否则会先黑后白闪一下。
-   放在 <head> 顶部，任何 CSS/内容渲染之前执行。
-   规则：默认暗色；只有用户主动切过浅色才记住。 */
-(function(){
-  try{
-    if(localStorage.getItem('memories.theme') === 'light'){
-      document.documentElement.setAttribute('data-theme','light');
-    }
-  }catch(e){}
-})();
-</script>
 <meta charset="UTF-8">
 <meta http-equiv="Cache-Control" content="no-cache,must-revalidate">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -23,7 +11,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-55">
+<link rel="stylesheet" href="style.css?v=20260915-56">
 <style>
   /* 2026-09-15：浅色主题（与主页同步，通过 postMessage 切换） */
   [data-theme="light"]{
@@ -356,7 +344,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-55"></script>
+<script src="vendor/supabase.js?v=20260915-56"></script>
 <script>
 (function(){
   'use strict';
@@ -840,14 +828,8 @@ function _pwOk(v, cb){
       else document.documentElement.removeAttribute('data-theme');
     }
   });
-  // 2026-09-15：无论是否在 iframe 中，都先按本地偏好应用主题
-  // （同源共享 localStorage；父页面的 postMessage 只是后续切换时的同步手段）
-  (function(){
-    try{
-      if(localStorage.getItem('memories.theme') === 'light') document.documentElement.setAttribute('data-theme','light');
-      else document.documentElement.removeAttribute('data-theme');
-    }catch(e){}
-  })();
+  // 2026-09-15：默认暗色（不读本地存储）；浅色只由父页面的 postMessage 在本次会话内同步
+  document.documentElement.removeAttribute('data-theme');
 
   // 访问上报（2026-09-15）：博客页也记录，含"是否通过密码"与设备信息
   (function(){
