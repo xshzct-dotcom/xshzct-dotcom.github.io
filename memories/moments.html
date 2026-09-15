@@ -57,25 +57,28 @@
 /* 2026-09-15：3 列网格（参考站排列），照片作为卡片内的实体元素 */
 .ml-list{max-width:1120px;margin:0 auto;padding:22px 26px 84px;
   display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
-/* 2026-09-15：照片作为卡片内的实体元素（固定高度，非正方形卡片） */
-.ml-item{position:relative;display:block;padding:16px;background:var(--bg-card);
-  border:none;border-radius:3px;overflow:hidden;text-decoration:none;
+/* 2026-09-15 最终版（参考 thelongestway）：照片【淡化后铺满整张卡片】作背景，文字叠在上面。
+   亮度：默认 44%（昏暗可见），鼠标悬停 80%（照片亮起来） */
+.ml-item{position:relative;display:block;padding:20px 20px 22px;min-height:196px;
+  background:var(--bg-card);border:none;border-radius:3px;overflow:hidden;text-decoration:none;
   transition:background .3s ease}
-.ml-photo{width:100%;height:172px;background-size:cover;background-position:center;
-  border-radius:2px;margin-bottom:14px;background-color:var(--bg-elevated);
-  filter:brightness(.44);
-  transition:filter .35s ease,transform .5s ease}
+.ml-bgimg{position:absolute;inset:0;background-size:cover;background-position:center;
+  filter:brightness(.44);pointer-events:none;
+  transition:filter .38s ease,transform .6s ease}
+/* 渐层遮罩：保证暗色主题下文字始终可读 */
+.ml-item::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(14,17,22,.34) 0%,rgba(14,17,22,.62) 55%,rgba(14,17,22,.76) 100%)}
 .ml-body{position:relative;z-index:1}
-.ml-date{font-size:.72rem;color:rgba(232,228,218,.5);letter-spacing:.7px;margin-bottom:9px}
+.ml-date{font-size:.72rem;color:rgba(232,228,218,.52);letter-spacing:.7px;margin-bottom:9px}
 .ml-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.1rem;font-weight:600;
   color:var(--text);margin:0 0 9px;line-height:1.5;letter-spacing:.2px}
 .ml-title-empty{color:var(--text-dim);font-weight:400;font-size:1rem}
-.ml-excerpt{font-size:.82rem;color:rgba(232,228,218,.62);line-height:1.85;margin:0;overflow:hidden;
+.ml-excerpt{font-size:.82rem;color:rgba(232,228,218,.64);line-height:1.85;margin:0;overflow:hidden;
   display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
 @media (hover: hover) and (pointer: fine){
   .ml-item:hover{background:var(--bg-card-hover)}
-  /* 悬停时照片提升到原图 80% 亮度 */
-  .ml-item:hover .ml-photo{filter:brightness(.80);transform:scale(1.015)}
+  /* 悬停：照片亮到原图 80% */
+  .ml-item:hover .ml-bgimg{filter:brightness(.80);transform:scale(1.025)}
 }
 /* 2026-09-15：没有照片的文章 → 用极淡的渐层+光晕替代（避免大片死板的纯色） */
 .ml-item.no-bg{
@@ -470,7 +473,7 @@ function _pwOk(v, cb){
     // 2026-09-15：照片淡化铺底（参考 thelongestway）；文字顺序改为 日期→标题→摘要
     var bgStyle = thumb ? "background-image:url('" + String(thumb).replace(/'/g, '%27') + "')" : '';
     return '<a class="ml-item' + (thumb ? '' : ' no-bg') + '" href="?id=' + encodeURIComponent(p.id) + '">' +
-      (thumb ? '<div class="ml-photo" style="' + bgStyle + '" aria-hidden="true"></div>' : '') +
+      (thumb ? '<span class="ml-bgimg" style="' + bgStyle + '" aria-hidden="true"></span>' : '') +
       '<div class="ml-body">' +
         '<div class="ml-date">' + meta + '</div>' +
         '<h2 class="ml-title' + (hasTitle ? '' : ' ml-title-empty') + '">' + esc(titleOf(p)) + '</h2>' +
