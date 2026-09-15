@@ -521,3 +521,28 @@ html,body,.nav,.nav-icon-btn,.section,.nav-brand,.hero-title,.hero-sub,.hero-con
 /* 白色模式选择文本颜色 */
 
 /* 白色模式滚动条 */
+
+
+/* ===== 2026-09-15 全局质感与无障碍提升 ===== */
+
+/* 键盘焦点可见（鼠标点击时不显示，避免视觉噪音） */
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+:focus:not(:focus-visible){outline:none}
+
+/* 尊重系统「减少动效」偏好（无障碍） */
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
+}
+
+/* 图片占位底色：加载时不再白闪/跳动 */
+img{background-color:rgba(var(--fg-rgb),.04)}
+
+/* 触屏设备统一按下反馈（替代 hover 的轻量版） */
+@media (hover: none){
+  button:active, .nav-icon-btn:active, .river-card:active{opacity:.75;transition:opacity .08s}
+}
