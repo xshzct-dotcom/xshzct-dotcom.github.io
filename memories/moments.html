@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-71">
+<link rel="stylesheet" href="style.css?v=20260916-8">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -76,12 +76,12 @@
   /* 2026-09-15：浅色主题（与主页同步，通过 postMessage 切换） */
   [data-theme="light"]{
     --fg-rgb: 32,35,40;
-    --bg: #F7F5F0;
+    --bg: #FFFFFF;
     --bg-elevated: #FFFFFF;
     --bg-card: #FFFFFF;
-    --bg-card-hover: #F1EDE6;
-    --border: rgba(32,35,40,.10);
-    --border-hover: rgba(32,35,40,.20);
+    --bg-card-hover: #F7F7F8;
+    --border: rgba(0,0,0,.09);
+    --border-hover: rgba(0,0,0,.18);
     --text: #1F2226;
     --text-dim: rgba(32,35,40,.64);
     --text-muted: rgba(32,35,40,.42);
@@ -92,7 +92,7 @@
   /* 2026-09-15 修正：不加白色遮罩（会把文字洗白），改为照片淡化 + 深色文字 */
   [data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.14}
   [data-theme="light"] .ml-item{background:#FFFFFF}
-  [data-theme="light"] .ml-item::after{background:linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.18) 60%,rgba(255,255,255,.30) 100%)}
+  [data-theme="light"] .ml-item::after{background:linear-gradient(180deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.24) 60%,rgba(255,255,255,.36) 100%)}
   /* 2026-09-15：浅色下加深加粗（原来偏细偏淡，白底上发虚看不清） */
   [data-theme="light"] .ml-title{color:#08090A;font-weight:700}
   [data-theme="light"] .ml-title-empty{color:rgba(32,35,40,.86);font-weight:500}
@@ -407,7 +407,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-71"></script>
+<script src="vendor/supabase.js?v=20260916-8"></script>
 <script>
 (function(){
   'use strict';
