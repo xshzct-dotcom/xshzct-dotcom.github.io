@@ -466,18 +466,18 @@ function _pwOk(v, cb){
       if(tm) tm.textContent = '0:00 / ' + fmtT(audio.duration);
     });
     audio.addEventListener('play', function(){
+      // 2026-09-15：先发通知（必须在 curBar 判空之前，否则页面切换时发不出去）
+      try{ window.parent.postMessage('blog-music-play', '*'); }catch(e){}
       if(!curBar) return;
       var b = curBar.querySelector('.mp-play');
       if(b){ b.textContent = '⏸'; b.classList.add('playing'); }
-      // 2026-09-15：通知主页暂停它的背景音乐（避免两首歌打架）
-      try{ window.parent.postMessage('blog-music-play', '*'); }catch(e){}
     });
     audio.addEventListener('pause', function(){
+      // 2026-09-15：先发通知（同上），让主页从原进度继续
+      try{ window.parent.postMessage('blog-music-stop', '*'); }catch(e){}
       if(!curBar) return;
       var b = curBar.querySelector('.mp-play');
       if(b){ b.textContent = '▶'; b.classList.remove('playing'); }
-      // 2026-09-15：本页音乐停下 → 让主页从原进度继续播放
-      try{ window.parent.postMessage('blog-music-stop', '*'); }catch(e){}
     });
     audio.addEventListener('waiting', function(){
       if(curBar){ var b = curBar.querySelector('.mp-play'); if(b) b.textContent = '⋯'; }
