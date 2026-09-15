@@ -22,8 +22,23 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-69">
+<link rel="stylesheet" href="style.css?v=20260915-70">
 <style>
+
+/* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
+   —— 之前只让照片变亮，但卡片上那层黑色渐变压着它，所以看不出变化 */
+.ml-item::after{ transition:opacity .6s cubic-bezier(.22,.61,.36,1) }
+@media (hover: hover) and (pointer: fine){
+  .ml-item:hover::after{ opacity:.30 }          /* 暗色：遮罩减到三成 */
+}
+@media (hover: none){
+  .ml-item:active::after{ opacity:.30 }
+  .ml-item.touch-show::after{ opacity:.30 }
+}
+[data-theme="light"] .ml-item:hover::after{ opacity:.55 }   /* 浅色本来就是浅遮罩，略减即可 */
+[data-theme="light"] .ml-item.touch-show::after{ opacity:.55 }
+
+
 /* 2026-09-15：触屏设备的"照片显现"效果
    手机没有 hover，改用 :active —— 手指按住卡片时照片浮现，松开淡回。
    过渡时间调短（.28s），避免手指滑动时闪得太明显。 */
@@ -392,7 +407,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-69"></script>
+<script src="vendor/supabase.js?v=20260915-70"></script>
 <script>
 (function(){
   'use strict';
