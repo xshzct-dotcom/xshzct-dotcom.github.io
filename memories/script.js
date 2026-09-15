@@ -71,7 +71,12 @@ $$('.nav-links a').forEach(a=>a.onclick=(e)=>{
   // 2026-09-15：博客改为在主页内横滑打开（不跳转新页面）
   if(a.id === 'navBlogLink'){
     e.preventDefault();
-    if(typeof window.openBlog === 'function') window.openBlog();
+    // 2026-09-15：已打开时再点一次收起（toggle）
+    if(typeof window.isBlogOpen === 'function' && window.isBlogOpen()){
+      if(typeof window.closeBlog === 'function') window.closeBlog();
+    } else if(typeof window.openBlog === 'function'){
+      window.openBlog();
+    }
   }
 });
 
