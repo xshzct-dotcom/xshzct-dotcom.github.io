@@ -14,9 +14,9 @@
 <link rel="stylesheet" href="style.css?v=20260914-07">
 <style>
 /* ===== 动态页专属样式（2026-09-11） ===== */
-/* 2026-09-15：与详情页 .mp-detail-wrap 同宽同边距，使返回箭头垂直对齐（统一左上角） */
+/* 2026-09-15：顶部返回箭头统一贴屏幕左上角（列表页与详情页一致） */
 .mp-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;
-  max-width:668px;margin:0 auto;padding:16px;
+  padding:14px 18px;
   background:rgba(14,17,22,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-bottom:1px solid var(--border)}
 .mp-back{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
@@ -103,8 +103,12 @@
   }
 }
 /* 详情页 */
-.mp-detail-wrap{max-width:668px;margin:0 auto;padding:18px 16px 80px}
-.ml-back{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;color:var(--text-dim);text-decoration:none;margin-bottom:20px;transition:color .2s}
+/* 2026-09-15：容器不再做定位锚点，让 .ml-back 相对视口贴左上角 */
+.mp-detail-wrap{max-width:668px;margin:0 auto;padding:56px 16px 80px}
+/* 2026-09-15：详情页的返回按钮也贴屏幕左上角（与列表页箭头同一位置） */
+.ml-back{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;color:var(--text-dim);
+  text-decoration:none;transition:color .2s;
+  position:absolute;left:18px;top:14px;margin:0;z-index:5}
 
 .mp-detail-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.95rem;font-weight:700;color:var(--text);margin:0 0 12px;line-height:1.45;letter-spacing:.5px}
 .mp-detail-meta{font-size:.86rem;color:var(--text-muted);margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border);letter-spacing:.3px}
