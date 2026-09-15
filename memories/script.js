@@ -1635,6 +1635,25 @@ function init(){
   mo.observe(document.body,{childList:true,subtree:true});
 }
 
+// ===== 2026-09-15：供博客页(iframe)调用，实现音乐互斥 =====
+// 博客里的歌播放 → 主页背景乐暂停（进度自动保留）；博客的歌停下 → 主页从原进度继续
+window.pauseHomeMusic = function(){
+  try{
+    if(bgMusic && !bgMusic.paused){
+      window._homeMusicWasPlaying = true;
+      bgMusic.pause();          // 只暂停，currentTime 自然保留
+    }
+  }catch(e){}
+};
+window.resumeHomeMusic = function(){
+  try{
+    if(window._homeMusicWasPlaying && bgMusic && bgMusic.paused){
+      bgMusic.play().catch(function(){});
+      window._homeMusicWasPlaying = false;
+    }
+  }catch(e){}
+};
+
 if(document.readyState==='complete') init();
 else window.addEventListener('load',init);
 
