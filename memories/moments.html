@@ -53,26 +53,28 @@
 .mp-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 
 /* ===== 列表页（2026-09-14：动态改为"列表 → 详情"）===== */
-.ml-list{max-width:700px;margin:0 auto;padding:16px 16px 70px;display:flex;flex-direction:column;gap:14px}
-/* 2026-09-15 视觉升级（参考 thelongestway 风格）：
-   照片【淡化】后铺满卡片作背景 → 日期(小灰字)/标题(大字)/摘要(灰字) 叠在上面。
-   无边框、小圆角，靠底色与图像层次区分层次。 */
-.ml-item{position:relative;display:block;padding:24px 22px 22px;background:var(--bg-card);
-  border:none;border-radius:5px;overflow:hidden;text-decoration:none;
+/* 2026-09-15：排列一比一复刻 thelongestway —— 3 列网格 / 近直角 / 照片浓度约30% */
+.ml-list{max-width:1180px;margin:0 auto;padding:20px 26px 84px;
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+.ml-item{position:relative;display:block;padding:20px 20px 22px;min-height:196px;
+  background:var(--bg-card);border:none;border-radius:2px;overflow:hidden;text-decoration:none;
   transition:background .3s ease}
+/* 照片浓度 30%（参考站照片清晰可见，此处适配暗色主题并加渐层保证文字可读） */
 .ml-bgimg{position:absolute;inset:0;background-size:cover;background-position:center;
-  opacity:.13;pointer-events:none;filter:saturate(.9);
-  transition:opacity .45s ease,transform .7s ease}
-.ml-body{position:relative;z-index:1}
-.ml-date{font-size:.72rem;color:var(--text-muted);letter-spacing:.7px;margin-bottom:10px}
-.ml-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.17rem;font-weight:600;
-  color:var(--text);margin:0 0 10px;line-height:1.45;letter-spacing:.2px}
-.ml-title-empty{color:var(--text-dim);font-weight:400;font-size:1.05rem}
-.ml-excerpt{font-size:.86rem;color:var(--text-dim);line-height:1.88;margin:0;overflow:hidden;
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+  opacity:.30;pointer-events:none;filter:saturate(.78) contrast(.96);
+  transition:opacity .45s ease,transform .75s ease}
+.ml-item::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(14,17,22,.30) 0%,rgba(14,17,22,.66) 62%,rgba(14,17,22,.80) 100%)}
+.ml-body{position:relative;z-index:1;display:flex;flex-direction:column;height:100%}
+.ml-date{font-size:.72rem;color:rgba(232,228,218,.5);letter-spacing:.7px;margin-bottom:9px}
+.ml-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.1rem;font-weight:600;
+  color:var(--text);margin:0 0 9px;line-height:1.5;letter-spacing:.2px}
+.ml-title-empty{color:var(--text-dim);font-weight:400;font-size:1rem}
+.ml-excerpt{font-size:.82rem;color:rgba(232,228,218,.62);line-height:1.85;margin:0;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
 @media (hover: hover) and (pointer: fine){
   .ml-item:hover{background:var(--bg-card-hover)}
-  .ml-item:hover .ml-bgimg{opacity:.26;transform:scale(1.035)}
+  .ml-item:hover .ml-bgimg{opacity:.44;transform:scale(1.04)}
 }
 /* 2026-09-15：没有照片的文章 → 用极淡的渐层+光晕替代（避免大片死板的纯色） */
 .ml-item.no-bg{
@@ -103,12 +105,19 @@
 .mp-detail-nav{margin-top:34px;padding-top:18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:12px}
 .mp-detail-nav a{font-size:.84rem;color:var(--text-dim);text-decoration:none}
 
-@media(max-width:520px){
-  .ml-item{padding:20px 18px 18px}
-  .ml-title{font-size:1.1rem}
-  .ml-excerpt{-webkit-line-clamp:3}
-  .ml-bgimg{opacity:.10}
+@media(max-width:940px){
+  .ml-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:18px 18px 76px}
 }
+@media(max-width:600px){
+  .ml-list{grid-template-columns:1fr;gap:12px;padding:14px 14px 72px}
+  .ml-item{min-height:0;padding:18px 18px 20px}
+  .ml-title{font-size:1.06rem}
+  .ml-excerpt{-webkit-line-clamp:4}
+  .ml-bgimg{opacity:.26}
+  .ml-item::after{background:linear-gradient(180deg,rgba(14,17,22,.26) 0%,rgba(14,17,22,.62) 62%,rgba(14,17,22,.78) 100%)}
+}
+/* 无图卡片（纯文字日记）保留渐层底纹 */
+.ml-item.no-bg{background:var(--bg-card)}
 /* 兜底：display:flex 会覆盖 hidden 属性，必须显式处理（2026-09-12 踩过这个坑） */
 .ml-list[hidden],#mpDetail[hidden]{display:none!important}
 
