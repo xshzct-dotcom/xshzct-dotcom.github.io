@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-65">
+<link rel="stylesheet" href="style.css?v=20260915-66">
 <style>
   /* 2026-09-15：浅色主题（与主页同步，通过 postMessage 切换） */
   [data-theme="light"]{
@@ -60,6 +60,7 @@
 /* ===== 动态页专属样式（2026-09-11） ===== */
 /* 2026-09-15：顶部返回箭头统一贴屏幕左上角（列表页与详情页一致） */
 .mp-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;
+  transition:opacity .3s ease, transform .3s ease;
   padding:14px 18px;
   background:rgba(14,17,22,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-bottom:1px solid var(--border)}
@@ -73,6 +74,8 @@
 .mp-head{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-bottom:none!important;padding:16px}
 .mp-head h1, .mp-head .mp-stat{display:none!important}
 .mp-head.detail{display:none!important}
+/* 2026-09-15：下滑时隐藏顶部返回（像浏览器地址栏），上滑或回顶时出现 */
+.mp-head.head-hidden{opacity:0;transform:translateY(-100%);pointer-events:none}
 .mp-head h1{font-family:var(--font-display);font-size:1.15rem;font-weight:500;letter-spacing:2px;flex:1;margin:0}
 .mp-head h1 em{font-style:normal;color:var(--accent)}
 .mp-stat{font-size:.75rem;color:var(--text-muted);font-family:var(--font-display)}
@@ -355,7 +358,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-65"></script>
+<script src="vendor/supabase.js?v=20260915-66"></script>
 <script>
 (function(){
   'use strict';
@@ -919,6 +922,23 @@ function _pwOk(v, cb){
     }
   }
 
+  // 2026-09-15：移动端顶部返回键"下滑隐藏/上滑显示"（避免一直占着左上角）
+  (function(){
+    var hd = document.querySelector('.mp-head');
+    if(!hd) return;
+    var lastY = window.scrollY, ticking = false;
+    window.addEventListener('scroll', function(){
+      if(ticking) return;
+      ticking = true;
+      requestAnimationFrame(function(){
+        var y = window.scrollY;
+        if(y > lastY + 6 && y > 80){ hd.classList.add('head-hidden'); }
+        else if(y < lastY - 6 || y <= 80){ hd.classList.remove('head-hidden'); }
+        lastY = y;
+        ticking = false;
+      });
+    }, {passive:true});
+  })();
   bindEvents();   // 2026-09-15：事件委托只绑一次（含无刷新路由的点击拦截）
   load();
 })();
