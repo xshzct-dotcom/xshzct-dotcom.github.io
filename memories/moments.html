@@ -420,9 +420,9 @@ function _pwOk(v, cb){
     '</div>';
   }
   function renderDetailView(p, prev, next){
-    // 2026-09-15：返回列表是整页跳转，必须在跳转【之前】同步告知主页恢复背景音乐
-    var backJs = "try{window.parent.postMessage('blog-music-stop','*')}catch(e){}"
-               + "setTimeout(function(){location.href='./moments.html'},80);return false;";
+    // 2026-09-15：返回列表已改为无刷新切换（点击由事件委托拦截）；
+    // 这里只需在点击时同步告知主页恢复背景音乐
+    var backJs = "try{window.parent.postMessage('blog-music-stop','*')}catch(e){}";
     return '<div class="mp-detail-wrap">' +
       '<a class="ml-back" href="./moments.html" onclick="' + backJs + '">← 返回列表</a>' +
       '<h1 class="mp-detail-title">' + esc(titleOf(p)) + '</h1>' +
@@ -548,6 +548,61 @@ function _pwOk(v, cb){
   viewer.addEventListener('click', closeViewer);
   document.addEventListener('keydown', function(e){ if(e.key==='Escape' && !viewer.hidden) closeViewer(); });
 
+  // ===== 无刷新路由（2026-09-15）=====
+  // 目的：进出文章不重载页面，返回列表时保持原来的滚动位置
+  var _postsCache = null;    // 列表数据缓存
+  var _listScrollY = 0;      // 列表滚动位置
+
+  function renderRoute(){
+    var list = _postsCache || [];
+    var listEl = document.getElementById('mpList');
+    var detailEl = document.getElementById('mpDetail');
+    var hd = document.querySelector('.mp-head');
+    var stat = document.getElementById('mpStat');
+    var id = null;
+    try{ id = new URLSearchParams(location.search).get('id'); }catch(e){}
+
+    if(id){
+      var p = null;
+      for(var i = 0; i < list.length; i++){
+        if(String(list[i].id) === String(id)){ p = list[i]; break; }
+      }
+      if(!p){
+        listEl.hidden = false;
+        detailEl.hidden = true;
+        listEl.innerHTML = '<div class="mp-loading">这篇内容不存在（可能已被删除）<br><br><a href="./moments.html" style="color:var(--accent);text-decoration:none">← 返回列表</a></div>';
+        return;
+      }
+      var idx = list.indexOf(p);
+      listEl.hidden = true;
+      listEl.innerHTML = '';
+      detailEl.innerHTML = renderDetailView(p, idx - 1 >= 0 ? list[idx - 1] : null, idx + 1 < list.length ? list[idx + 1] : null);
+      detailEl.hidden = false;
+      if(hd) hd.classList.add('detail');
+      if(stat) stat.textContent = '';
+      document.title = titleOf(p) + ' · 向天游';
+      window.scrollTo(0, 0);
+    }else{
+      if(stat) stat.textContent = list.length ? list.length + ' 篇' : '';
+      listEl.innerHTML = list.map(renderListItem).join('');
+      listEl.hidden = false;
+      detailEl.hidden = true;
+      if(hd) hd.classList.remove('detail');
+      document.title = '博客 · 向天游';
+      // 2026-09-15：回到列表时停掉文章里的音乐
+      // （原来是靠整页跳转自然停止，改成无刷新后必须主动暂停）
+      try{ if(audio && !audio.paused) audio.pause(); }catch(e){}
+      // 关键：恢复进入文章前的滚动位置
+      window.scrollTo(0, _listScrollY);
+    }
+    try{ if(typeof observeFadeUps === 'function') observeFadeUps(); }catch(e){}
+  }
+
+  // 浏览器前进/后退
+  window.addEventListener('popstate', function(){
+    if(_postsCache) renderRoute();
+  });
+
   function bindEvents(){
     if(bindEvents._done) return;
     bindEvents._done = true;
@@ -559,7 +614,28 @@ function _pwOk(v, cb){
       var figImg = e.target.closest('.mp-fig-img');
       if(figImg){ openViewer(figImg.getAttribute('src')); return; }
       var imgWrap = e.target.closest('.mp-img');
-      if(imgWrap){ openViewer(imgWrap.getAttribute('data-src')); }
+      if(imgWrap){ openViewer(imgWrap.getAttribute('data-src')); return; }
+      // 2026-09-15：无刷新进入文章（记住列表滚动位置）
+      var item = e.target.closest('.ml-item');
+      if(item){
+        e.preventDefault();
+        var href = item.getAttribute('href') || '';
+        var mm = href.match(/[?&]id=([^&]+)/);
+        if(mm){
+          _listScrollY = window.scrollY;
+          try{ history.pushState({id: mm[1]}, '', '?id=' + mm[1]); }catch(err){}
+          renderRoute();
+        }
+        return;
+      }
+      // 2026-09-15：无刷新返回列表（恢复滚动位置）
+      var backBtn = e.target.closest('.ml-back');
+      if(backBtn){
+        e.preventDefault();
+        try{ history.pushState({list: 1}, '', location.pathname); }catch(err){}
+        renderRoute();
+        return;
+      }
     });
     // 进度条：点击 / 拖动跳转（2026-09-15）
     var dragBar = null;
@@ -684,53 +760,16 @@ function _pwOk(v, cb){
         return;
       }
       var list = res.data || [];
-      var idParam = null;
-      try{ idParam = new URLSearchParams(location.search).get('id'); }catch(e){}
-
-      if(idParam){
-        var p = null;
-        for(var i = 0; i < list.length; i++){
-          if(String(list[i].id) === String(idParam)){ p = list[i]; break; }
-        }
-        if(!p){
-          listEl.innerHTML = '<div class="mp-loading">这篇内容不存在（可能已被删除）<br><br><a href="./moments.html" style="color:var(--accent);text-decoration:none">← 返回列表</a></div>';
-          return;
-        }
-        var idx = list.indexOf(p);
-        // 列表按时间倒序（最新在最上）：
-        //   idx-1 → 列表里更靠上 = 更新的一篇 = 「上一篇」（放左边）
-        //   idx+1 → 列表里更靠下 = 更早的一篇 = 「下一篇」（放右边）
-        var prev = (idx - 1 >= 0) ? list[idx - 1] : null;
-        var next = (idx + 1 < list.length) ? list[idx + 1] : null;
-        listEl.hidden = true;
-        listEl.innerHTML = '';
-        detailEl.innerHTML = renderDetailView(p, prev, next);
-        detailEl.hidden = false;
-        // 2026-09-15：详情页隐藏博客页自己的「← 返回主页」（此时已有「← 返回列表」）
-        var hd = document.querySelector('.mp-head');
-        if(hd) hd.classList.add('detail');
-        var stat = document.getElementById('mpStat');
-        if(stat) stat.textContent = '';
-        document.title = titleOf(p) + ' · 向天游';
-        bindEvents();
-        window.scrollTo(0, 0);
-        return;
-      }
-
-      var stat2 = document.getElementById('mpStat');
-      if(stat2) stat2.textContent = list.length ? list.length + ' 篇' : '';
+      _postsCache = list;
+      // 2026-09-15：统一交给无刷新路由渲染（列表/详情由 URL 的 id 参数决定）
       if(!list.length){ showEmpty(); return; }
-      listEl.innerHTML = list.map(renderListItem).join('');
-      listEl.hidden = false;
-      detailEl.hidden = true;
-      var hd2 = document.querySelector('.mp-head');
-      if(hd2) hd2.classList.remove('detail');
-      bindEvents();
+      renderRoute();
     }catch(err){
       listEl.innerHTML = '<div class="mp-loading">加载出错，请刷新重试</div>';
     }
   }
 
+  bindEvents();   // 2026-09-15：事件委托只绑一次（含无刷新路由的点击拦截）
   load();
 })();
 </script>
