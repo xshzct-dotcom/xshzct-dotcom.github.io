@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-25">
+<link rel="stylesheet" href="style.css?v=20260915-26">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>body{font-family:'Inter','Noto Serif SC',system-ui,sans-serif;background:#0E1116;color:#E8E4DA;margin:0}
 /* 灯箱核心 CSS — 内联!important 确保 SW 缓存旧版 style.css 也不影响 */
@@ -65,7 +65,7 @@
     #pwdGate .fade-in{animation:fin .6s ease .3s both}
     @keyframes fin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   </style>
-  <style>.pwd-authed #pwdGate{display:none!important}</style><div class="fade-in" id="pwdGate" style="max-width:340px;padding:24px;width:100%">
+  <style>.pwd-authed #pwdGate{display:none!important}</style><div class="fade-in" style="max-width:340px;padding:24px;width:100%">
     <div style="font-size:1.6rem;margin-bottom:12px;font-family:var(--font-display,'Playfair Display',serif);font-style:italic;color:var(--accent,#7C9B7E)">✦</div>
     <div style="font-size:.95rem;font-weight:500;color:var(--text,#E8E4DA);margin-bottom:16px">输入密码</div>
     <div style="position:relative;width:100%;margin-bottom:12px">
@@ -93,7 +93,7 @@
 
   window.openBlog = function(){
     // 2026-09-15：每次打开都回到【博客列表】（避免上次浏览的文章残留）
-    var url = 'moments.html?v=20260915-25';
+    var url = 'moments.html?v=20260915-26';
     if(!loaded){
       fr.src = url; loaded = true;
     }else{
@@ -253,7 +253,7 @@
       <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:rgba(232,228,218,.4);font-size:.95rem;pointer-events:none;z-index:1;user-select:none">陈</span>
       <input type="text" id="pwdInput2" placeholder="**" style="width:100%;padding:10px 12px 10px 36px;background:rgba(232,228,218,.04);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);text-align:left;font-size:1rem;outline:none;-webkit-text-security:disc" autocomplete="off" inputmode="text">
     </div>
-    <p class="pwd-error" id="pwdError"></p>
+    <p class="pwd-error"></p>
     <button class="pwd-btn-ok" onclick="checkPwd()">确定</button>
     <button class="pwd-btn-cancel" onclick="closePwdModal()">取消</button>
   </div>
@@ -345,10 +345,10 @@
   }, 100);
 })();
 </script>
-<script src="script.js?v=20260915-25"></script>
+<script src="script.js?v=20260915-26"></script>
 <script src="sound.js?v=20260811"></script>
 <script src="vendor/lame.min.js?v=20260915"></script>
-<script src="editor.js?v=20260915-25"></script>
+<script src="editor.js?v=20260915-26"></script>
 <script>
 // 访客统计（Supabase，后台记录，不在页面上显示，不被 adblock 拦截）
 (function(){
