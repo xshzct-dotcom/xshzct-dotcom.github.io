@@ -660,3 +660,25 @@ img{background-color:rgba(var(--fg-rgb),.04)}
   /* 触屏：只去掉过渡（减少重绘），不动 transform（避免干扰手势判定） */
   .polaroid{transition:none !important}
 }
+
+/* 2026-09-15：触屏上禁用 content-visibility
+   —— 它让屏外卡片延迟渲染，横向滑动时"即时渲染"跟不上手指 → 偶尔卡死 */
+@media (hover: none), (pointer: coarse){
+  .polaroid{
+    content-visibility:visible !important;
+    contain-intrinsic-size:auto !important;
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .polaroid img{
+    -webkit-user-drag:none; user-select:none;
+    pointer-events:none;
+  }
+  /* 容器本身也禁止选中/长按菜单，保证"按着照片滑"顺畅交给滚动处理 */
+  .river-stream{
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+}
