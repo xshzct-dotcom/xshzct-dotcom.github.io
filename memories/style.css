@@ -622,7 +622,7 @@ img{background-color:rgba(var(--fg-rgb),.04)}
    过渡时间调短（.28s），避免手指滑动时闪得太明显。 */
 @media (hover: none){
   .ml-item:active .ml-bgimg{
-    filter:brightness(.70) !important;
+    filter:brightness(.95) !important;
     transform:scale(1.02);
     transition:filter .28s ease, opacity .28s ease, transform .3s ease;
   }
