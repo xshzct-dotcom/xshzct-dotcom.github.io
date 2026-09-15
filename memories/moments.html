@@ -13,6 +13,28 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
 <link rel="stylesheet" href="style.css?v=20260915-44">
 <style>
+  /* 2026-09-15：浅色主题（与主页同步，通过 postMessage 切换） */
+  [data-theme="light"]{
+    --fg-rgb: 32,35,40;
+    --bg: #F7F5F0;
+    --bg-elevated: #FFFFFF;
+    --bg-card: #FFFFFF;
+    --bg-card-hover: #F1EDE6;
+    --border: rgba(32,35,40,.10);
+    --border-hover: rgba(32,35,40,.20);
+    --text: #1F2226;
+    --text-dim: rgba(32,35,40,.64);
+    --text-muted: rgba(32,35,40,.42);
+    --accent: #5E7D60;
+    --accent-dim: #7A9679;
+    --danger: #C2564A;
+  }
+  [data-theme="light"] .ml-bgimg{filter:brightness(.80) saturate(.95)}
+  [data-theme="light"] .ml-item::after{background:linear-gradient(180deg,rgba(255,255,255,.34) 0%,rgba(255,255,255,.70) 55%,rgba(255,255,255,.86) 100%)}
+  [data-theme="light"] .ml-item.no-bg{background:radial-gradient(120% 90% at 12% 8%,rgba(32,35,40,.045),transparent 58%),linear-gradient(155deg,rgba(32,35,40,.02),transparent 55%),#FFFFFF}
+  [data-theme="light"] .mp-head{background:transparent!important}
+  [data-theme="light"] .mp-embed,[data-theme="light"] .mp-video{background:#E8E4DC}
+
 /* ===== 动态页专属样式（2026-09-11） ===== */
 /* 2026-09-15：顶部返回箭头统一贴屏幕左上角（列表页与详情页一致） */
 .mp-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;
@@ -782,12 +804,26 @@ function _pwOk(v, cb){
   })();
 
   // 2026-09-15：接收主页指令（关闭博客画布时停掉正在播放的文章音乐）
+// 2026-09-15：接收主页指令（停音乐 / 同步明暗主题）
   window.addEventListener('message', function(e){
     if(!e || !e.data) return;
     if(e.data === 'stop-iframe-music'){
       try{ if(audio){ audio.pause(); } }catch(err){}
+      return;
+    }
+    if(typeof e.data === 'string' && e.data.indexOf('theme:') === 0){
+      var t = e.data.slice(6);
+      if(t === 'light') document.documentElement.setAttribute('data-theme','light');
+      else document.documentElement.removeAttribute('data-theme');
     }
   });
+  // 独立打开（非 iframe）时读取本地主题偏好
+  (function(){
+    if(window.self !== window.top) return;
+    try{
+      if(localStorage.getItem('memories.theme') === 'light') document.documentElement.setAttribute('data-theme','light');
+    }catch(e){}
+  })();
 
   // 访问上报（2026-09-15）：博客页也记录，含"是否通过密码"与设备信息
   (function(){
