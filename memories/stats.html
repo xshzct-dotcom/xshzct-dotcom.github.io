@@ -218,7 +218,9 @@ async function render(){
           var dt=new Date(d.visited_at);
           var t=(dt.getMonth()+1)+'/'+dt.getDate()+' '+('0'+dt.getHours()).slice(-2)+':'+('0'+dt.getMinutes()).slice(-2);
           var dev=/Mobile|Android|iPhone|iPad/i.test(d.ua||'')?'📱手机':'💻电脑';
-          var loc=[d.city,d.region,d.country].filter(Boolean).join(' · ')||'—';
+          var loc=[d.city,d.region,d.country].filter(Boolean).join(' · ');
+          if(!loc && d.tz) loc = d.tz.replace('Asia/','').replace(/_/g,' ');   // 2026-09-15：IP 无数据时用时区兜底
+          if(!loc) loc = '—';
           html+='<div style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)">'+t+' · '+dev+' · '+loc
               +' · 停留 '+(d.duration?fmt(d.duration):'--')+'</div>';
         });
