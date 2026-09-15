@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-16">
+<link rel="stylesheet" href="style.css?v=20260915-17">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>body{font-family:'Inter','Noto Serif SC',system-ui,sans-serif;background:#0E1116;color:#E8E4DA;margin:0}
 /* 灯箱核心 CSS — 内联!important 确保 SW 缓存旧版 style.css 也不影响 */
@@ -93,6 +93,9 @@
     if(isOpen) return;
     isOpen = true;
     ov.setAttribute('aria-hidden', 'false');
+    // 2026-09-15：锁住外层滚动，避免和 iframe 内滚动条同时出现
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
     void ov.offsetWidth;                       // 强制重排，确保过渡生效
     ov.style.transform = 'translateX(0)';
     try{ history.pushState({blog: 1}, '', '#blog'); }catch(e){}
@@ -102,6 +105,8 @@
     isOpen = false;
     ov.style.transform = 'translateX(100%)';
     ov.setAttribute('aria-hidden', 'true');
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
     if(!skipHistory && location.hash === '#blog'){
       try{ history.back(); }catch(e){}
     }
@@ -304,10 +309,10 @@
   }, 100);
 })();
 </script>
-<script src="script.js?v=20260915-16"></script>
+<script src="script.js?v=20260915-17"></script>
 <script src="sound.js?v=20260811"></script>
 <script src="vendor/lame.min.js?v=20260915"></script>
-<script src="editor.js?v=20260915-16"></script>
+<script src="editor.js?v=20260915-17"></script>
 <script>
 // 访客统计（Supabase，后台记录，不在页面上显示，不被 adblock 拦截）
 (function(){
