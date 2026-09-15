@@ -333,21 +333,6 @@ function fmt(s){ if(s==null||s===undefined) return '--'; if(s<60) return s+'秒'
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // 通用 fetch + 超时（兼容性最好，不用 AbortSignal.timeout）
-function fetchWithTimeout(url, opts, timeoutMs){
-  return new Promise(function(resolve, reject){
-    var timer = setTimeout(function(){
-      reject(new Error('fetch 超时 ('+timeoutMs+'ms) — 可能是网络慢/代理问题'));
-    }, timeoutMs);
-    fetch(url, opts).then(function(r){
-      clearTimeout(timer);
-      resolve(r);
-    }, function(err){
-      clearTimeout(timer);
-      reject(err);
-    });
-  });
-}
-
 // 注册 Service Worker 让后续 fetch 走缓存兜底（2026-09-06）
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
