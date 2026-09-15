@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-59">
+<link rel="stylesheet" href="style.css?v=20260915-60">
 <style>
   /* 2026-09-15：浅色主题（与主页同步，通过 postMessage 切换） */
   [data-theme="light"]{
@@ -126,7 +126,7 @@
 @media (hover: hover) and (pointer: fine){
   .ml-item:hover{background:var(--bg-card-hover)}
   /* 悬停：照片亮到原图 80% */
-  .ml-item:hover .ml-bgimg{filter:brightness(.80);transform:scale(1.025)}
+  .ml-item:hover .ml-bgimg{filter:brightness(.28);transform:scale(1.025)}
 }
 /* 2026-09-15：没有照片的文章 → 用极淡的渐层+光晕替代（避免大片死板的纯色） */
 .ml-item.no-bg{
@@ -355,7 +355,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-59"></script>
+<script src="vendor/supabase.js?v=20260915-60"></script>
 <script>
 (function(){
   'use strict';
