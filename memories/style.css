@@ -683,19 +683,3 @@ img{background-color:rgba(var(--fg-rgb),.04)}
   }
 }
 
-/* 2026-09-16：刷新后的"继续播放"提示（浏览器不允许无交互自动出声，给个明确入口） */
-.resume-tip{
-  position:fixed;left:50%;bottom:96px;transform:translateX(-50%);
-  z-index:60;display:flex;align-items:center;gap:8px;
-  padding:10px 18px;border-radius:999px;cursor:pointer;
-  background:var(--accent);color:#0E1116;font-size:.86rem;font-weight:600;
-  box-shadow:0 8px 28px rgba(0,0,0,.35);
-  animation:resumeIn .4s var(--ease-spring) both;
-  -webkit-tap-highlight-color:transparent;
-}
-.resume-tip[hidden]{display:none}
-.resume-tip .rt-icon{font-size:.8rem}
-@media (hover:hover) and (pointer:fine){
-  .resume-tip:hover{transform:translateX(-50%) translateY(-2px)}
-}
-@keyframes resumeIn{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
