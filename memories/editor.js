@@ -1907,6 +1907,11 @@ async function renderPostTab(){
       var path = 'posts/img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '.' + ext;
       _postStatus('上传照片…（稍等，不要切走）');
       await uploadToStorage(path, blob);
+      // 2026-09-15：同步生成缩略图（thumbs/posts/...）
+      // 博客列表卡片用缩略图作淡化背景，缺失会导致卡片背景空白
+      makeThumbBlob(blob, 420, 0.78).then(function(tb){
+        if(tb) return sb.storage.from('photos').upload('thumbs/' + path, tb, {upsert:true, contentType:'image/jpeg'});
+      }).catch(function(e){ console.warn('[thumb] post thumb upload failed', e); });
       _postDraft.images.push({ path: path, cap: '', name: f.name, preview: URL.createObjectURL(blob) });
       var n = _postDraft.images.length;
       var ta = document.getElementById('postText');
