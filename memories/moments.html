@@ -54,8 +54,9 @@
 
 /* ===== 列表页（2026-09-14：动态改为"列表 → 详情"）===== */
 /* 2026-09-15：排列一比一复刻 thelongestway —— 3 列网格 / 近直角 / 照片浓度约30% */
-.ml-list{max-width:1180px;margin:0 auto;padding:20px 26px 84px;
-  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+/* 2026-09-15：铺满可用宽度（不再两侧留白），列数随窗口自适应 */
+.ml-list{width:100%;margin:0;padding:20px 26px 84px;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px;align-items:start}
 .ml-item{position:relative;display:block;padding:20px 20px 22px;min-height:196px;
   background:var(--bg-card);border:none;border-radius:2px;overflow:hidden;text-decoration:none;
   transition:background .3s ease}
@@ -106,7 +107,7 @@
 .mp-detail-nav a{font-size:.84rem;color:var(--text-dim);text-decoration:none}
 
 @media(max-width:940px){
-  .ml-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:18px 18px 76px}
+  .ml-list{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;padding:18px 18px 76px}
 }
 @media(max-width:600px){
   .ml-list{grid-template-columns:1fr;gap:12px;padding:14px 14px 72px}
