@@ -68,12 +68,12 @@
    核心是 --fg-rgb（所有半透明前景色的基色）与几个底色/阴影/主色。 */
 [data-theme="light"]{
   --fg-rgb: 32,35,40;              /* 深灰：浅底上的一切半透明前景色自动适配 */
-  --bg: #FAFAFA;                   /* 2026-09-16：中性浅白（去掉暖黄调，参考站那种干净的白） */
+  --bg: #FFFFFF;                   /* 2026-09-16：纯白（参考站那种冷净的白） */
   --bg-elevated: #FFFFFF;
   --bg-card: #FFFFFF;
-  --bg-card-hover: #F2F2F3;
-  --border: rgba(32,35,40,.12);
-  --border-hover: rgba(32,35,40,.24);
+  --bg-card-hover: #F7F7F8;
+  --border: rgba(0,0,0,.09);
+  --border-hover: rgba(0,0,0,.18);
   --text: #1F2226;                 /* 墨色 */
   --text-dim: rgba(32,35,40,.74);
   --text-muted: rgba(32,35,40,.56);
@@ -86,14 +86,14 @@
   --success: #5E7D60;
   --glass: rgba(250,250,250,.86);
   --glass-border: rgba(32,35,40,.08);
-  --shadow-sm: 0 2px 8px rgba(32,35,40,.06);
-  --shadow-md: 0 8px 32px rgba(32,35,40,.10);
-  --shadow-lg: 0 20px 60px rgba(32,35,40,.14);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.04);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.05);
 }
 /* 浅色下 hero 遮罩减轻，照片更亮 */
-[data-theme="light"] .hero::after{background:linear-gradient(180deg,rgba(250,250,250,.30),rgba(250,250,250,.92))}
-[data-theme="light"] .nav{background:rgba(250,250,250,.55)}
-[data-theme="light"] .nav.scrolled{background:rgba(250,250,250,.90);border-bottom-color:rgba(32,35,40,.08)}
+[data-theme="light"] .hero::after{background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,.92))}
+[data-theme="light"] .nav{background:rgba(255,255,255,.60)}
+[data-theme="light"] .nav.scrolled{background:rgba(255,255,255,.92);border-bottom-color:rgba(32,35,40,.08)}
 /* 2026-09-15 修正：浅色下【不再用白色遮罩】（那会把文字洗白看不清）
    改为：照片用不透明度淡化，文字保持深色直接压在上面 —— 与参考站一致 */
 [data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.14}
