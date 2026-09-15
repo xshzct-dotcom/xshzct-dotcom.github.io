@@ -108,7 +108,7 @@
              linear-gradient(155deg,rgba(32,35,40,.02),transparent 55%),#FFFFFF;
 }
 @media (hover: hover) and (pointer: fine){
-  [data-theme="light"] .ml-item:hover .ml-bgimg{filter:brightness(1.02) saturate(1); opacity:.70; transform:scale(1.02)}
+  [data-theme="light"] .ml-item:hover .ml-bgimg{filter:brightness(1.02) saturate(1); opacity:.8; transform:scale(1.02)}
 }
 
 
@@ -622,7 +622,7 @@ img{background-color:rgba(var(--fg-rgb),.04)}
    过渡时间调短（.28s），避免手指滑动时闪得太明显。 */
 @media (hover: none){
   .ml-item:active .ml-bgimg{
-    opacity:1 !important;
+    opacity:.8 !important;
     transform:scale(1.02);
     transition:filter .14s ease, opacity .14s ease, transform .14s ease;
   }
@@ -631,7 +631,7 @@ img{background-color:rgba(var(--fg-rgb),.04)}
 @media (hover: none){
   [data-theme="light"] .ml-item:active .ml-bgimg{
     filter:brightness(1.02) saturate(1) !important;
-    opacity:.70;
+    opacity:.8;
   }
 }
 
