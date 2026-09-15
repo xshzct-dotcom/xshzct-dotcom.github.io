@@ -47,6 +47,21 @@
   --ease-spring: cubic-bezier(.34,1.56,.64,1);
   --nav-h: 60px;
 }
+/* 2026-09-15：浅色主题下的滚动条（否则浏览器沿用暗色 color-scheme，滚动条会是黑的） */
+[data-theme="light"]{color-scheme:light}
+[data-theme="light"] ::-webkit-scrollbar-track{background:rgba(32,35,40,.04)}
+[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(32,35,40,.22)}
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover{background:rgba(32,35,40,.34)}
+[data-theme="light"] .river-stream::-webkit-scrollbar{height:6px}
+[data-theme="light"] .river-stream::-webkit-scrollbar-thumb{background:rgba(32,35,40,.24);border-radius:6px}
+[data-theme="light"] .river-stream::-webkit-scrollbar-track{background:rgba(32,35,40,.06)}
+/* 浅色下更多细节微调：标签/按钮对比 */
+[data-theme="light"] .river-filter{background:rgba(32,35,40,.05);border-color:rgba(32,35,40,.10);color:rgba(32,35,40,.78)}
+[data-theme="light"] .river-filter.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+[data-theme="light"] .tl-group-header{color:rgba(32,35,40,.82)}
+[data-theme="light"] .tl-group-footer{color:rgba(32,35,40,.42)}
+[data-theme="light"] .section-sub,[data-theme="light"] .tl-count{color:rgba(32,35,40,.62)}
+
 
 /* ===== 2026-09-15：浅色（白色）主题 =====
    用法：给 <html> 加 data-theme="light" 即整体切换。
@@ -57,11 +72,11 @@
   --bg-elevated: #FFFFFF;
   --bg-card: #FFFFFF;
   --bg-card-hover: #F1EDE6;
-  --border: rgba(32,35,40,.10);
-  --border-hover: rgba(32,35,40,.20);
+  --border: rgba(32,35,40,.14);
+  --border-hover: rgba(32,35,40,.28);
   --text: #1F2226;                 /* 墨色 */
-  --text-dim: rgba(32,35,40,.64);
-  --text-muted: rgba(32,35,40,.42);
+  --text-dim: rgba(32,35,40,.74);
+  --text-muted: rgba(32,35,40,.56);
   --accent: #5E7D60;               /* 深一点的鼠尾草绿，浅底更清晰 */
   --accent-2: #B06A4C;
   --accent-glow: rgba(94,125,96,.14);
