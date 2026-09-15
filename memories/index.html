@@ -2,6 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache,must-revalidate">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>向天游的随笔 · Memories</title>
 <meta name="description" content="至少留下过些东西">
@@ -466,7 +467,7 @@
 // Service Worker 注册（2026-08-11 启用：加速二次访问 + 离线回退）
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js?v=20260811').catch(function(e){
+    navigator.serviceWorker.register('sw.js?v=20260915').catch(function(e){
       console.warn('[SW] register failed:', e);
     });
   });
