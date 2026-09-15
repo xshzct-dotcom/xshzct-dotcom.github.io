@@ -147,7 +147,7 @@ function _pwOk(v, cb){
 <div id="content"><div class="msg ld">加载中···</div></div>
 
 <!-- Supabase SDK：本地托管（同主页），避免外部 CDN 加载失败 -->
-<script src="vendor/supabase.js?v=20260916-19"></script>
+<script src="vendor/supabase.js?v=20260916-27"></script>
 <script>
   if (typeof supabase === 'undefined') {
     document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
@@ -310,7 +310,23 @@ async function render(){
 
     // 详情
     html+='<div class="section"><h2>📋 每一次访问（含访客信息）</h2><div class="scroll"><table><thead><tr><th>时间</th><th>页面</th><th>停留</th><th>访客地区</th><th>来源</th></tr></thead><tbody>';
+    // 2026-09-16：同一次访问会写多条记录，但只有第一条查了 IP 归属地
+    //   → 先按 session_id 收集"有地区"的那条，渲染时补全，避免大量"未知"的假象
+    var geoBySession = {};
     (visits||[]).forEach(function(d){
+      if(d.session_id && (d.ip || d.country)){
+        var g = geoBySession[d.session_id];
+        // 已有则保留信息更全的那条
+        var score = (x)=> ((x.country?2:0) + (x.city?1:0));
+        if(!g || score(d) > score(g)) geoBySession[d.session_id] = d;
+      }
+    });
+    (visits||[]).forEach(function(d){
+      // 补全：本条没地区时，用同会话的记录顶上
+      if((!d.ip && !d.country) && d.session_id && geoBySession[d.session_id]){
+        var g2 = geoBySession[d.session_id];
+        d = Object.assign({}, d, { ip:g2.ip, country:g2.country, region:g2.region, city:g2.city });
+      }
       var time = '--';
       // 2026-09-10 修正：数据库现在存的是标准 UTC（写入端已改为 toISOString()）
       // 用 Date 解析后按浏览器本地时区（北京时间）显示
