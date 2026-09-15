@@ -124,14 +124,13 @@ function applyTheme(t){
 window.applyTheme = applyTheme;
 window.toggleTheme = function(){
   var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-  var next = (cur === 'light') ? 'dark' : 'light';
-  try{ localStorage.setItem('memories.theme', next); }catch(e){}
-  applyTheme(next);
+  applyTheme(cur === 'light' ? 'dark' : 'light');
 };
+/* 2026-09-15：按用户要求 —— 进入网站/刷新【一律回到默认暗色】，主题不做持久化。
+   切换只在本次会话内有效，刷新即重置。 */
 function initTheme(){
-  var t = 'dark';
-  try{ t = localStorage.getItem('memories.theme') || 'dark'; }catch(e){}
-  applyTheme(t);
+  try{ localStorage.removeItem('memories.theme'); }catch(e){}   // 清掉历史残留
+  applyTheme('dark');
 }
 
 function clearLegacyTheme(){
