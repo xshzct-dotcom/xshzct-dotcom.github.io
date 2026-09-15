@@ -65,6 +65,11 @@ const nav=$('#nav');
 const navLinks=$('#navLinks');
 const navHamburger=$('#navHamburger');
 navHamburger.onclick=()=>{ navHamburger.classList.toggle('open'); navLinks.classList.toggle('open'); };
+// 2026-09-15：主题切换按钮
+(function(){
+  var tb = document.getElementById('navTheme');
+  if(tb) tb.onclick = function(){ if(typeof window.toggleTheme === 'function') window.toggleTheme(); };
+})();
 $$('.nav-links a').forEach(a=>a.onclick=(e)=>{
   navHamburger.classList.remove('open');
   navLinks.classList.remove('open');
@@ -100,6 +105,35 @@ window.addEventListener('scroll', onScroll, {passive:true});
 // ===== 主题：单一暗色模式（2026-09-10 移除白色模式切换）=====
 // 历史：曾支持暗色/白色双主题（tag: pre-theme-toggle 之前为无主题版本）
 // 用户决定只保留默认暗色 —— 深底更能衬托照片（相册为主角的网站）
+/* ===== 2026-09-15：明暗主题（默认暗色，可选浅色）=====
+   实现：给 <html> 加/去 data-theme="light"，所有颜色由 style.css 的 CSS 变量接管 */
+function applyTheme(t){
+  var light = (t === 'light');
+  if(light) document.documentElement.setAttribute('data-theme','light');
+  else document.documentElement.removeAttribute('data-theme');
+  var btn = document.getElementById('navTheme');
+  if(btn) btn.textContent = light ? '🌙' : '☀️';
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute('content', light ? '#F7F5F0' : '#0E1116');
+  // 同步通知 iframe（博客页）
+  try{
+    var fr = document.getElementById('blogFrame');
+    if(fr && fr.contentWindow) fr.contentWindow.postMessage('theme:' + (light ? 'light' : 'dark'), '*');
+  }catch(e){}
+}
+window.applyTheme = applyTheme;
+window.toggleTheme = function(){
+  var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  var next = (cur === 'light') ? 'dark' : 'light';
+  try{ localStorage.setItem('memories.theme', next); }catch(e){}
+  applyTheme(next);
+};
+function initTheme(){
+  var t = 'dark';
+  try{ t = localStorage.getItem('memories.theme') || 'dark'; }catch(e){}
+  applyTheme(t);
+}
+
 function clearLegacyTheme(){
   // 清理旧版遗留的 localStorage 偏好，避免残留数据
   try{
@@ -1614,7 +1648,7 @@ function init(){
   if(gear) gear.onclick = () => { if(window.EDITOR && window.EDITOR.open) window.EDITOR.open(); };
 
   // 主题切换（2026-08-27：右上角 ☀/☾ 按钮）
-  clearLegacyTheme();   // 清除旧版白色模式遗留的偏好
+  initTheme();   // 2026-09-15：初始化明暗主题（默认暗色）
 
   // 同步 data.js → Supabase（让编辑器有真实数据）— 暴露 promise 给 editor 共享
   window.MemoriesReady = ensureSync();
