@@ -48,6 +48,49 @@
   --nav-h: 60px;
 }
 
+/* ===== 2026-09-15：浅色（白色）主题 =====
+   用法：给 <html> 加 data-theme="light" 即整体切换。
+   核心是 --fg-rgb（所有半透明前景色的基色）与几个底色/阴影/主色。 */
+[data-theme="light"]{
+  --fg-rgb: 32,35,40;              /* 深灰：浅底上的一切半透明前景色自动适配 */
+  --bg: #F7F5F0;                   /* 暖白，像米色纸张 */
+  --bg-elevated: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F1EDE6;
+  --border: rgba(32,35,40,.10);
+  --border-hover: rgba(32,35,40,.20);
+  --text: #1F2226;                 /* 墨色 */
+  --text-dim: rgba(32,35,40,.64);
+  --text-muted: rgba(32,35,40,.42);
+  --accent: #5E7D60;               /* 深一点的鼠尾草绿，浅底更清晰 */
+  --accent-2: #B06A4C;
+  --accent-glow: rgba(94,125,96,.14);
+  --accent-2-glow: rgba(176,106,76,.14);
+  --accent-dim: #7A9679;
+  --danger: #C2564A;
+  --success: #5E7D60;
+  --glass: rgba(247,245,240,.86);
+  --glass-border: rgba(32,35,40,.08);
+  --shadow-sm: 0 2px 8px rgba(32,35,40,.06);
+  --shadow-md: 0 8px 32px rgba(32,35,40,.10);
+  --shadow-lg: 0 20px 60px rgba(32,35,40,.14);
+}
+/* 浅色下 hero 遮罩减轻，照片更亮 */
+[data-theme="light"] .hero::after{background:linear-gradient(180deg,rgba(247,245,240,.30),rgba(247,245,240,.92))}
+[data-theme="light"] .nav{background:rgba(247,245,240,.5)}
+[data-theme="light"] .nav.scrolled{background:rgba(247,245,240,.88);border-bottom-color:rgba(32,35,40,.08)}
+/* 浅色下博客卡片：照片更亮一些，避免灰蒙蒙 */
+[data-theme="light"] .ml-bgimg{filter:brightness(.78) saturate(.95)}
+[data-theme="light"] .ml-item::after{background:linear-gradient(180deg,rgba(255,255,255,.30) 0%,rgba(255,255,255,.66) 55%,rgba(255,255,255,.82) 100%)}
+[data-theme="light"] .ml-item.no-bg{
+  background:radial-gradient(120% 90% at 12% 8%,rgba(32,35,40,.045),transparent 58%),
+             linear-gradient(155deg,rgba(32,35,40,.02),transparent 55%),#FFFFFF;
+}
+@media (hover: hover) and (pointer: fine){
+  [data-theme="light"] .ml-item:hover .ml-bgimg{filter:brightness(.95);transform:scale(1.025)}
+}
+
+
 /* --- Reset --- */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
