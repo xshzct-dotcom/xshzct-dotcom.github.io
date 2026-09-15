@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-66">
+<link rel="stylesheet" href="style.css?v=20260915-67">
 <style>
   /* 2026-09-15：浅色主题（与主页同步，通过 postMessage 切换） */
   [data-theme="light"]{
@@ -358,7 +358,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-66"></script>
+<script src="vendor/supabase.js?v=20260915-67"></script>
 <script>
 (function(){
   'use strict';
@@ -939,6 +939,26 @@ function _pwOk(v, cb){
       });
     }, {passive:true});
   })();
+  // 2026-09-15：卡片上长按不要弹系统菜单（否则会打断"按住显现"的手感）
+  (function(){
+    document.addEventListener('contextmenu', function(e){
+      var t = e.target;
+      if(t && t.closest && t.closest('.ml-item')) e.preventDefault();
+    }, {passive:false});
+    // 触屏：手指按到哪张，哪张显现（用类代替 :active，避免多点触控/滑动的怪异表现）
+    function clearAll(){ 
+      var els = document.querySelectorAll('.ml-item.touch-show');
+      for(var i=0;i<els.length;i++) els[i].classList.remove('touch-show');
+    }
+    document.addEventListener('touchstart', function(e){
+      var it = e.target && e.target.closest ? e.target.closest('.ml-item') : null;
+      if(!it) return;
+      clearAll();
+      it.classList.add('touch-show');
+    }, {passive:true});
+    document.addEventListener('touchend', function(){ setTimeout(clearAll, 220); }, {passive:true});
+    document.addEventListener('touchcancel', function(){ clearAll(); }, {passive:true});
+  })();
   bindEvents();   // 2026-09-15：事件委托只绑一次（含无刷新路由的点击拦截）
   load();
 })();
@@ -962,4 +982,20 @@ function _pwOk(v, cb){
     filter:brightness(1.02) saturate(1) !important;
     opacity:.70;
   }
+}
+
+/* 2026-09-15：手机上按住卡片时不要弹出"保存图片"等系统菜单
+   —— 让按住只做一件事：让照片浮现（与电脑端 hover 同效） */
+.ml-item, .ml-item *{
+  -webkit-touch-callout:none;
+  -webkit-user-select:none; -moz-user-select:none; user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.ml-bgimg{ -webkit-touch-callout:none; pointer-events:none }
+
+/* 触屏"按到哪张显现哪张"（与桌面 hover 同效，都是 70%） */
+@media (hover: none){
+  .ml-item.touch-show .ml-bgimg{ filter:brightness(.70) !important; transform:scale(1.02) }
+  [data-theme="light"] .ml-item.touch-show .ml-bgimg{ filter:brightness(1.02) saturate(1) !important; opacity:.70 }
+  .ml-item.touch-show{ background:var(--bg-card-hover) }
 }
