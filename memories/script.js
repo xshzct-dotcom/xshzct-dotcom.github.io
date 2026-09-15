@@ -65,7 +65,15 @@ const nav=$('#nav');
 const navLinks=$('#navLinks');
 const navHamburger=$('#navHamburger');
 navHamburger.onclick=()=>{ navHamburger.classList.toggle('open'); navLinks.classList.toggle('open'); };
-$$('.nav-links a').forEach(a=>a.onclick=()=>{ navHamburger.classList.remove('open'); navLinks.classList.remove('open'); });
+$$('.nav-links a').forEach(a=>a.onclick=(e)=>{
+  navHamburger.classList.remove('open');
+  navLinks.classList.remove('open');
+  // 2026-09-15：博客改为在主页内横滑打开（不跳转新页面）
+  if(a.id === 'navBlogLink'){
+    e.preventDefault();
+    if(typeof window.openBlog === 'function') window.openBlog();
+  }
+});
 
 function onScroll(){
   const y=window.scrollY;
