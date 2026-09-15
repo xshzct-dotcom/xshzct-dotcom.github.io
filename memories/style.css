@@ -616,3 +616,21 @@ img{background-color:rgba(var(--fg-rgb),.04)}
 @media (hover: none){
   button:active, .nav-icon-btn:active, .river-card:active{opacity:.75;transition:opacity .08s}
 }
+
+/* 2026-09-15：触屏设备的"照片显现"效果
+   手机没有 hover，改用 :active —— 手指按住卡片时照片浮现，松开淡回。
+   过渡时间调短（.28s），避免手指滑动时闪得太明显。 */
+@media (hover: none){
+  .ml-item:active .ml-bgimg{
+    filter:brightness(.70) !important;
+    transform:scale(1.02);
+    transition:filter .28s ease, opacity .28s ease, transform .3s ease;
+  }
+  .ml-item:active{ background:var(--bg-card-hover) }
+}
+@media (hover: none){
+  [data-theme="light"] .ml-item:active .ml-bgimg{
+    filter:brightness(1.02) saturate(1) !important;
+    opacity:.70;
+  }
+}
