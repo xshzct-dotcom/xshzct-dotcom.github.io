@@ -580,6 +580,19 @@ function _pwOk(v, cb){
     if(msg){ el.querySelector('p').textContent=msg; el.querySelector('.mp-empty-sub').textContent=''; }
   }
 
+  // 2026-09-15：若在主页的横滑层(iframe)里打开，点「← 返回」时通知父页收起
+  (function(){
+    if(window.self === window.top) return;   // 独立打开时不变
+    var backs = document.querySelectorAll('.mp-back');
+    Array.prototype.forEach.call(backs, function(a){
+      a.setAttribute('href', 'javascript:void(0)');
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        try{ window.parent.postMessage('close-blog', '*'); }catch(err){}
+      });
+    });
+  })();
+
   // 访问上报（2026-09-15）：博客页也记录，含"是否通过密码"与设备信息
   (function(){
     try{
