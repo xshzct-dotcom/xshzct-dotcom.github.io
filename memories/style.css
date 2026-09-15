@@ -624,7 +624,7 @@ img{background-color:rgba(var(--fg-rgb),.04)}
   .ml-item:active .ml-bgimg{
     filter:brightness(.95) !important;
     transform:scale(1.02);
-    transition:filter .28s ease, opacity .28s ease, transform .3s ease;
+    transition:filter .14s ease, opacity .14s ease, transform .14s ease;
   }
   .ml-item:active{ background:var(--bg-card-hover) }
 }
