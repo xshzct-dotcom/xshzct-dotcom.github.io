@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<script>
+/* 2026-09-15：主题必须在【首次渲染前】应用，否则会先黑后白闪一下。
+   放在 <head> 顶部，任何 CSS/内容渲染之前执行。
+   规则：默认暗色；只有用户主动切过浅色才记住。 */
+(function(){
+  try{
+    if(localStorage.getItem('memories.theme') === 'light'){
+      document.documentElement.setAttribute('data-theme','light');
+    }
+  }catch(e){}
+})();
+</script>
 <meta charset="UTF-8">
 <meta http-equiv="Cache-Control" content="no-cache,must-revalidate">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -149,7 +161,7 @@ function _pwOk(v, cb){
 <div id="content"><div class="msg ld">加载中···</div></div>
 
 <!-- Supabase SDK：本地托管（同主页），避免外部 CDN 加载失败 -->
-<script src="vendor/supabase.js?v=20260915-51"></script>
+<script src="vendor/supabase.js?v=20260915-54"></script>
 <script>
   if (typeof supabase === 'undefined') {
     document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
