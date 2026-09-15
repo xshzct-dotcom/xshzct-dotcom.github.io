@@ -22,18 +22,18 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260916-18">
+<link rel="stylesheet" href="style.css?v=20260916-20">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
    —— 之前只让照片变亮，但卡片上那层黑色渐变压着它，所以看不出变化 */
 .ml-item::after{ transition:opacity .6s cubic-bezier(.22,.61,.36,1) }
 @media (hover: hover) and (pointer: fine){
-  .ml-item:hover::after{ opacity:.30 }          /* 暗色：遮罩减到三成 */
+  .ml-item:hover::after{ opacity:.12 }          /* 暗色：遮罩减到三成 */
 }
 @media (hover: none){
-  .ml-item:active::after{ opacity:.30 }
-  .ml-item.touch-show::after{ opacity:.30 }
+  .ml-item:active::after{ opacity:.12 }
+  .ml-item.touch-show::after{ opacity:.12 }
 }
 [data-theme="light"] .ml-item:hover::after{ opacity:.55 }   /* 浅色本来就是浅遮罩，略减即可 */
 [data-theme="light"] .ml-item.touch-show::after{ opacity:.55 }
@@ -44,7 +44,7 @@
    过渡时间调短（.28s），避免手指滑动时闪得太明显。 */
 @media (hover: none){
   .ml-item:active .ml-bgimg{
-    filter:brightness(.95) !important;
+    filter:brightness(1.12) !important;
     transform:scale(1.02);
     transition:filter .14s ease, opacity .14s ease, transform .14s ease;
   }
@@ -68,7 +68,7 @@
 
 /* 触屏"按到哪张显现哪张"（与桌面 hover 同效，都是 70%） */
 @media (hover: none){
-  .ml-item.touch-show .ml-bgimg{ filter:brightness(.95) !important; transform:scale(1.02); transition:filter .14s ease, opacity .14s ease, transform .14s ease }
+  .ml-item.touch-show .ml-bgimg{ filter:brightness(1.12) !important; transform:scale(1.02); transition:filter .14s ease, opacity .14s ease, transform .14s ease }
   [data-theme="light"] .ml-item.touch-show .ml-bgimg{ filter:brightness(1.02) saturate(1) !important; opacity:.70 }
   .ml-item.touch-show{ background:var(--bg-card-hover) }
 }
@@ -163,7 +163,7 @@
   background:var(--bg-card);border:none;border-radius:3px;overflow:hidden;text-decoration:none;
   transition:background .3s ease}
 .ml-bgimg{position:absolute;inset:0;background-size:cover;background-position:center;
-  filter:brightness(.44);pointer-events:none;
+  filter:brightness(.28);pointer-events:none;
   transition:filter .6s cubic-bezier(.22,.61,.36,1),opacity .6s cubic-bezier(.22,.61,.36,1),transform .7s cubic-bezier(.22,.61,.36,1)}
 /* 渐层遮罩：保证暗色主题下文字始终可读 */
 .ml-item::after{content:'';position:absolute;inset:0;pointer-events:none;
@@ -178,7 +178,7 @@
 @media (hover: hover) and (pointer: fine){
   .ml-item:hover{background:var(--bg-card-hover)}
   /* 悬停：照片亮到原图 80% */
-  .ml-item:hover .ml-bgimg{filter:brightness(.95);transform:scale(1.02)}
+  .ml-item:hover .ml-bgimg{filter:brightness(1.12);transform:scale(1.02)}
 }
 /* 2026-09-15：没有照片的文章 → 用极淡的渐层+光晕替代（避免大片死板的纯色） */
 .ml-item.no-bg{
@@ -407,7 +407,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260916-18"></script>
+<script src="vendor/supabase.js?v=20260916-20"></script>
 <script>
 (function(){
   'use strict';
@@ -1005,8 +1005,8 @@ function _pwOk(v, cb){
       clearAll();
       it.classList.add('touch-show');
     }, {passive:true});
-    document.addEventListener('touchend', function(){ setTimeout(clearAll, 700); }, {passive:true});
-    document.addEventListener('touchcancel', function(){ setTimeout(clearAll, 350); }, {passive:true});
+    document.addEventListener('touchend', function(){ setTimeout(clearAll, 220); }, {passive:true});
+    document.addEventListener('touchcancel', function(){ clearAll(); }, {passive:true});
   })();
   bindEvents();   // 2026-09-15：事件委托只绑一次（含无刷新路由的点击拦截）
   load();
