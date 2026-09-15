@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-70">
+<link rel="stylesheet" href="style.css?v=20260915-71">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -138,7 +138,7 @@
 .mp-text{font-size:.95rem;line-height:1.85;color:var(--text);word-break:break-word}
 
 /* ===== 块式图文排版（2026-09-14，参考 thelongestway.com）===== */
-.mp-body{font-family:'Noto Serif SC','Songti SC','SimSun',Georgia,serif;font-size:1.08rem;line-height:2.05;color:var(--text);letter-spacing:.2px}
+.mp-body{font-family:var(--font-display),Georgia,serif;font-size:1.08rem;line-height:2.05;color:var(--text);letter-spacing:.2px}
 .mp-p{margin:0 0 20px;word-break:break-word}
 .mp-p:last-child{margin-bottom:0}
 .mp-h{font-family:'Noto Serif SC',var(--font-display);font-size:1.26rem;font-weight:600;margin:30px 0 15px;color:var(--text);letter-spacing:.5px}
@@ -169,11 +169,11 @@
 .ml-item::after{content:'';position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(180deg,rgba(14,17,22,.34) 0%,rgba(14,17,22,.62) 55%,rgba(14,17,22,.76) 100%)}
 .ml-body{position:relative;z-index:1}
-.ml-date{font-size:.72rem;color:rgba(232,228,218,.52);letter-spacing:.7px;margin-bottom:9px}
-.ml-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.1rem;font-weight:600;
-  color:var(--text);margin:0 0 9px;line-height:1.5;letter-spacing:.2px}
+.ml-date{font-size:.78rem;color:rgba(232,228,218,.52);letter-spacing:.8px;font-weight:500;margin-bottom:8px}
+.ml-title{font-family:var(--font-display);font-size:1.2rem;font-weight:600;
+  color:var(--text);margin:0 0 10px;line-height:1.35;letter-spacing:.2px}
 .ml-title-empty{color:var(--text-dim);font-weight:400;font-size:1rem}
-.ml-excerpt{font-size:.82rem;color:rgba(232,228,218,.64);line-height:1.85;margin:0;overflow:hidden;
+.ml-excerpt{font-size:.9rem;color:rgba(232,228,218,.64);line-height:1.75;margin:0;overflow:hidden;
   display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
 @media (hover: hover) and (pointer: fine){
   .ml-item:hover{background:var(--bg-card-hover)}
@@ -223,7 +223,7 @@
 @media(max-width:600px){
   .ml-list{grid-template-columns:1fr;gap:12px;padding:14px 14px 72px}
   .ml-item{min-height:0;padding:18px 18px 20px}
-  .ml-title{font-size:1.06rem}
+  .ml-title{font-size:1.14rem}
   .ml-excerpt{-webkit-line-clamp:4}
   .ml-bgimg{opacity:.26}
   .ml-item::after{background:linear-gradient(180deg,rgba(14,17,22,.26) 0%,rgba(14,17,22,.62) 62%,rgba(14,17,22,.78) 100%)}
@@ -407,7 +407,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-70"></script>
+<script src="vendor/supabase.js?v=20260915-71"></script>
 <script>
 (function(){
   'use strict';
