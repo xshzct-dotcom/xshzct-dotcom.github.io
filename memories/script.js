@@ -83,6 +83,8 @@ $$('.nav-links a').forEach(a=>a.onclick=(e)=>{
 function onScroll(){
   const y=window.scrollY;
   nav.classList.toggle('scrolled', y>60);
+  // 2026-09-15：博客画布打开时，导航高亮由 openBlog 接管，滚动不再覆盖
+  if(window._blogNavLocked) return;
   const heroBg=$('#heroBg');
   if(heroBg) heroBg.style.transform = `translate3d(0,${y*0.32}px,0)`;
   $$('.nav-links a').forEach(a=>{
