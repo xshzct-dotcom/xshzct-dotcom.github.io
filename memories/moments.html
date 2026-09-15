@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260915-58">
+<link rel="stylesheet" href="style.css?v=20260915-59">
 <style>
   /* 2026-09-15：浅色主题（与主页同步，通过 postMessage 切换） */
   [data-theme="light"]{
@@ -41,7 +41,7 @@
     --danger: #C2564A;
   }
   /* 2026-09-15 修正：不加白色遮罩（会把文字洗白），改为照片淡化 + 深色文字 */
-  [data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.22}
+  [data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.14}
   [data-theme="light"] .ml-item{background:#FFFFFF}
   [data-theme="light"] .ml-item::after{background:linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.18) 60%,rgba(255,255,255,.30) 100%)}
   /* 2026-09-15：浅色下加深加粗（原来偏细偏淡，白底上发虚看不清） */
@@ -355,7 +355,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260915-58"></script>
+<script src="vendor/supabase.js?v=20260915-59"></script>
 <script>
 (function(){
   'use strict';
