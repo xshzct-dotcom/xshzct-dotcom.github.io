@@ -20,6 +20,8 @@
 .mp-back{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   border:1px solid var(--border);color:var(--text-dim);font-size:1rem;text-decoration:none;transition:all .2s;flex:0 0 auto}
 .mp-back:hover{border-color:var(--border-hover);color:var(--text)}
+/* 详情页隐藏本页的「← 返回主页」，避免同时出现两个返回箭头（2026-09-15） */
+.mp-head.detail .mp-back{display:none!important}
 .mp-head h1{font-family:var(--font-display);font-size:1.15rem;font-weight:500;letter-spacing:2px;flex:1;margin:0}
 .mp-head h1 em{font-style:normal;color:var(--accent)}
 .mp-stat{font-size:.75rem;color:var(--text-muted);font-family:var(--font-display)}
@@ -464,11 +466,15 @@ function _pwOk(v, cb){
       if(!curBar) return;
       var b = curBar.querySelector('.mp-play');
       if(b){ b.textContent = '⏸'; b.classList.add('playing'); }
+      // 2026-09-15：通知主页暂停它的背景音乐（避免两首歌打架）
+      try{ window.parent.postMessage('blog-music-play', '*'); }catch(e){}
     });
     audio.addEventListener('pause', function(){
       if(!curBar) return;
       var b = curBar.querySelector('.mp-play');
       if(b){ b.textContent = '▶'; b.classList.remove('playing'); }
+      // 2026-09-15：本页音乐停下 → 让主页从原进度继续播放
+      try{ window.parent.postMessage('blog-music-stop', '*'); }catch(e){}
     });
     audio.addEventListener('waiting', function(){
       if(curBar){ var b = curBar.querySelector('.mp-play'); if(b) b.textContent = '⋯'; }
@@ -594,6 +600,16 @@ function _pwOk(v, cb){
     });
   })();
 
+  // 2026-09-15：离开本页（返回列表/切换文章/关闭博客）时，通知主页恢复背景音乐。
+  // 因为「← 返回列表」是整页跳转，audio 的 pause 事件不会触发，必须靠 pagehide 兜底。
+  (function(){
+    function notifyStop(){
+      try{ window.parent.postMessage('blog-music-stop', '*'); }catch(e){}
+    }
+    window.addEventListener('pagehide', notifyStop);
+    window.addEventListener('beforeunload', notifyStop);
+  })();
+
   // 访问上报（2026-09-15）：博客页也记录，含"是否通过密码"与设备信息
   (function(){
     try{
@@ -679,6 +695,9 @@ function _pwOk(v, cb){
         listEl.innerHTML = '';
         detailEl.innerHTML = renderDetailView(p, prev, next);
         detailEl.hidden = false;
+        // 2026-09-15：详情页隐藏博客页自己的「← 返回主页」（此时已有「← 返回列表」）
+        var hd = document.querySelector('.mp-head');
+        if(hd) hd.classList.add('detail');
         var stat = document.getElementById('mpStat');
         if(stat) stat.textContent = '';
         document.title = titleOf(p) + ' · 向天游';
@@ -693,6 +712,8 @@ function _pwOk(v, cb){
       listEl.innerHTML = list.map(renderListItem).join('');
       listEl.hidden = false;
       detailEl.hidden = true;
+      var hd2 = document.querySelector('.mp-head');
+      if(hd2) hd2.classList.remove('detail');
       bindEvents();
     }catch(err){
       listEl.innerHTML = '<div class="mp-loading">加载出错，请刷新重试</div>';
