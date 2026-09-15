@@ -1,30 +1,18 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<script>
-/* 2026-09-15：主题在首帧前应用，避免闪白。
-   规则：有记录用记录；无记录默认暗色。 */
-(function(){
-  try{
-    if(localStorage.getItem('memories.theme') === 'light'){
-      document.documentElement.setAttribute('data-theme','light');
-    }
-  }catch(e){}
-})();
-</script>
 <meta charset="UTF-8">
 <meta http-equiv="Cache-Control" content="no-cache,must-revalidate">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>访问统计 - 向天游</title>
 <style>
-/* 2026-09-15：浅色主题（跟随主页选择） */
-[data-theme="light"]{--bg:#F7F5F0;--fg-rgb:32,35,40;--text:#1F2226}
-[data-theme="light"] body{background:#F7F5F0;color:#1F2226}
-[data-theme="light"] .overview>div{background:rgba(32,35,40,.03);border-color:rgba(32,35,40,.08)}
-[data-theme="light"] .overview .l{color:rgba(32,35,40,.45)}
+
+
+
+
 
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;margin:0;padding:24px 16px;max-width:720px;margin:0 auto;min-height:100vh}
+body{background:#0E1116;color:#E8E4DA;font-family:system-ui,sans-serif;margin:0;padding:24px 16px;max-width:720px;margin:0 auto;min-height:100vh}
 h1{font-size:1.3rem;font-weight:600;text-align:center;margin:0 0 4px;letter-spacing:.5px}
 h1 em{font-style:italic;color:#7C9B7E;font-weight:400}
 .sub{text-align:center;color:rgba(232,228,218,.35);font-size:.8rem;margin-bottom:18px}
@@ -159,7 +147,7 @@ function _pwOk(v, cb){
 <div id="content"><div class="msg ld">加载中···</div></div>
 
 <!-- Supabase SDK：本地托管（同主页），避免外部 CDN 加载失败 -->
-<script src="vendor/supabase.js?v=20260915-58"></script>
+<script src="vendor/supabase.js?v=20260915-64"></script>
 <script>
   if (typeof supabase === 'undefined') {
     document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
