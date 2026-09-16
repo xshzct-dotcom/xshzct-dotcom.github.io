@@ -833,7 +833,9 @@ function renderList(){
           _selSet.forEach(function(i){ if(plist[i]){ ids.push(plist[i].id); sps.push(plist[i].storage_path); } });
           try{
             if(sb) await sb.from('album_photos').delete().in('id', ids);
-            if(sps.length && sb) sb.storage.from('photos').remove(sps).catch(function(){});
+            // 2026-09-16：连缩略图一起删，避免"删了照片但 thumbs/ 还占着空间"
+            var spsAll = sps.concat(sps.map(function(x){ return 'thumbs/' + x; }));
+            if(spsAll.length && sb) sb.storage.from('photos').remove(spsAll).catch(function(){});
           }catch(err){ console.warn(err); }
           _selSet.clear(); _selectMode = false;
           invalidateCache('album');   // 删除照片后清相册列表缓存（返回时张数正确）
