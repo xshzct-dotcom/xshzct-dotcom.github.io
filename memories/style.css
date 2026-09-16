@@ -788,15 +788,13 @@ html{
 
 /* ═══ 2026-09-16 质感·第2层：视觉秩序 ═══ */
 
-/* ① 图片渐显：图片"从无到有"最伤质感（硬切=廉价）。
-   用 opacity 过渡 + 加载完成的属性选择器，纯 CSS 实现 */
-img{
-  opacity: 0;
-  transition: opacity .45s var(--ease-out-soft, ease);
-}
-img[complete], img.loaded{ opacity: 1 }
-/* 已经是完整 URI 的图（缓存命中）立即显示 */
-img[src^="data:"]{ opacity: 1 }
+/* ① 图片渐显：用 animation 而非 opacity 初值 ——
+   注意：不能写 img{opacity:0} + img[complete]{opacity:1}，
+   因为 complete 是 DOM 属性而非 HTML 属性，属性选择器永不匹配，会导致图片全部隐藏 ✗ */
+img{ animation: imgFadeIn .42s cubic-bezier(.22,.61,.36,1) both }
+@keyframes imgFadeIn{ from{ opacity:0 } to{ opacity:1 } }
+/* 已经是完整数据 URI 的图（图标等）不需要动画 */
+img[src^="data:"]{ animation:none }
 
 /* ② 圆角统一（原来是各处 2px/3px/4px 混用，显得随意） */
 :root{
