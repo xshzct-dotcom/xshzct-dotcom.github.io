@@ -831,3 +831,82 @@ img[src^="data:"]{ animation:none }
   }
   ::-webkit-scrollbar-thumb:hover{ background: rgba(128,128,128,.38); background-clip: content-box }
 }
+
+
+/* ═══ 2026-09-16 质感·第3层：交互与显示的"贵气" ═══ */
+
+/* ① 骨架屏：加载时用"呼吸的灰块"占位，而不是空白或转圈
+   —— 高级站与普通站最大的观感差距就在"等待时刻" */
+.skel{
+  background: linear-gradient(100deg,
+    rgba(var(--fg-rgb),.045) 26%,
+    rgba(var(--fg-rgb),.085) 42%,
+    rgba(var(--fg-rgb),.045) 60%);
+  background-size: 300% 100%;
+  animation: skelShine 1.5s var(--ease-in-out-quart, ease-in-out) infinite;
+  border-radius: var(--r-sm, 6px);
+}
+@keyframes skelShine{
+  0%{ background-position: 120% 0 }
+  100%{ background-position: -20% 0 }
+}
+.skel-line{ height: 12px; margin-bottom: 10px }
+.skel-line.w60{ width: 60% }
+.skel-line.w40{ width: 40% }
+.skel-line.w80{ width: 80% }
+.skel-block{ aspect-ratio: 16/10; width: 100% }
+
+/* 骨架卡片：与真实卡片同尺寸，切换时"不跳" */
+.skel-card{
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 10px);
+  padding: 16px;
+  overflow: hidden;
+}
+
+/* ② 点击涟漪：从指/鼠标落点扩散（触觉反馈的自然延伸） */
+.ripple-host{ position: relative; overflow: hidden }
+.ripple{
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  background: radial-gradient(circle, rgba(var(--fg-rgb),.28) 0%, rgba(var(--fg-rgb),0) 68%);
+  pointer-events: none;
+  animation: rippleOut .56s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)) forwards;
+}
+@keyframes rippleOut{
+  to{ transform: scale(2.6); opacity: 0 }
+}
+
+/* ③ 空状态：用图形而非干巴巴一行字（视觉上"有人设计过"） */
+.empty-art{
+  display: flex; flex-direction: column; align-items: center;
+  padding: 44px 20px; gap: 14px; text-align: center;
+}
+.empty-art .ea-ring{
+  width: 62px; height: 62px; border-radius: 50%;
+  border: 1.5px dashed rgba(var(--fg-rgb),.22);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  animation: eaFloat 3.4s var(--ease-in-out-quart, ease-in-out) infinite;
+}
+.empty-art .ea-ring::after{
+  content: ''; width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(var(--fg-rgb),.10);
+}
+.empty-art .ea-bars{ display:flex; gap:5px; align-items:flex-end; height:22px }
+.empty-art .ea-bars i{
+  display:block; width:4px; border-radius:2px; background:rgba(var(--fg-rgb),.16);
+  animation: eaBar 1.6s var(--ease-in-out-quart, ease-in-out) infinite;
+}
+.empty-art .ea-bars i:nth-child(1){ height:10px; animation-delay:0s }
+.empty-art .ea-bars i:nth-child(2){ height:18px; animation-delay:.16s }
+.empty-art .ea-bars i:nth-child(3){ height:13px; animation-delay:.32s }
+.empty-art .ea-bars i:nth-child(4){ height:20px; animation-delay:.48s }
+@keyframes eaFloat{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-5px) } }
+@keyframes eaBar{ 0%,100%{ transform:scaleY(.55); opacity:.5 } 50%{ transform:scaleY(1); opacity:.9 } }
+
+/* ④ 数字/统计值：切换时轻微上浮淡入（而不是瞬间替换） */
+.value-swap{ animation: valueIn .3s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)) both }
+@keyframes valueIn{ from{ opacity:0; transform: translateY(4px) } to{ opacity:1; transform:none } }
