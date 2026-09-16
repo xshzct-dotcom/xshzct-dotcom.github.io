@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260916-28">
+<link rel="stylesheet" href="style.css?v=20260916-32">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -322,6 +322,41 @@
 /* 2026-09-12 关键修复：display:flex 会覆盖 HTML 的 hidden 属性，
    导致这个透明全屏层常驻，挡住页面所有点击（表现为鼠标变 zoom-out 光标、什么都点不动） */
 .mp-viewer[hidden],.mp-empty[hidden]{display:none!important}
+
+
+/* 2026-09-16：博客页质感层（与主页一致） */
+:root{
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+  --ease-out-expo: cubic-bezier(.16,1,.3,1);
+  --dur-press: .16s;
+  --dur-ui: .26s;
+}
+button, a, [role="button"], .mp-play, .mp-music-btn, .mp-back,
+.ml-item, .mp-head a, .mp-date-nav button{
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-press) var(--ease-spring),
+    box-shadow var(--dur-ui) var(--ease-out-expo),
+    background-color var(--dur-ui) ease,
+    border-color var(--dur-ui) ease,
+    color var(--dur-ui) ease,
+    opacity var(--dur-ui) ease;
+}
+button:active, [role="button"]:active, .mp-play:active, .mp-music-btn:active{
+  transform: scale(.945);
+  transition-duration: var(--dur-press);
+}
+.ml-item:active{ transform: scale(.978); transition-duration: var(--dur-press) }
+.ml-list, .mp-body{ -webkit-overflow-scrolling: touch }
+:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px }
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -407,7 +442,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260916-28"></script>
+<script src="vendor/supabase.js?v=20260916-32"></script>
 <script>
 (function(){
   'use strict';
