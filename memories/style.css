@@ -784,3 +784,52 @@ html{
     scroll-behavior: auto !important;
   }
 }
+
+
+/* ═══ 2026-09-16 质感·第2层：视觉秩序 ═══ */
+
+/* ① 图片渐显：图片"从无到有"最伤质感（硬切=廉价）。
+   用 opacity 过渡 + 加载完成的属性选择器，纯 CSS 实现 */
+img{
+  opacity: 0;
+  transition: opacity .45s var(--ease-out-soft, ease);
+}
+img[complete], img.loaded{ opacity: 1 }
+/* 已经是完整 URI 的图（缓存命中）立即显示 */
+img[src^="data:"]{ opacity: 1 }
+
+/* ② 圆角统一（原来是各处 2px/3px/4px 混用，显得随意） */
+:root{
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-full: 999px;
+}
+
+/* ③ 阴影分层：定义 3 级，全站只用这 3 级（层次感来自克制） */
+:root{
+  --sh-1: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04);
+  --sh-2: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+  --sh-3: 0 12px 32px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.05);
+}
+
+/* ④ 交互元素统一"落点"：避免 hover 时元素跳来跳去 */
+@media (hover: hover) and (pointer: fine){
+  .ml-item:hover, .timeline-card:hover, .polaroid:hover{
+    translate: 0 -1px;
+  }
+}
+
+/* ⑤ 滚动条美化（桌面）：细、圆、低对比，不抢视线 */
+@media (hover: hover) and (pointer: fine){
+  ::-webkit-scrollbar{ width: 8px; height: 8px }
+  ::-webkit-scrollbar-track{ background: transparent }
+  ::-webkit-scrollbar-thumb{
+    background: rgba(128,128,128,.22);
+    border-radius: var(--r-full);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover{ background: rgba(128,128,128,.38); background-clip: content-box }
+}
