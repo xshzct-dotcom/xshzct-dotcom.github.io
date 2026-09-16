@@ -1273,7 +1273,9 @@ function renderPostOldList(posts){
         var rm = [];
         (p.images || []).forEach(function(x){ rm.push(x); });
         if(p.music_path) rm.push(p.music_path);
-        if(rm.length && sb) sb.storage.from('photos').remove(rm).catch(function(){});
+        // 2026-09-16：附件 + 缩略图一并删除（否则 thumbs/ 会长期残留占空间）
+        var rmAll = rm.concat(rm.map(function(x){ return 'thumbs/' + x; }));
+        if(rmAll.length && sb) sb.storage.from('photos').remove(rmAll).catch(function(){});
         invalidateCache('post');
         renderTab();
       }catch(e){ b.textContent = '删除'; alert('删除失败：' + e.message); }
