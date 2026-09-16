@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260916-34">
+<link rel="stylesheet" href="style.css?v=20260916-35">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -378,6 +378,39 @@ img[src^="data:"]{ animation:none }
   ::-webkit-scrollbar-thumb:hover{ background:rgba(128,128,128,.38); background-clip:content-box }
 }
 
+
+
+/* ═══ 2026-09-16 质感·第3层（博客页）═══ */
+.skel{
+  background: linear-gradient(100deg,
+    rgba(var(--fg-rgb),.045) 26%, rgba(var(--fg-rgb),.085) 42%, rgba(var(--fg-rgb),.045) 60%);
+  background-size:300% 100%;
+  animation: skelShine 1.5s ease-in-out infinite;
+  border-radius:6px;
+}
+@keyframes skelShine{ 0%{background-position:120% 0} 100%{background-position:-20% 0} }
+.skel-line{ height:12px; margin-bottom:10px }
+.skel-line.w60{ width:60% } .skel-line.w40{ width:40% } .skel-line.w80{ width:80% }
+.skel-block{ aspect-ratio:16/10; width:100% }
+.skel-card{ background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:16px; overflow:hidden }
+
+.ripple-host{ position:relative; overflow:hidden }
+.ripple{
+  position:absolute; border-radius:50%; transform:scale(0);
+  background:radial-gradient(circle, rgba(var(--fg-rgb),.26) 0%, rgba(var(--fg-rgb),0) 68%);
+  pointer-events:none; animation: rippleOut .56s cubic-bezier(.16,1,.3,1) forwards;
+}
+@keyframes rippleOut{ to{ transform:scale(2.6); opacity:0 } }
+
+.empty-art{ display:flex; flex-direction:column; align-items:center; padding:44px 20px; gap:14px; text-align:center }
+.empty-art .ea-bars{ display:flex; gap:5px; align-items:flex-end; height:22px }
+.empty-art .ea-bars i{ display:block; width:4px; border-radius:2px; background:rgba(var(--fg-rgb),.16); animation: eaBar 1.6s ease-in-out infinite }
+.empty-art .ea-bars i:nth-child(1){ height:10px }
+.empty-art .ea-bars i:nth-child(2){ height:18px; animation-delay:.16s }
+.empty-art .ea-bars i:nth-child(3){ height:13px; animation-delay:.32s }
+.empty-art .ea-bars i:nth-child(4){ height:20px; animation-delay:.48s }
+@keyframes eaBar{ 0%,100%{ transform:scaleY(.55); opacity:.5 } 50%{ transform:scaleY(1); opacity:.9 } }
+
 </style>
 </head>
 <body>
@@ -463,7 +496,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260916-34"></script>
+<script src="vendor/supabase.js?v=20260916-35"></script>
 <script>
 (function(){
   'use strict';
@@ -1009,7 +1042,19 @@ function _pwOk(v, cb){
     }catch(e){}
   })();
 
-  async function load(){
+    // 2026-09-16：加载时显示骨架屏（等待时刻也要有质感）
+  function showSkeleton(){
+    var el = document.getElementById('mpList');
+    if(!el) return;
+    var one = '<div class="skel-card"><div class="skel skel-block" style="margin-bottom:14px"></div>'
+            + '<div class="skel skel-line w80"></div><div class="skel skel-line w60"></div>'
+            + '<div class="skel skel-line w40"></div></div>';
+    el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:22px;padding:8px 0">'
+                 + one + one + one + one + one + one + '</div>';
+  }
+async function load(){
+    // 2026-09-16：先出骨架屏（仅首次/列表为空时，避免每次刷新都闪）
+    try{ if(document.getElementById('mpList') && !document.querySelector('#mpList .ml-item')) showSkeleton(); }catch(e){}
     var listEl = document.getElementById('mpList');
     var detailEl = document.getElementById('mpDetail');
     if(!sb){
@@ -1071,6 +1116,27 @@ function _pwOk(v, cb){
     }, {passive:true});
     document.addEventListener('touchend', function(){ setTimeout(clearAll, 220); }, {passive:true});
     document.addEventListener('touchcancel', function(){ clearAll(); }, {passive:true});
+  })();
+  // 2026-09-16：全局点击涟漪 —— 从点击落点扩散，给交互"实感"
+  (function(){
+    function makeRipple(e){
+      var el = e.target && e.target.closest ? e.target.closest('button, .nav-icon-btn, .river-filter, .editor-btn-sm, .ml-item, .timeline-card, .tl-group-header, .mp-play, .mp-music-btn, .polaroid') : null;
+      if(!el) return;
+      if(getComputedStyle(el).position === 'static') el.style.position = 'relative';
+      if(getComputedStyle(el).overflow === 'visible') el.style.overflow = 'hidden';
+      var r = el.getBoundingClientRect();
+      var size = Math.max(r.width, r.height);
+      var x = (e.clientX != null ? e.clientX : r.left + r.width/2) - r.left;
+      var y = (e.clientY != null ? e.clientY : r.top + r.height/2) - r.top;
+      var d = document.createElement('span');
+      d.className = 'ripple';
+      d.style.width = d.style.height = size + 'px';
+      d.style.left = (x - size/2) + 'px';
+      d.style.top  = (y - size/2) + 'px';
+      el.appendChild(d);
+      setTimeout(function(){ d.remove(); }, 600);
+    }
+    document.addEventListener('pointerdown', makeRipple, {passive:true});
   })();
   bindEvents();   // 2026-09-15：事件委托只绑一次（含无刷新路由的点击拦截）
   load();
