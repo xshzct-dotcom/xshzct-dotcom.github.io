@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260916-32">
+<link rel="stylesheet" href="style.css?v=20260916-33">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -357,6 +357,23 @@ button:active, [role="button"]:active, .mp-play:active, .mp-music-btn:active{
   }
 }
 
+
+
+/* ═══ 2026-09-16 质感·第2层（博客页）═══ */
+img{ opacity:0; transition:opacity .45s cubic-bezier(.22,.61,.36,1) }
+img[complete], img.loaded{ opacity:1 }
+img[src^="data:"]{ opacity:1 }
+:root{ --r-full:999px }
+@media (hover: hover) and (pointer: fine){
+  ::-webkit-scrollbar{ width:8px; height:8px }
+  ::-webkit-scrollbar-track{ background:transparent }
+  ::-webkit-scrollbar-thumb{
+    background:rgba(128,128,128,.22); border-radius:var(--r-full);
+    border:2px solid transparent; background-clip:content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover{ background:rgba(128,128,128,.38); background-clip:content-box }
+}
+
 </style>
 </head>
 <body>
@@ -442,7 +459,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260916-32"></script>
+<script src="vendor/supabase.js?v=20260916-33"></script>
 <script>
 (function(){
   'use strict';
