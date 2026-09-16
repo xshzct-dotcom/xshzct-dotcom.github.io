@@ -851,9 +851,27 @@ function showLbLoader(show, pct, text){
 }
 
 function navLightbox(dir){
-  lightboxIdx += dir;
-  if(lightboxIdx < 0) lightboxIdx = lightboxPhotos.length - 1;
-  if(lightboxIdx >= lightboxPhotos.length) lightboxIdx = 0;
+  // 2026-09-16 修复：照片池里可能有重复（河流用的是带重复的随机池），
+  //   原来是直接 +1，遇到重复时"切了但图没变"，看起来像"要按好几次才换"。
+  //   现在改为：向前找第一张与当前不同的照片，最多绕一圈。
+  var n = (lightboxPhotos && lightboxPhotos.length) || 0;
+  if(n <= 1){ if(window.SFX) window.SFX.flip(); return; }
+  var cur = lightboxPhotos[lightboxIdx];
+  var curKey = cur ? (full(cur) || String(cur)) : '';
+  var next = -1;
+  for(var k = 1; k <= n; k++){
+    var ni = lightboxIdx + dir * k;
+    ni = ((ni % n) + n) % n;
+    var cand = lightboxPhotos[ni];
+    var candKey = cand ? (full(cand) || String(cand)) : '';
+    if(candKey !== curKey){ next = ni; break; }
+  }
+  if(next < 0){
+    next = lightboxIdx + dir;
+    if(next < 0) next = n - 1;
+    if(next >= n) next = 0;
+  }
+  lightboxIdx = next;
   if(window.SFX) window.SFX.flip();
   openLightbox(lightboxIdx);
 }
