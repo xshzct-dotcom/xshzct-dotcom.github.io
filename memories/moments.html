@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260916-26">
+<link rel="stylesheet" href="style.css?v=20260916-28">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -407,7 +407,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260916-26"></script>
+<script src="vendor/supabase.js?v=20260916-28"></script>
 <script>
 (function(){
   'use strict';
@@ -883,6 +883,14 @@ function _pwOk(v, cb){
     if(!e || !e.data) return;
     if(e.data === 'stop-iframe-music'){
       try{ if(audio){ audio.pause(); } }catch(err){}
+      return;
+    }
+    // 2026-09-16：编辑器改动数据后，父页通知博客立即重新拉取（免手动刷新）
+    if(e.data === 'data-changed'){
+      try{
+        if(typeof load === 'function') load();          // 重新查 Supabase 并重渲染
+        else if(typeof renderRoute === 'function') renderRoute();
+      }catch(err){}
       return;
     }
     if(typeof e.data === 'string' && e.data.indexOf('theme:') === 0){
