@@ -152,7 +152,12 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#editorPanel').c
 var _editorCache = {essay: null, album: null, music: null, post: null};
 var _cacheTime = {essay: 0, album: 0, music: 0, post: 0};
 var _CACHE_TTL = 180000; // 2026-09-11 优化：15秒 → 3分钟（编辑器内改动会 invalidateCache，延长安全）
-function invalidateCache(tab){ if(tab && _cacheTime[tab]!==undefined) _cacheTime[tab]=0; else{_cacheTime={essay:0,album:0,music:0,post:0};} }
+function invalidateCache(tab){
+  if(tab && _cacheTime[tab]!==undefined) _cacheTime[tab]=0;
+  else{_cacheTime={essay:0,album:0,music:0,post:0};}
+  // 2026-09-16：本地缓存失效的同时，通知博客画布也重新拉取（免手动刷新）
+  try{ if(typeof window.notifyBlogDataChanged === 'function') window.notifyBlogDataChanged(); }catch(e){}
+}
 
 // ===== 2026-09-11 加载优化：统一加载入口（复用进行中的请求）+ 三 tab 并行预取 =====
 // 原来三个 tab 串行加载 + open() 等待同步流程，切换时每次都要等一个跨境往返
