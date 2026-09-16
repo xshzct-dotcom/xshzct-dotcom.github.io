@@ -1197,24 +1197,39 @@ function playSong(idx, seekFromStorage){
           : sp.startsWith('music/') ? MUSIC_BASE+sp.slice(6)
           : sp ? SUPABASE_STORAGE+sp
           : MUSIC_BASE+(t.name||t.title||'')+'.mp3';
-  bgMusic.src=url; bgMusic.load();
-
-  // 恢复进度：switchPlaylist 传入 seekFromStorage=true 时才从 localStorage 恢复
-  // 手动切歌（下一首/上一首）不恢复进度，从头开始
+  // 2026-09-16 修复：先把"恢复进度"的监听器绑好，再设置 src 并 load
+  //   —— 原来是 src+load() 之后才绑 loadedmetadata；元数据若已就绪就永不触发，
+  //      这正是"歌记住了但进度不延续"的原因
+  var _resumeT = 0;
   if(seekFromStorage){
     try{
-      var key=url.split('/').pop();
-      var saved=localStorage.getItem('musicResume_'+key);
-      if(saved){
-        var obj=JSON.parse(saved);
-        if(obj.t && obj.t > 0){
-          bgMusic.addEventListener('loadedmetadata', function onResume(){
-            bgMusic.currentTime = obj.t;
-            bgMusic.removeEventListener('loadedmetadata', onResume);
-          }, {once:true});
-        }
+      var _key = url.split('/').pop();
+      var _saved = localStorage.getItem('musicResume_' + _key);
+      if(_saved){
+        var _obj = JSON.parse(_saved);
+        if(_obj.t && _obj.t > 0) _resumeT = _obj.t;
       }
     }catch(e){}
+  }
+  function _applySeek(){
+    try{
+      if(bgMusic.duration && !isNaN(bgMusic.duration) && _resumeT < bgMusic.duration - 1){
+        bgMusic.currentTime = _resumeT;
+      }
+    }catch(e){}
+  }
+  if(_resumeT > 0){
+    bgMusic.addEventListener('loadedmetadata', _applySeek, {once:true});
+    bgMusic.addEventListener('canplay', _applySeek, {once:true});
+  }
+  bgMusic.src=url; bgMusic.load();
+  // 兜底：部分移动端元数据已就绪，稍后确认一次
+  if(_resumeT > 0){
+    setTimeout(function(){
+      try{
+        if(bgMusic.readyState >= 1 && Math.abs(bgMusic.currentTime - _resumeT) > 2) _applySeek();
+      }catch(e){}
+    }, 400);
   }
 
   // 播放：已授权直接播，否则等 _grant
