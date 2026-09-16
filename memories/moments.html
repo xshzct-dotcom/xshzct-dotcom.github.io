@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260916-33">
+<link rel="stylesheet" href="style.css?v=20260916-34">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -360,9 +360,13 @@ button:active, [role="button"]:active, .mp-play:active, .mp-music-btn:active{
 
 
 /* ═══ 2026-09-16 质感·第2层（博客页）═══ */
-img{ opacity:0; transition:opacity .45s cubic-bezier(.22,.61,.36,1) }
-img[complete], img.loaded{ opacity:1 }
-img[src^="data:"]{ opacity:1 }
+/* ① 图片渐显：用 animation 而非 opacity 初值 ——
+   注意：不能写 img{opacity:0} + img[complete]{opacity:1}，
+   因为 complete 是 DOM 属性而非 HTML 属性，属性选择器永不匹配，会导致图片全部隐藏 ✗ */
+img{ animation: imgFadeIn .42s cubic-bezier(.22,.61,.36,1) both }
+@keyframes imgFadeIn{ from{ opacity:0 } to{ opacity:1 } }
+/* 已经是完整数据 URI 的图（图标等）不需要动画 */
+img[src^="data:"]{ animation:none }
 :root{ --r-full:999px }
 @media (hover: hover) and (pointer: fine){
   ::-webkit-scrollbar{ width:8px; height:8px }
@@ -459,7 +463,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260916-33"></script>
+<script src="vendor/supabase.js?v=20260916-34"></script>
 <script>
 (function(){
   'use strict';
