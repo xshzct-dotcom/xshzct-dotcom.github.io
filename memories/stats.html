@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<script>
+/* 2026-09-19：统计页原来是"写死暗色"，切到浅色主题时只有它还是黑的 —— 视觉上很跳。
+   这里与主页/博客页保持一致：首帧前按记录应用主题。 */
+(function(){ try{
+  if(localStorage.getItem('memories.theme') !== 'light') document.documentElement.setAttribute('data-theme','dark');
+  else document.documentElement.setAttribute('data-theme','light');
+}catch(e){} })();
+</script>
 <meta charset="UTF-8">
 <meta http-equiv="Cache-Control" content="no-cache,must-revalidate">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -12,79 +20,80 @@
 
 
 *{box-sizing:border-box}
-body{background:#0E1116;color:#E8E4DA;font-family:system-ui,sans-serif;margin:0;padding:24px 16px;max-width:720px;margin:0 auto;min-height:100vh}
+body{background:var(--bg,#0E1116);color:var(--text,var(--text));font-family:system-ui,sans-serif;margin:0;padding:24px 16px;max-width:720px;margin:0 auto;min-height:100vh}
 h1{font-size:1.3rem;font-weight:600;text-align:center;margin:0 0 4px;letter-spacing:.5px}
-h1 em{font-style:italic;color:#7C9B7E;font-weight:400}
-.sub{text-align:center;color:rgba(232,228,218,.35);font-size:.8rem;margin-bottom:18px}
+h1 em{font-style:italic;color:var(--accent);font-weight:400}
+.sub{text-align:center;color:rgba(var(--fg-rgb),.35);font-size:.8rem;margin-bottom:18px}
 
 /* 日期导航 */
-.date-nav{background:rgba(232,228,218,.04);border:1px solid rgba(232,228,218,.08);border-radius:12px;padding:12px;margin-bottom:18px;display:flex;align-items:center;gap:8px}
-.date-nav .nav-btn{flex-shrink:0;width:36px;height:36px;border-radius:8px;border:1px solid rgba(232,228,218,.1);background:transparent;color:rgba(232,228,218,.5);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
-.date-nav .nav-btn:hover{background:rgba(232,228,218,.06);color:#E8E4DA}
-.date-nav input[type=date]{flex:1;background:rgba(232,228,218,.05);border:1px solid rgba(232,228,218,.1);border-radius:8px;padding:8px 12px;color:#E8E4DA;font-size:.95rem;font-family:inherit;text-align:center;outline:none;cursor:pointer;min-width:0}
+.date-nav{background:rgba(var(--fg-rgb),.04);border:1px solid rgba(var(--fg-rgb),.08);border-radius:12px;padding:12px;margin-bottom:18px;display:flex;align-items:center;gap:8px}
+.date-nav .nav-btn{flex-shrink:0;width:36px;height:36px;border-radius:8px;border:1px solid rgba(var(--fg-rgb),.1);background:transparent;color:rgba(var(--fg-rgb),.5);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.date-nav .nav-btn:hover{background:rgba(var(--fg-rgb),.06);color:var(--text)}
+.date-nav input[type=date]{flex:1;background:rgba(var(--fg-rgb),.05);border:1px solid rgba(var(--fg-rgb),.1);border-radius:8px;padding:8px 12px;color:var(--text);font-size:.95rem;font-family:inherit;text-align:center;outline:none;cursor:pointer;min-width:0}
 .date-nav input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.7);cursor:pointer}
-.date-nav .today-btn{padding:0 12px;height:36px;border-radius:8px;border:1px solid rgba(124,155,126,.4);background:transparent;color:#7C9B7E;font-size:.78rem;cursor:pointer;font-family:inherit}
-.date-nav .today-btn:hover{background:rgba(124,155,126,.15)}
+.date-nav .today-btn{padding:0 12px;height:36px;border-radius:8px;border:1px solid rgba(94,125,96,.4);background:transparent;color:var(--accent);font-size:.78rem;cursor:pointer;font-family:inherit}
+.date-nav .today-btn:hover{background:rgba(94,125,96,.15)}
 
 .overview{display:flex;gap:10px;margin-bottom:18px}
-.overview>div{flex:1;background:rgba(232,228,218,.03);border:1px solid rgba(232,228,218,.07);border-radius:10px;padding:14px 8px;text-align:center;position:relative;overflow:hidden}
+.overview>div{flex:1;background:rgba(var(--fg-rgb),.03);border:1px solid rgba(var(--fg-rgb),.07);border-radius:10px;padding:14px 8px;text-align:center;position:relative;overflow:hidden}
 /* 2026-09-15 ⑦：数字卡加极淡网格纹理作底（同样的"淡化图像"思路，用数据图形代替照片） */
 .overview>div::before{
   content:'';position:absolute;inset:0;pointer-events:none;
-  background-image:linear-gradient(90deg,rgba(232,228,218,.05) 1px,transparent 1px),
-                   linear-gradient(rgba(232,228,218,.05) 1px,transparent 1px);
+  background-image:linear-gradient(90deg,rgba(var(--fg-rgb),.05) 1px,transparent 1px),
+                   linear-gradient(rgba(var(--fg-rgb),.05) 1px,transparent 1px);
   background-size:13px 13px;
   -webkit-mask-image:linear-gradient(155deg,#000 8%,transparent 70%);
   mask-image:linear-gradient(155deg,#000 8%,transparent 70%);
 }
 .overview>div>*{position:relative;z-index:1}
 .overview .n{font-size:1.8rem;font-weight:700;line-height:1.2}
-.overview .l{font-size:.72rem;margin-top:3px;color:rgba(232,228,218,.4);text-transform:uppercase;letter-spacing:.5px}
+.overview .l{font-size:.72rem;margin-top:3px;color:rgba(var(--fg-rgb),.4);text-transform:uppercase;letter-spacing:.5px}
 
-.section{background:rgba(232,228,218,.03);border:1px solid rgba(232,228,218,.07);border-radius:12px;padding:18px;margin-bottom:14px}
-.section h2{font-size:.85rem;color:rgba(232,228,218,.4);margin:0 0 14px;font-weight:500;letter-spacing:.5px;text-transform:uppercase}
+.section{background:rgba(var(--fg-rgb),.03);border:1px solid rgba(var(--fg-rgb),.07);border-radius:12px;padding:18px;margin-bottom:14px}
+.section h2{font-size:.85rem;color:rgba(var(--fg-rgb),.4);margin:0 0 14px;font-weight:500;letter-spacing:.5px;text-transform:uppercase}
 
 .bar-row{display:flex;align-items:center;gap:6px;margin:3px 0;padding:2px 0}
-.bar-row .dt{font-size:.75rem;color:rgba(232,228,218,.35);width:50px;flex-shrink:0}
-.bar-row .bar{height:7px;border-radius:4px;background:#7C9B7E;min-width:3px;transition:width .5s;opacity:.8}
-.bar-row .cnt{font-size:.78rem;color:rgba(232,228,218,.5);min-width:18px;text-align:right}
+.bar-row .dt{font-size:.75rem;color:rgba(var(--fg-rgb),.35);width:50px;flex-shrink:0}
+.bar-row .bar{height:7px;border-radius:4px;background:var(--accent);min-width:3px;transition:width .5s;opacity:.8}
+.bar-row .cnt{font-size:.78rem;color:rgba(var(--fg-rgb),.5);min-width:18px;text-align:right}
 
-.list-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(232,228,218,.05);font-size:.85rem}
+.list-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(var(--fg-rgb),.05);font-size:.85rem}
 .list-item:last-child{border-bottom:none}
-.list-item .p{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(232,228,218,.7)}
-.list-item .c{color:rgba(232,228,218,.5);font-weight:600;min-width:20px;text-align:right}
+.list-item .p{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(var(--fg-rgb),.7)}
+.list-item .c{color:rgba(var(--fg-rgb),.5);font-weight:600;min-width:20px;text-align:right}
 
 .hour-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px}
-.hour-cell{text-align:center;padding:8px 0;border-radius:6px;background:rgba(232,228,218,.04);font-size:.75rem;color:rgba(232,228,218,.45)}
-.hour-cell .hc{font-size:.95rem;font-weight:600;color:#E8E4DA;display:block;margin-bottom:1px}
-.hour-cell.hot{background:rgba(124,155,126,.2)}
-.hour-cell.warm{background:rgba(124,155,126,.1)}
+.hour-cell{text-align:center;padding:8px 0;border-radius:6px;background:rgba(var(--fg-rgb),.04);font-size:.75rem;color:rgba(var(--fg-rgb),.45)}
+.hour-cell .hc{font-size:.95rem;font-weight:600;color:var(--text);display:block;margin-bottom:1px}
+.hour-cell.hot{background:rgba(94,125,96,.2)}
+.hour-cell.warm{background:rgba(94,125,96,.1)}
 
 .scroll{overflow-x:auto;margin-top:6px}
 table{width:100%;border-collapse:collapse;font-size:.8rem}
-thead th{text-align:left;padding:6px 8px;color:rgba(232,228,218,.35);font-weight:500;border-bottom:1px solid rgba(232,228,218,.08);white-space:nowrap}
-tbody td{padding:5px 8px;border-bottom:1px solid rgba(232,228,218,.04);white-space:nowrap;color:rgba(232,228,218,.65)}
-tbody tr:hover td{background:rgba(232,228,218,.03)}
+thead th{text-align:left;padding:6px 8px;color:rgba(var(--fg-rgb),.35);font-weight:500;border-bottom:1px solid rgba(var(--fg-rgb),.08);white-space:nowrap}
+tbody td{padding:5px 8px;border-bottom:1px solid rgba(var(--fg-rgb),.04);white-space:nowrap;color:rgba(var(--fg-rgb),.65)}
+tbody tr:hover td{background:rgba(var(--fg-rgb),.03)}
 tbody .p{max-width:160px;overflow:hidden;text-overflow:ellipsis}
-tbody .r{max-width:120px;overflow:hidden;text-overflow:ellipsis;color:rgba(232,228,218,.4)}
+tbody .r{max-width:120px;overflow:hidden;text-overflow:ellipsis;color:rgba(var(--fg-rgb),.4)}
 
-.msg{text-align:center;color:rgba(232,228,218,.25);padding:50px 0;font-size:.9rem}
-.msg.ld{color:rgba(232,228,218,.15);font-size:.8rem}
-.empty{color:rgba(232,228,218,.25);text-align:center;padding:14px;font-size:.85rem}
-.day-label{text-align:center;color:rgba(232,228,218,.35);font-size:.75rem;margin-top:4px}
+.msg{text-align:center;color:rgba(var(--fg-rgb),.25);padding:50px 0;font-size:.9rem}
+.msg.ld{color:rgba(var(--fg-rgb),.15);font-size:.8rem}
+.empty{color:rgba(var(--fg-rgb),.25);text-align:center;padding:14px;font-size:.85rem}
+.day-label{text-align:center;color:rgba(var(--fg-rgb),.35);font-size:.75rem;margin-top:4px}
 </style>
+<link rel="stylesheet" href="style.css?v=20260919-13">
 </head>
 <body>
 <div id="pwdGate" style="position:fixed;inset:0;z-index:9999;background:var(--bg,#0E1116);display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center">
   <div style="max-width:340px;padding:24px;width:100%">
-    <div style="font-size:1.6rem;margin-bottom:12px;font-family:var(--font-display,serif);font-style:italic;color:var(--accent,#7C9B7E)">✦</div>
-    <div style="font-size:.95rem;font-weight:500;color:var(--text,#E8E4DA);margin-bottom:16px">输入密码</div>
+    <div style="font-size:1.6rem;margin-bottom:12px;font-family:var(--font-display,serif);font-style:italic;color:var(--accent,var(--accent))">✦</div>
+    <div style="font-size:.95rem;font-weight:500;color:var(--text,var(--text));margin-bottom:16px">输入密码</div>
     <div style="position:relative;width:100%;margin-bottom:12px">
-      <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:rgba(232,228,218,.4);font-size:.95rem;pointer-events:none;z-index:1;user-select:none">陈</span>
-      <input id="pwdInputS" lang="zh-CN" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%;padding:12px 16px 12px 40px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left;-webkit-text-security:disc" placeholder="**" autocomplete="off">
+      <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:rgba(var(--fg-rgb),.4);font-size:.95rem;pointer-events:none;z-index:1;user-select:none">陈</span>
+      <input id="pwdInputS" lang="zh-CN" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%;padding:12px 16px 12px 40px;background:rgba(var(--fg-rgb),.06);border:1px solid rgba(var(--fg-rgb),.12);border-radius:10px;color:var(--text,var(--text));font-size:.95rem;outline:none;text-align:left;-webkit-text-security:disc" placeholder="**" autocomplete="off">
     </div>
-    <div id="pwdErrorS" style="font-size:.78rem;color:#e74c3c;margin-bottom:10px;display:none">密码不对，再试试</div>
-    <button id="pwdSubmitS" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent,#7C9B7E);color:#fff;font-size:.9rem;font-weight:500;cursor:pointer">进入</button>
+    <div id="pwdErrorS" style="font-size:.78rem;color:var(--danger);margin-bottom:10px;display:none">密码不对，再试试</div>
+    <button id="pwdSubmitS" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent,var(--accent));color:#fff;font-size:.9rem;font-weight:500;cursor:pointer">进入</button>
   </div>
 </div>
 <script>
@@ -147,7 +156,7 @@ function _pwOk(v, cb){
 <div id="content"><div class="msg ld">加载中···</div></div>
 
 <!-- Supabase SDK：本地托管（同主页），避免外部 CDN 加载失败 -->
-<script src="vendor/supabase.js?v=20260919-12"></script>
+<script src="vendor/supabase.js?v=20260919-13"></script>
 <script>
   if (typeof supabase === 'undefined') {
     document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
@@ -280,8 +289,8 @@ async function render(){
     // 访客构成（2026-09-15）：通过密码 / 未通过密码（客观描述，不做身份判断）
     if(authedN + guestN > 0){
       html+='<div class="section"><h2>🔐 访问构成</h2><div class="overview">';
-      html+='<div><div class="n" style="color:#7C9B7E">'+authedN+'</div><div class="l">通过密码的访问</div></div>';
-      html+='<div><div class="n" style="color:#e6a23c">'+guestN+'</div><div class="l">未通过密码的访问</div></div>';
+      html+='<div><div class="n" style="color:var(--accent)">'+authedN+'</div><div class="l">通过密码的访问</div></div>';
+      html+='<div><div class="n" style="color:var(--warn-text)">'+guestN+'</div><div class="l">未通过密码的访问</div></div>';
       html+='</div></div>';
       if(guestRows.length){
         html+='<div class="section"><h2>👀 未通过密码的访问（停在密码页，看不到内容）</h2>';
@@ -350,11 +359,11 @@ async function render(){
       // 2026-09-16：译成中文（表里没有的原样保留，不硬翻）
       var loc = parts.filter(Boolean).map(function(x){ return esc(zh(x)); }).join(' · ') || '地区未知';
       var dev = devName(d.ua) + (d.screen ? ' · '+esc(d.screen) : '');
-      var gate = d.is_authed ? '<span style="color:rgba(124,155,126,.85)">已通过密码</span>' : '<span style="color:rgba(216,123,107,.85)">仅到密码页</span>';
-      var visitor = '<span style="color:rgba(232,228,218,.86);font-weight:500">'+loc+'</span>'
-                  + '<br><span style="font-size:.7rem;color:rgba(232,228,218,.42)">'+dev+'</span>'
+      var gate = d.is_authed ? '<span style="color:var(--accent)">已通过密码</span>' : '<span style="color:var(--danger)">仅到密码页</span>';
+      var visitor = '<span style="color:rgba(var(--fg-rgb),.86);font-weight:500">'+loc+'</span>'
+                  + '<br><span style="font-size:.7rem;color:rgba(var(--fg-rgb),.42)">'+dev+'</span>'
                   + '<br><span style="font-size:.68rem">'+gate+'</span>';
-      html+='<tr><td style="color:rgba(232,228,218,.4);font-size:.75rem">'+time+'</td><td class="p" style="font-size:.76rem">'+esc(String(d.path||'/').split('?')[0])+'</td><td style="font-size:.78rem;color:'+(d.duration?'rgba(124,155,126,.7)':'rgba(232,228,218,.2)')+'">'+dur+'</td><td style="font-size:.75rem;white-space:nowrap">'+visitor+'</td><td class="r" style="font-size:.7rem">'+(d.ref?esc(d.ref):'--')+'</td></tr>';
+      html+='<tr><td style="color:rgba(var(--fg-rgb),.4);font-size:.75rem">'+time+'</td><td class="p" style="font-size:.76rem">'+esc(String(d.path||'/').split('?')[0])+'</td><td style="font-size:.78rem;color:'+(d.duration?'var(--accent)':'rgba(var(--fg-rgb),.2)')+'">'+dur+'</td><td style="font-size:.75rem;white-space:nowrap">'+visitor+'</td><td class="r" style="font-size:.7rem">'+(d.ref?esc(d.ref):'--')+'</td></tr>';
     });
     if(!visits||!visits.length) html+='<tr><td colspan="5" class="empty">当天无访问记录</td></tr>';
     html+='</tbody></table></div></div>';
@@ -394,7 +403,7 @@ async function render(){
           var time = (d.visited_at||'').match(/(\d+):(\d+):(\d+)/);
           time = time ? (time[1]+':'+time[2]+':'+time[3]) : '';
           var dur = d.duration ? fmt(d.duration) : '--';
-          localHTML += '<tr><td style="color:rgba(232,228,218,.4);font-size:.75rem">'+time+'</td><td class="p">'+esc(d.path||'/')+'</td><td style="font-size:.78rem;color:rgba(124,155,126,.7)">'+dur+'</td></tr>';
+          localHTML += '<tr><td style="color:rgba(var(--fg-rgb),.4);font-size:.75rem">'+time+'</td><td class="p">'+esc(d.path||'/')+'</td><td style="font-size:.78rem;color:var(--accent)">'+dur+'</td></tr>';
         });
         localHTML += '</tbody></table></div>';
       }
@@ -413,6 +422,11 @@ if('serviceWorker' in navigator){
   });
 }
 
+window.addEventListener('message', function(e){
+  if(!e || typeof e.data !== 'string' || e.data.indexOf('theme:') !== 0) return;
+  if(e.data.slice(6) === 'light') document.documentElement.setAttribute('data-theme','light');
+  else document.documentElement.setAttribute('data-theme','dark');
+});
 render();
 </script>
 </body>
