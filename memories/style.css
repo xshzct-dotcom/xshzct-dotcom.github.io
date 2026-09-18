@@ -1087,3 +1087,35 @@ img[src^="data:"]{ animation:none }
 @media (max-width: 820px){
   .player .play-mode-btn{ width: 30px; height: 30px; font-size: 1.05rem; margin-left: 8px }
 }
+
+
+/* ═══ 2026-09-19：全屏遮罩层"不挡点击"的彻底修复 ═══
+   问题：灯箱（#lightbox）关闭时虽然 opacity:0 + pointer-events:none，
+        但 elementFromPoint 仍把点击判给它 → 导航按钮"点了没反应"✗
+   原因：仅靠 pointer-events 不可靠（会被其他规则/内联样式覆盖）
+   方案：关闭态加 visibility:hidden —— 隐藏元素【绝不参与命中测试】✓
+        并配 transition 让显隐不突兀（visibility 延迟到 opacity 结束再切） */
+#lightbox:not(.active){
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transition: opacity .3s ease, visibility 0s linear .3s !important;
+}
+#lightbox.active{
+  visibility: visible !important;
+  pointer-events: auto !important;
+  transition: opacity .3s ease, visibility 0s !important;
+}
+/* 同类全屏层一并加固：博客画布、编辑器遮罩、密码门 */
+#blogOverlay:not(.open):not([data-open="1"]){
+  pointer-events: none !important;
+}
+#editorBackdrop:not(.active){
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+#essayModal:not(.active){
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+/* 已认证时密码门彻底移除命中 */
+.pwd-authed #pwdGate{ display: none !important }
