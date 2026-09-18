@@ -561,7 +561,7 @@ function renderRiver(opts){
   if(!stream) return;
 
   var filtered = getFilteredRiver();
-  // 2026-09-18：顺序【固定】—— 与相册编辑器的排列一致，不再随机打乱
+  // 2026-09-18：顺序【固定】—— 与相册编辑器的排列一致，不随机、不去重
   var pool = (filtered && filtered.length) ? filtered.slice() : allGalleryPhotos.slice();
   _riverTotal = pool.length;
 
