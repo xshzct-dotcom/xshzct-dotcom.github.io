@@ -950,9 +950,9 @@ img[src^="data:"]{ animation:none }
   margin: 0 !important;
   padding: 0 !important;
   flex: 0 0 auto !important;
+  position: relative !important;      /* 放大时的 z-index 需要它才生效 */
   aspect-ratio: 4 / 3 !important;
   border-radius: 6px !important;
-  overflow: hidden !important;
   background: rgba(128,128,128,.08) !important;
   cursor: zoom-in !important;
   position: relative !important;
@@ -962,6 +962,7 @@ img[src^="data:"]{ animation:none }
   height: 100% !important;
   object-fit: cover !important;
   display: block !important;
+  border-radius: 6px !important;
 }
 @media (max-width: 1200px){
   .masonry-item{ width: calc(33.333% - 8px) !important }   /* 3 列 */
@@ -987,3 +988,51 @@ img[src^="data:"]{ animation:none }
 }
 .lightbox-stage{ z-index: 200 !important }
 .lightbox-filmstrip{ z-index: 210 !important }
+
+
+/* ═══════════════════════════════════════════════════════════
+   2026-09-18：相册照片的"选中/聚焦"交互
+   设计意图：用【尺寸 + 高度 + 阴影】表达聚焦，不用透明度（用户明确要求）
+   ═══════════════════════════════════════════════════════════ */
+
+/* 基础：所有卡片都能平滑变化 */
+.masonry-item{
+  transition:
+    transform .42s cubic-bezier(.34,1.56,.64,1),   /* 弹簧：有回弹感 */
+    box-shadow .42s cubic-bezier(.16,1,.3,1),
+    border-radius .3s ease !important;
+  will-change: transform;
+}
+.masonry-item img{
+  transition: transform .6s cubic-bezier(.16,1,.3,1) !important;
+}
+
+/* ① 桌面：悬停 → 放大 + 上浮 + 阴影加深 + 图内二级推近 */
+@media (hover: hover) and (pointer: fine){
+  .masonry-item:hover{
+    transform: scale(1.055) translateY(-5px) !important;
+    box-shadow: 0 18px 44px rgba(0,0,0,.30), 0 4px 12px rgba(0,0,0,.16) !important;
+    z-index: 20 !important;
+    border-radius: 8px !important;
+  }
+  .masonry-item:hover img{
+    transform: scale(1.06) !important;   /* 二级：图片内部再推近，形成层次 */
+    border-radius: 8px !important;
+  }
+}
+
+/* ② 触屏：按住 → 放大 + 弹起（手指上有"抓住"的实感） */
+@media (hover: none), (pointer: coarse){
+  .masonry-item:active{
+    transform: scale(1.045) !important;
+    box-shadow: 0 12px 30px rgba(0,0,0,.34) !important;
+    z-index: 20 !important;
+    transition: transform .2s cubic-bezier(.34,1.56,.64,1) !important;
+  }
+  .masonry-item:active img{ transform: scale(1.03) !important }
+}
+
+/* ③ 点击瞬间：先轻微下沉再弹起（像按到实物） */
+.masonry-item:active{
+  transition-duration: .2s !important;
+}
