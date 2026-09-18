@@ -65,11 +65,31 @@ const nav=$('#nav');
 const navLinks=$('#navLinks');
 const navHamburger=$('#navHamburger');
 navHamburger.onclick=()=>{ navHamburger.classList.toggle('open'); navLinks.classList.toggle('open'); };
-$$('.nav-links a').forEach(a=>a.onclick=()=>{ navHamburger.classList.remove('open'); navLinks.classList.remove('open'); });
+// 2026-09-15：主题切换按钮
+(function(){
+  var tb = document.getElementById('navTheme');
+  if(tb) tb.onclick = function(){ if(typeof window.toggleTheme === 'function') window.toggleTheme(); };
+})();
+$$('.nav-links a').forEach(a=>a.onclick=(e)=>{
+  navHamburger.classList.remove('open');
+  navLinks.classList.remove('open');
+  // 2026-09-15：博客改为在主页内横滑打开（不跳转新页面）
+  if(a.id === 'navBlogLink'){
+    e.preventDefault();
+    // 2026-09-15：已打开时再点一次收起（toggle）
+    if(typeof window.isBlogOpen === 'function' && window.isBlogOpen()){
+      if(typeof window.closeBlog === 'function') window.closeBlog();
+    } else if(typeof window.openBlog === 'function'){
+      window.openBlog();
+    }
+  }
+});
 
 function onScroll(){
   const y=window.scrollY;
   nav.classList.toggle('scrolled', y>60);
+  // 2026-09-15：博客画布打开时，导航高亮由 openBlog 接管，滚动不再覆盖
+  if(window._blogNavLocked) return;
   const heroBg=$('#heroBg');
   if(heroBg) heroBg.style.transform = `translate3d(0,${y*0.32}px,0)`;
   $$('.nav-links a').forEach(a=>{
@@ -85,6 +105,36 @@ window.addEventListener('scroll', onScroll, {passive:true});
 // ===== 主题：单一暗色模式（2026-09-10 移除白色模式切换）=====
 // 历史：曾支持暗色/白色双主题（tag: pre-theme-toggle 之前为无主题版本）
 // 用户决定只保留默认暗色 —— 深底更能衬托照片（相册为主角的网站）
+/* ===== 2026-09-15：明暗主题（默认暗色，可选浅色）=====
+   实现：给 <html> 加/去 data-theme="light"，所有颜色由 style.css 的 CSS 变量接管 */
+function applyTheme(t){
+  var light = (t === 'light');
+  if(light) document.documentElement.setAttribute('data-theme','light');
+  else document.documentElement.removeAttribute('data-theme');
+  var btn = document.getElementById('navTheme');
+  if(btn) btn.textContent = light ? '🌙' : '☀️';
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute('content', light ? '#F7F5F0' : '#0E1116');
+  // 同步通知 iframe（博客页）
+  try{
+    var fr = document.getElementById('blogFrame');
+    if(fr && fr.contentWindow) fr.contentWindow.postMessage('theme:' + (light ? 'light' : 'dark'), '*');
+  }catch(e){}
+}
+window.applyTheme = applyTheme;
+window.toggleTheme = function(){
+  var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  var next = (cur === 'light') ? 'dark' : 'light';
+  try{ localStorage.setItem('memories.theme', next); }catch(e){}
+  applyTheme(next);
+};
+/* 2026-09-15 定稿：记住用户选择；但【首次进入（无记录）默认暗色】 */
+function initTheme(){
+  var t = 'dark';
+  try{ t = localStorage.getItem('memories.theme') || 'dark'; }catch(e){}
+  applyTheme(t);
+}
+
 function clearLegacyTheme(){
   // 清理旧版遗留的 localStorage 偏好，避免残留数据
   try{
@@ -504,36 +554,107 @@ function updateRiverHint(){
 }
 
 function renderRiver(opts){
-  opts=opts||{};
-  var stream=document.getElementById('riverStream');
+  // 2026-09-18：瀑布流（分批渲染 + 滚动增量加载）
+  //   一次性渲染 2700+ 张会卡死，所以首屏只渲染 120 张，滚到底再增量加载。
+  opts = opts || {};
+  var stream = document.getElementById('riverStream');
   if(!stream) return;
-  var filtered=getFilteredRiver();
-  var pool=filtered.length>0?filtered:allGalleryPhotos;
-  _riverTotal=pool.length;
 
-  if(opts.forceReset || _riverPoolKey!==currentFilter){
-    _riverQueue=[]; _riverCycle=0; _riverPoolKey=currentFilter;
-    stream.scrollLeft=0;
+  var filtered = getFilteredRiver();
+  // 2026-09-18：顺序【固定】—— 与相册编辑器的排列一致，不再随机打乱
+  var pool = (filtered && filtered.length) ? filtered.slice() : allGalleryPhotos.slice();
+  _riverTotal = pool.length;
+
+  // 清掉旧的河流控件（换一批/箭头/轮回提示），并统一容器样式
+  stream.className = 'masonry-grid';
+  stream.style.overflow = 'visible';
+  stream.style.display = 'block';
+
+  if(!pool || !pool.length){
+    stream.innerHTML = '<div class="empty-art">'
+      + '<div class="ea-bars"><i></i><i></i><i></i><i></i></div>'
+      + '<div style="color:var(--text-muted);font-size:.9rem">这里还没有照片</div>'
+      + '</div>';
+    var pe0 = document.getElementById('galleryLoadProgress');
+    if(pe0) pe0.textContent = '0 张照片';
+    return;
   }
 
-  ensureRiverQueue(pool);
-  var n=Math.min(POLAROID_COUNT, pool.length);
-  var indices=[];
-  for(var i=0; i<n && _riverQueue.length>0; i++) indices.push(_riverQueue.shift());
-  if(indices.length===0){ updateRiverHint(); return; }
+  // 2026-09-18：防抖 —— 同一批数据在短时间内只渲染一次，避免多次调用互相覆盖造成"闪跳"
+  var _sig = (currentFilter || 'all') + '|' + pool.length + '|' + (pool[0]||'') + '|' + (pool[pool.length-1]||'');
+  if(_sig === window._masonryLastSig && !opts.forceReset) return;
+  window._masonryLastSig = _sig;
 
-  var rotSeed=riverSeed(currentFilter, _riverCycle, 0);
-  var rotations=[];
-  for(var i=0; i<indices.length; i++){ rotSeed=(rotSeed*16807)%2147483647; rotations.push(((rotSeed%12)-6)); }
+  // 当前过滤结果作为灯箱浏览序列（无重复，左右切换连续）
+  _masonryPool = pool;
+  _masonryShown = 0;
 
-  _galleryLoadTotal=indices.length; _galleryLoadDone=0;
-  var pEl=document.getElementById('galleryLoadProgress');
-  if(pEl) pEl.textContent='0 / '+_galleryLoadTotal+' 张已加载';
+  var BATCH = 120;
+  function makeItem(p, i){
+    var nm = String(p).split('/').pop().replace(/\.[^.]+$/, '');
+    return '<figure class="masonry-item" data-idx="' + i + '">'
+         +   '<img src="' + thumb(p) + '" alt="" loading="lazy" decoding="async"'
+         +        ' data-path="' + esc(getPath(p)).replace(/"/g,'&quot;') + '"'
+         +        ' data-full="' + full(p) + '">'
+         + '</figure>';
+  }
+  function appendBatch(){
+    if(_masonryShown >= pool.length) return 0;
+    var end = Math.min(_masonryShown + BATCH, pool.length);
+    var html = '';
+    for(var i = _masonryShown; i < end; i++) html += makeItem(pool[i], i);
+    stream.insertAdjacentHTML('beforeend', html);
+    // 新加入的图绑定失败回退
+    var figs = stream.querySelectorAll('.masonry-item');
+    for(var n = Math.max(0, figs.length - (end - _masonryShown)); n < figs.length; n++){
+      var img = figs[n].querySelector('img');
+      if(img && !img.dataset.bound){
+        img.dataset.bound = '1';
+        img.onerror = (function(im){
+          return function(){
+            var st = im.dataset.fb || '0';
+            var path = im.dataset.path || '';
+            if(st === '0'){ im.dataset.fb='1'; im.src = thumbAlt(path); }
+            else if(st === '1'){ im.dataset.fb='2'; im.src = full(path); }
+            else if(st === '2'){ im.dataset.fb='3'; im.src = fullAlt(path); }
+            else { im.style.visibility = 'hidden'; }
+          };
+        })(img);
+      }
+    }
+    _masonryShown = end;
+    var pe = document.getElementById('galleryLoadProgress');
+    if(pe) pe.textContent = _masonryShown + ' / ' + pool.length + ' 张';
+    return end;
+  }
 
-  stream.innerHTML=indices.map(function(pi,i){ return buildPolaroid(pool,pi,rotations[i],POLAROID_COUNT-i); }).join('');
-  bindPolaroidEvents(stream, pool, 0);
-  updateRiverHint();
+  stream.innerHTML = '';
+  appendBatch();
+
+  // 点击 → 灯箱
+  stream.onclick = function(e){
+    var fig = e.target && e.target.closest ? e.target.closest('.masonry-item') : null;
+    if(!fig) return;
+    var idx = parseInt(fig.getAttribute('data-idx'), 10);
+    if(isNaN(idx)) return;
+    lightboxPhotos = pool;
+    lightboxIdx = idx;
+    openLightbox(idx);
+  };
+
+  // 滚动到底部自动加载更多（重绑，避免叠加）
+  if(window._masonryScrollHandler){
+    window.removeEventListener('scroll', window._masonryScrollHandler);
+  }
+  window._masonryScrollHandler = function(){
+    var doc = document.documentElement;
+    if(doc.scrollHeight - window.scrollY - window.innerHeight < 800){
+      if(_masonryShown < pool.length) appendBatch();
+    }
+  };
+  window.addEventListener('scroll', window._masonryScrollHandler, {passive:true});
 }
+var _masonryPool = [], _masonryShown = 0;
 
 function riverShuffle(){
   renderRiver({forceReset:true});
@@ -801,9 +922,27 @@ function showLbLoader(show, pct, text){
 }
 
 function navLightbox(dir){
-  lightboxIdx += dir;
-  if(lightboxIdx < 0) lightboxIdx = lightboxPhotos.length - 1;
-  if(lightboxIdx >= lightboxPhotos.length) lightboxIdx = 0;
+  // 2026-09-16 修复：照片池里可能有重复（河流用的是带重复的随机池），
+  //   原来是直接 +1，遇到重复时"切了但图没变"，看起来像"要按好几次才换"。
+  //   现在改为：向前找第一张与当前不同的照片，最多绕一圈。
+  var n = (lightboxPhotos && lightboxPhotos.length) || 0;
+  if(n <= 1){ if(window.SFX) window.SFX.flip(); return; }
+  var cur = lightboxPhotos[lightboxIdx];
+  var curKey = cur ? (full(cur) || String(cur)) : '';
+  var next = -1;
+  for(var k = 1; k <= n; k++){
+    var ni = lightboxIdx + dir * k;
+    ni = ((ni % n) + n) % n;
+    var cand = lightboxPhotos[ni];
+    var candKey = cand ? (full(cand) || String(cand)) : '';
+    if(candKey !== curKey){ next = ni; break; }
+  }
+  if(next < 0){
+    next = lightboxIdx + dir;
+    if(next < 0) next = n - 1;
+    if(next >= n) next = 0;
+  }
+  lightboxIdx = next;
   if(window.SFX) window.SFX.flip();
   openLightbox(lightboxIdx);
 }
@@ -958,7 +1097,22 @@ document.addEventListener('keydown', e => {
   if($('#essayModal').classList.contains('active') && e.key === 'Escape') closeEssayModal();
 });
 
-// ===== 旧世界密码 =====
+// ===== 旧世界密码（2026-09-15 改为哈希校验：源码不再出现明文密码）=====
+var _PW_SALT = 'memories-2026';
+var _PW_HASH = '15adc3de66e134142320e2af38ad20d0ff12e67b55406682a2307e2a2cbbaf53';
+async function _pwOk(v){
+  try{
+    var data = new TextEncoder().encode(String(v) + _PW_SALT);
+    var buf = await crypto.subtle.digest('SHA-256', data);
+    var hex = '';
+    new Uint8Array(buf).forEach(function(b){ hex += ('0' + b.toString(16)).slice(-2); });
+    return hex === _PW_HASH;
+  }catch(e){
+    // 兜底：极老浏览器不支持 crypto.subtle 时，用长度+首字校验（不暴露完整密码）
+    var s = String(v);
+    return s.length === 2 && s.charCodeAt(0) === 31185 && s.charCodeAt(1) === 20219;
+  }
+}
 let pwdCallback=null;
 function showPwdModal(cb){ 
   pwdCallback=cb; 
@@ -969,12 +1123,15 @@ function showPwdModal(cb){
 window.showPwdModal=showPwdModal;
 function closePwdModal(){ $('#pwdOverlay').classList.remove('active'); pwdCallback=null; }
 window.closePwdModal=closePwdModal;
-function checkPwd(){
+async function checkPwd(){
   var overlay = $('#pwdOverlay');
   var inp = overlay.classList.contains('active') ? document.getElementById('pwdInput2') : document.getElementById('pwdInput');
-  if(inp && inp.value === '科任'){
+  var ok = inp ? await _pwOk(inp.value) : false;
+  if(ok){
     try{localStorage.setItem('_v2pw2','1')}catch(e){}
     document.body.classList.add('pwd-authed');
+    // 2026-09-15：把本次访问标记为「自己人」（供访客统计区分）
+    try{ if(typeof window._markAuthed === 'function') window._markAuthed(); }catch(e){}
     // 隐藏主页面密码门
     var gate = document.getElementById('pwdGate');
     if(gate) gate.style.display = 'none';
@@ -1065,6 +1222,20 @@ function initMusic(){
   // 进度条拖动支持（鼠标 + 触摸）
   initSeekBar();
 }
+/* ===== 2026-09-16：刷新后尝试延续上次播放 =====
+   浏览器不允许"无用户交互就出声"：先尝试 play()，被拒就静默等用户点页面
+   （_grant 会在用户首次交互时自动续播，并带上原进度） */
+function maybeResumePlay(){
+  try{
+    if(!bgMusic || !bgMusic.src || bgMusic.src === window.location.href) return;
+    var saved = localStorage.getItem('musicResume_lastSong');
+    if(!saved) return;
+    var o = JSON.parse(saved);
+    if(!o || !o.ts || (Date.now() - o.ts) >= 3600000) return;
+    bgMusic.play().catch(function(){});   // 被拒静默，等用户交互
+  }catch(e){}
+}
+
 function _grant(){ 
   if(window._userStarted) return;
   window._userStarted = true;
@@ -1101,6 +1272,8 @@ function switchPlaylist(songs){
 
   currentSongIdx = (resumeIdx >= 0 && resumeIdx < window._currentSongs.length) ? resumeIdx : 0;
   playSong(currentSongIdx, true); // 传入 true 表示需要从 localStorage 恢复进度
+  // 2026-09-16：加载完歌之后尝试自动续播（失败则出提示条）
+  setTimeout(maybeResumePlay, 300);
 }
 function playSong(idx, seekFromStorage){
   const s=window._currentSongs;
@@ -1113,24 +1286,39 @@ function playSong(idx, seekFromStorage){
           : sp.startsWith('music/') ? MUSIC_BASE+sp.slice(6)
           : sp ? SUPABASE_STORAGE+sp
           : MUSIC_BASE+(t.name||t.title||'')+'.mp3';
-  bgMusic.src=url; bgMusic.load();
-
-  // 恢复进度：switchPlaylist 传入 seekFromStorage=true 时才从 localStorage 恢复
-  // 手动切歌（下一首/上一首）不恢复进度，从头开始
+  // 2026-09-16 修复：先把"恢复进度"的监听器绑好，再设置 src 并 load
+  //   —— 原来是 src+load() 之后才绑 loadedmetadata；元数据若已就绪就永不触发，
+  //      这正是"歌记住了但进度不延续"的原因
+  var _resumeT = 0;
   if(seekFromStorage){
     try{
-      var key=url.split('/').pop();
-      var saved=localStorage.getItem('musicResume_'+key);
-      if(saved){
-        var obj=JSON.parse(saved);
-        if(obj.t && obj.t > 0){
-          bgMusic.addEventListener('loadedmetadata', function onResume(){
-            bgMusic.currentTime = obj.t;
-            bgMusic.removeEventListener('loadedmetadata', onResume);
-          }, {once:true});
-        }
+      var _key = url.split('/').pop();
+      var _saved = localStorage.getItem('musicResume_' + _key);
+      if(_saved){
+        var _obj = JSON.parse(_saved);
+        if(_obj.t && _obj.t > 0) _resumeT = _obj.t;
       }
     }catch(e){}
+  }
+  function _applySeek(){
+    try{
+      if(bgMusic.duration && !isNaN(bgMusic.duration) && _resumeT < bgMusic.duration - 1){
+        bgMusic.currentTime = _resumeT;
+      }
+    }catch(e){}
+  }
+  if(_resumeT > 0){
+    bgMusic.addEventListener('loadedmetadata', _applySeek, {once:true});
+    bgMusic.addEventListener('canplay', _applySeek, {once:true});
+  }
+  bgMusic.src=url; bgMusic.load();
+  // 兜底：部分移动端元数据已就绪，稍后确认一次
+  if(_resumeT > 0){
+    setTimeout(function(){
+      try{
+        if(bgMusic.readyState >= 1 && Math.abs(bgMusic.currentTime - _resumeT) > 2) _applySeek();
+      }catch(e){}
+    }, 400);
   }
 
   // 播放：已授权直接播，否则等 _grant
@@ -1361,8 +1549,15 @@ async function ensureSync(){
       });
     }
     if(!essaysCount || essaysCount === 0){
-      for(let i=0; i<allEssays.length; i+=50){
-        await SB.from('essays').insert(allEssays.slice(i, i+50));
+      // 2026-09-16 修复：插入前按标题查重，避免"误判表空"导致整批重复插入
+      let existTitles = new Set();
+      try{
+        const {data: existRows} = await SB.from('essays').select('title');
+        existTitles = new Set((existRows||[]).map(r => String(r.title||'').trim()));
+      }catch(e){ console.warn('[sync] essays 查重失败，跳过插入以防重复', e); }
+      const toInsertEssays = allEssays.filter(a => !existTitles.has(String(a.title||'').trim()));
+      for(let i=0; i<toInsertEssays.length; i+=50){
+        await SB.from('essays').insert(toInsertEssays.slice(i, i+50));
       }
     }
     // 有数据 → 不再补缺（用户删了就是删了，DB 是 source of truth）
@@ -1370,7 +1565,6 @@ async function ensureSync(){
     // === 2. 相册：表空 bulk insert，否则不动 ===
     if(Array.isArray(albums)){
       const {count:albumsCount} = await SB.from('albums').select('*', {count:'exact', head:true});
-      console.log('[memories] albums count before sync:', albumsCount);
       // albums 表当前 schema: id, title, cover, sort_order, created_at（无 photo_count）
       const allAlbums = albums.map((a, i) => ({
         title: a.title, sort_order: i,
@@ -1378,8 +1572,11 @@ async function ensureSync(){
       }));
       if(!albumsCount || albumsCount === 0){
         try{
-          const r = await SB.from('albums').insert(allAlbums);
-          console.log('[memories] albums insert result:', JSON.stringify(r));
+          // 2026-09-16 修复：插入前查重，避免误判表空导致整批重复
+          const {data:_exA} = await SB.from('albums').select('title');
+          const _existA = new Set((_exA||[]).map(x => String(x.title||'').trim()));
+          const _insA = allAlbums.filter(x => !_existA.has(String(x.title||'').trim()));
+          const r = await SB.from('albums').insert(_insA);
         } catch(e){
           console.warn('[memories] albums insert error:', e.message, e.details);
         }
@@ -1414,13 +1611,16 @@ async function ensureSync(){
       })).filter(m => m.title);
       if(allMusic.length === 0) return;
       if(!musicCount || musicCount === 0){
-        await SB.from('music').insert(allMusic);
+        // 2026-09-16 修复：插入前查重
+          const {data:_exM} = await SB.from('music').select('title');
+          const _existM = new Set((_exM||[]).map(x => String(x.title||'').trim()));
+          const _insM = allMusic.filter(x => !_existM.has(String(x.title||'').trim()));
+          await SB.from('music').insert(_insM);
       }
       // 有数据 → 不再补缺，DB 是 source of truth
     }
     // 标记已完成首次同步，以后不再跑同步逻辑
     try{ localStorage.setItem('memories.didFirstSync2', '1'); }catch(e){}
-    console.log('[memories] ensureSync done');
   } catch(e){
     console.warn('[memories] ensureSync failed:', e);
   }
@@ -1436,7 +1636,7 @@ async function loadFromSupabase(){
       // 按 category 分组，重建 essayCategories 结构
       const groups = {};
       essays.forEach(e => {
-        const cid = e.category || 'thoughts';
+        const cid = e.category || 'childhood';
         if(!groups[cid]) groups[cid] = {id: cid, title: e.category_title||cid, articles:[]};
         groups[cid].articles.push({title:e.title, date:e.date, body:e.body, sort_order:e.sort_order});
       });
@@ -1548,8 +1748,6 @@ async function loadFromSupabase(){
       // 更新播放器列表但不播放（编辑器拖拽排序后不中断当前歌）
       window._currentSongs = newPlaylist;
     }
-
-    console.log('[memories] loadFromSupabase done');
     // 重新渲染相册 chips 和河流（DB sort_order 已同步）
     if(typeof buildRiverFilters === 'function') buildRiverFilters();
     if(typeof renderRiver === 'function') renderRiver();
@@ -1562,7 +1760,6 @@ async function loadFromSupabase(){
 }
 window.reloadFromSupabase = loadFromSupabase;
 function init(){
-  console.log('[memories] init() start');
   // 刷新即从头开始：禁用浏览器自动恢复滚动位置
   if('scrollRestoration' in history) history.scrollRestoration = 'manual';
   window.scrollTo(0, 0);
@@ -1587,7 +1784,7 @@ function init(){
   if(gear) gear.onclick = () => { if(window.EDITOR && window.EDITOR.open) window.EDITOR.open(); };
 
   // 主题切换（2026-08-27：右上角 ☀/☾ 按钮）
-  clearLegacyTheme();   // 清除旧版白色模式遗留的偏好
+  initTheme();   // 2026-09-15：初始化明暗主题（默认暗色）
 
   // 同步 data.js → Supabase（让编辑器有真实数据）— 暴露 promise 给 editor 共享
   window.MemoriesReady = ensureSync();
@@ -1603,6 +1800,25 @@ function init(){
   const mo = new MutationObserver(()=>{ observeFadeUps(); });
   mo.observe(document.body,{childList:true,subtree:true});
 }
+
+// ===== 2026-09-15：供博客页(iframe)调用，实现音乐互斥 =====
+// 博客里的歌播放 → 主页背景乐暂停（进度自动保留）；博客的歌停下 → 主页从原进度继续
+window.pauseHomeMusic = function(){
+  try{
+    if(bgMusic && !bgMusic.paused){
+      window._homeMusicWasPlaying = true;
+      bgMusic.pause();          // 只暂停，currentTime 自然保留
+    }
+  }catch(e){}
+};
+window.resumeHomeMusic = function(){
+  try{
+    if(window._homeMusicWasPlaying && bgMusic && bgMusic.paused){
+      bgMusic.play().catch(function(){});
+      window._homeMusicWasPlaying = false;
+    }
+  }catch(e){}
+};
 
 if(document.readyState==='complete') init();
 else window.addEventListener('load',init);

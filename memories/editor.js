@@ -152,7 +152,12 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#editorPanel').c
 var _editorCache = {essay: null, album: null, music: null, post: null};
 var _cacheTime = {essay: 0, album: 0, music: 0, post: 0};
 var _CACHE_TTL = 180000; // 2026-09-11 优化：15秒 → 3分钟（编辑器内改动会 invalidateCache，延长安全）
-function invalidateCache(tab){ if(tab && _cacheTime[tab]!==undefined) _cacheTime[tab]=0; else{_cacheTime={essay:0,album:0,music:0,post:0};} }
+function invalidateCache(tab){
+  if(tab && _cacheTime[tab]!==undefined) _cacheTime[tab]=0;
+  else{_cacheTime={essay:0,album:0,music:0,post:0};}
+  // 2026-09-16：本地缓存失效的同时，通知博客画布也重新拉取（免手动刷新）
+  try{ if(typeof window.notifyBlogDataChanged === 'function') window.notifyBlogDataChanged(); }catch(e){}
+}
 
 // ===== 2026-09-11 加载优化：统一加载入口（复用进行中的请求）+ 三 tab 并行预取 =====
 // 原来三个 tab 串行加载 + open() 等待同步流程，切换时每次都要等一个跨境往返
@@ -210,8 +215,9 @@ $$('#editorTabs .editor-tab').forEach(tab=>{
 // ===== 文章编辑 =====
 async function renderEssayTab(){
   const body=$('#editorBody');
-  const cats=['童年篇','初恋篇','日记','旅行见闻'];
-  const catIds=['childhood','firstlove','thoughts','travel'];
+  // 2026-09-15：「日记」分类已迁移到博客（posts 表），此处移除
+  const cats=['童年篇','初恋篇','旅行见闻'];
+  const catIds=['childhood','firstlove','travel'];
   var essays = await loadTabData('essay');
   // 文章按日期降序（最新在前），无日期文章按sort_order排在最后
   const all=(essays||[]).slice().sort(function(a,b){
@@ -307,7 +313,7 @@ async function renderEssayTab(){
   // 编辑/新建
   function editEssay(a, defaultCat){
     const isNew=!a;
-    const category=a?a.category:(defaultCat||'thoughts');
+    const category=a?a.category:(defaultCat||'childhood');
     const articleTitle=a?a.title:'';
     const date=a?(a.date||''):new Date().toLocaleDateString('zh-CN').replace(/\//g,'.');
     const articleBody=a?a.body:'';
@@ -827,7 +833,9 @@ function renderList(){
           _selSet.forEach(function(i){ if(plist[i]){ ids.push(plist[i].id); sps.push(plist[i].storage_path); } });
           try{
             if(sb) await sb.from('album_photos').delete().in('id', ids);
-            if(sps.length && sb) sb.storage.from('photos').remove(sps).catch(function(){});
+            // 2026-09-16：连缩略图一起删，避免"删了照片但 thumbs/ 还占着空间"
+            var spsAll = sps.concat(sps.map(function(x){ return 'thumbs/' + x; }));
+            if(spsAll.length && sb) sb.storage.from('photos').remove(spsAll).catch(function(){});
           }catch(err){ console.warn(err); }
           _selSet.clear(); _selectMode = false;
           invalidateCache('album');   // 删除照片后清相册列表缓存（返回时张数正确）
@@ -883,6 +891,10 @@ function renderList(){
                         (isCompressed ? 'jpg' : (f.name.split('.').pop() || 'jpg'));
             console.log('[upload] starting', fname, 'orig:', f.size, 'upload:', upFile.size);
             var uploadPromise = sb.storage.from('photos').upload(fname, upFile, {upsert:true});
+            // 2026-09-15：同步生成并上传缩略图（thumbs/ 前缀，~400px）。异步执行，失败不影响主上传
+            makeThumbBlob(upFile, 400, 0.8).then(function(tb){
+              if(tb) return sb.storage.from('photos').upload('thumbs/' + fname, tb, {upsert:true, contentType:'image/jpeg'});
+            }).catch(function(e){ console.warn('[thumb] upload failed', e); });
             // 超时按体积动态计算（每 MB 3 秒，最少 30 秒；原来固定 12 秒，大图容易误判失败）
             var toMs = Math.max(30000, Math.ceil(upFile.size / 1048576) * 3000);
             var timeoutPromise = new Promise(function(_,rej){ setTimeout(function(){ rej(new Error('上传超时')); }, toMs); });
@@ -1104,15 +1116,41 @@ function compressImage(file, maxSide, quality){
       img.onload = function(){
         try{
           var w = img.naturalWidth, h = img.naturalHeight;
-          var scale = Math.min(1, (maxSide || 1600) / Math.max(w, h));
+          var longSide = Math.max(w, h);
+          var sizeKB = (file.size || 0) / 1024;
+
+          // ===== 2026-09-14 按原图大小分级：小图温柔、大图下手重 =====
+          var targetSide = maxSide || 1600;
+          var q = quality || 0.85;
+
+          if(longSide <= 1280 && sizeKB <= 400){
+            // ① 本来就小 → 原样上传，不损失画质
+            if(url) URL.revokeObjectURL(url);
+            resolve(file);
+            return;
+          }
+          if(longSide <= 2000 && sizeKB <= 1200){
+            // ② 中等 → 温柔处理（少缩、质量高）
+            targetSide = Math.max(targetSide, 1800);
+            q = Math.max(q, 0.92);
+          }else if(longSide > 4000 || sizeKB > 4000){
+            // ④ 超大（相机原片）→ 下手重一点，省额度
+            q = Math.min(q, 0.8);
+          }
+          // ③ 其余走调用方给的标准参数
+
+          var scale = Math.min(1, targetSide / longSide);
           var cw = Math.round(w * scale), ch = Math.round(h * scale);
           var cv = document.createElement('canvas');
           cv.width = cw; cv.height = ch;
           cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
           if(url) URL.revokeObjectURL(url);
+          // PNG 保持 PNG（避免丢透明/变糊），其余用 JPEG
+          var isPng = /png/i.test(file.type || '') || /\.png$/i.test(file.name || '');
           cv.toBlob(function(blob){
-            resolve(blob && blob.size && blob.size < file.size ? blob : file);
-          }, 'image/jpeg', quality || 0.82);
+            if(blob && blob.size && blob.size < file.size) resolve(blob);
+            else resolve(file);   // 压完反而更大 → 用原图
+          }, isPng ? 'image/png' : 'image/jpeg', q);
         }catch(e){ if(url) URL.revokeObjectURL(url); resolve(file); }
       };
       img.onerror = function(){ if(url) URL.revokeObjectURL(url); resolve(file); };
@@ -1194,15 +1232,21 @@ function renderPostOldList(posts){
     var ts = isNaN(t.getTime()) ? '' :
       (t.getFullYear() + '年' + (t.getMonth() + 1) + '月' + t.getDate() + '日 ' +
        ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2));
+    var title = (p.title || '').trim();
     var txt = (p.content || '').replace(/\s+/g, ' ').slice(0, 40);
     var cnt = (p.images && p.images.length) ? ' 🖼' + p.images.length : '';
     if(p.music_path) cnt += ' 🎵';
     var extra = [p.mood, p.weather, p.location].filter(Boolean).join(' · ');
+    // 有标题 → 主行显示标题（醒目），下面小字跟正文摘要；无标题 → 只显示摘要
+    var mainLine = title
+      ? ('<div style="font-size:.93rem;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(title) + cnt + '</div>' +
+         (txt ? '<div style="font-size:.74rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px">' + esc(txt) + '…</div>' : ''))
+      : ('<div style="font-size:.86rem;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (esc(txt) || '（无文字）') + cnt + '</div>');
     return '<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">' +
       '<div style="flex:1;min-width:0">' +
-        '<div style="font-size:.72rem;color:var(--text-muted)">' + ts + '</div>' +
-        '<div style="font-size:.85rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (txt || '（无文字）') + cnt + '</div>' +
-        (extra ? '<div style="font-size:.7rem;color:var(--text-muted);margin-top:2px">' + extra + '</div>' : '') +
+        '<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:3px">' + ts + '</div>' +
+        mainLine +
+        (extra ? '<div style="font-size:.7rem;color:var(--text-muted);margin-top:3px">' + extra + '</div>' : '') +
       '</div>' +
       '<div style="display:flex;gap:6px;flex-shrink:0">' +
         '<button class="editor-btn-sm" data-edit-post="' + p.id + '">编辑</button>' +
@@ -1229,7 +1273,9 @@ function renderPostOldList(posts){
         var rm = [];
         (p.images || []).forEach(function(x){ rm.push(x); });
         if(p.music_path) rm.push(p.music_path);
-        if(rm.length && sb) sb.storage.from('photos').remove(rm).catch(function(){});
+        // 2026-09-16：附件 + 缩略图一并删除（否则 thumbs/ 会长期残留占空间）
+        var rmAll = rm.concat(rm.map(function(x){ return 'thumbs/' + x; }));
+        if(rmAll.length && sb) sb.storage.from('photos').remove(rmAll).catch(function(){});
         invalidateCache('post');
         renderTab();
       }catch(e){ b.textContent = '删除'; alert('删除失败：' + e.message); }
@@ -1241,6 +1287,7 @@ function renderPostOldList(posts){
 function startEditPost(p){
   _postDraft = {
     images: [],
+    videos: [],
     music: null,
     musicKeep: p.music_path || null,
     musicKeepTitle: p.music_title || '已有音乐',
@@ -1248,6 +1295,8 @@ function startEditPost(p){
   };
   var art = pbArticleFromPost(p);
   _postDraft.images = art.images;
+  _postDraft.videos = art.videos;
+  pbRenderVideoList();
   var ti0 = document.getElementById('postTitle'); if(ti0) ti0.value = p.title || '';
   var ta = document.getElementById('postText');
   if(ta) ta.value = art.text;
@@ -1278,10 +1327,11 @@ function startEditPost(p){
 
 // 取消编辑，回到新建模式
 function cancelEditPost(){
-  _postDraft = { images: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
+  _postDraft = { images: [], videos: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
   var tiC = document.getElementById('postTitle'); if(tiC) tiC.value = '';
   var ta = document.getElementById('postText'); if(ta) ta.value = '';
   pbRenderImgList();
+  pbRenderVideoList();
   ['postMood','postWeather','postLocation'].forEach(function(id){
     var e = document.getElementById(id); if(e) e.value = '';
   });
@@ -1453,16 +1503,120 @@ function pbRenderImgList(){
   });
 }
 
-function pbParseArticle(text, images){
+// ===== 视频（2026-09-15）：粘贴链接即可，不占 Supabase 空间 =====
+function pbRenderVideoList(){
+  var box = document.getElementById('postVideoList');
+  if(!box) return;
+  var vids = _postDraft.videos || [];
+  if(!vids.length){ box.innerHTML = ''; return; }
+  box.innerHTML = '<div style="font-size:.78rem;color:var(--text-muted);margin-bottom:6px">文中已插入的视频</div>' +
+    vids.map(function(v, i){
+      var tag = v.kind === 'direct' ? '视频直链' : (v.kind === 'youtube' ? 'YouTube 播放器' : 'B站播放器');
+      return '<div class="pi-row">' +
+        '<div class="pi-info">' +
+          '<div class="pi-name">视频' + (i + 1) + '<span class="pi-file">' + tag + '</span></div>' +
+          '<div style="font-size:.72rem;color:var(--text-muted);word-break:break-all;line-height:1.5">' + esc(v.src) + '</div>' +
+        '</div>' +
+        '<button type="button" class="pb-op pb-op-del" data-rmv="' + i + '" title="移除">×</button>' +
+      '</div>';
+    }).join('');
+  box.querySelectorAll('[data-rmv]').forEach(function(btn){
+    btn.onclick = function(){
+      var i = +btn.getAttribute('data-rmv');
+      var ta = document.getElementById('postText');
+      var cur = ta ? ta.value : '';
+      var parts = cur.split(/\[视频\d+\]/);
+      var order = (cur.match(/\[视频(\d+)\]/g) || []).map(function(s){ return parseInt(s.match(/\d+/)[0], 10); });
+      (_postDraft.videos || []).splice(i, 1);
+      var newOrder = order.filter(function(_, k){ return k !== i; });
+      var out = parts[0] || '';
+      newOrder.forEach(function(oldN, k){ out += '[视频' + (k + 1) + ']' + (parts[k + 1] || ''); });
+      if(ta) ta.value = out;
+      pbRenderVideoList();
+      pbSaveDraftSoon();
+      _postStatus('已移除视频');
+    };
+  });
+}
+
+// 识别链接类型（2026-09-15 扩展多平台）
+function pbVideoKind(url){
+  var u = String(url || '').trim();
+  if(/youtube\.com\/(watch|shorts)|youtu\.be\//i.test(u)) return 'youtube';
+  if(/bilibili\.com\/video\/|b23\.tv\//i.test(u)) return 'bilibili';
+  if(/vimeo\.com\//i.test(u)) return 'vimeo';
+  if(/v\.qq\.com\//i.test(u)) return 'qq';
+  if(/youku\.com\//i.test(u)) return 'youku';
+  if(/iqiyi\.com\//i.test(u)) return 'iqiyi';
+  if(/ixigua\.com\//i.test(u)) return 'ixigua';
+  if(/weibo\.com\/|weibo\.cn\//i.test(u)) return 'weibo';
+  if(/\.(mp4|webm|ogv|m4v|mov)(\?|$)/i.test(u)) return 'direct';
+  if(/^<iframe/i.test(u)) return 'iframe';
+  return 'direct';
+}
+
+// 各平台链接 → 可嵌入的播放器地址
+function pbVideoEmbedUrl(url){
+  var u = String(url || '').trim(), m;
+  // YouTube
+  if((m = u.match(/youtube\.com\/watch\?v=([\w-]+)/i)) || (m = u.match(/youtu\.be\/([\w-]+)/i))){
+    return 'https://www.youtube.com/embed/' + m[1];
+  }
+  if((m = u.match(/youtube\.com\/shorts\/([\w-]+)/i))){
+    return 'https://www.youtube.com/embed/' + m[1];
+  }
+  // B站
+  if((m = u.match(/bilibili\.com\/video\/(BV[\w]+)/i)) || (m = u.match(/b23\.tv\/(BV[\w]+)/i))){
+    return 'https://player.bilibili.com/player.html?bvid=' + m[1] + '&autoplay=0&high_quality=1';
+  }
+  // Vimeo
+  if((m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/i))){
+    return 'https://player.vimeo.com/video/' + m[1];
+  }
+  // 腾讯视频
+  if((m = u.match(/v\.qq\.com\/x\/cover\/[^/]+\/([\w]+)\.html/i)) || (m = u.match(/v\.qq\.com\/x\/page\/([\w]+)\.html/i))){
+    return 'https://v.qq.com/txp/iframe/player.html?vid=' + m[1];
+  }
+  // 优酷
+  if((m = u.match(/youku\.com\/v_show\/id_([\w=]+)\.html/i))){
+    return 'https://player.youku.com/embed/' + m[1];
+  }
+  // 爱奇艺
+  if((m = u.match(/iqiyi\.com\/v_([\w]+)\.html/i))){
+    return 'https://open.iqiyi.com/developer/player_js/coopPlayerIndex.html?vid=' + m[1];
+  }
+  // 西瓜视频
+  if((m = u.match(/ixigua\.com\/(\d+)/i))){
+    return 'https://www.ixigua.com/iframe/' + m[1];
+  }
+  // 微博视频
+  if((m = u.match(/weibo\.(?:com|cn)\/(?:tv\/show\/|detail\/|[^/]+\/[^/]+\/)([\w:]+)/i))){
+    return 'https://weibo.com/tv/show/' + m[1];
+  }
+  // 直接粘的 iframe 代码 → 抠出 src
+  if(/^<iframe/i.test(u)){
+    var s = u.match(/src\s*=\s*["']([^"']+)["']/i);
+    if(s) return s[1];
+  }
+  return u;
+}
+
+function pbParseArticle(text, images, videos){
   var blocks = [];
-  var re = /\[照片(\d+)\]/g;
+  // 同时匹配 [照片N] 与 [视频N]，按出现顺序切分（2026-09-15 支持视频）
+  var re = /\[(照片|视频)(\d+)\]/g;
   var last = 0, m;
   while((m = re.exec(text)) !== null){
     var before = text.slice(last, m.index).trim();
     if(before) blocks.push({t:'p', text:before});
-    var idx = parseInt(m[1], 10) - 1;
-    var im = images[idx];
-    if(im) blocks.push({t:'img', _idx: idx, cap: (im.cap || '').trim()});
+    var idx = parseInt(m[2], 10) - 1;
+    if(m[1] === '照片'){
+      var im = images[idx];
+      if(im) blocks.push({t:'img', _idx: idx, cap: (im.cap || '').trim()});
+    }else{
+      var vd = (videos || [])[idx];
+      if(vd) blocks.push({t:'video', _vidx: idx});
+    }
     last = m.index + m[0].length;
   }
   var after = text.slice(last).trim();
@@ -1471,7 +1625,7 @@ function pbParseArticle(text, images){
 }
 
 function pbArticleFromPost(p){
-  var text = '', images = [];
+  var text = '', images = [], videos = [];
   var blocks = (p && p.blocks && p.blocks.length) ? p.blocks : [];
   if(!blocks.length && p){
     if(p.content) blocks.push({t:'p', text:p.content});
@@ -1481,11 +1635,91 @@ function pbArticleFromPost(p){
     if(b.t === 'img' && b.src){
       images.push({ src: b.src, preview: _storageUrl(b.src), cap: b.cap || '', name: '' });
       text += '[照片' + images.length + ']';
-    }else if(b.t !== 'img'){
+    }else if(b.t === 'video' && b.src){
+      videos.push({ src: b.src, kind: b.kind || pbVideoKind(b.src), embed: b.embed || pbVideoEmbedUrl(b.src) });
+      text += '[视频' + videos.length + ']';
+    }else if(b.t !== 'img' && b.t !== 'video'){
       text += (text && !/\n$/.test(text) ? '\n\n' : '') + (b.text || '');
     }
   });
-  return { text: text, images: images };
+  return { text: text, images: images, videos: videos };
+}
+
+// 生成缩略图 Blob（2026-09-15）：上传照片时同步生成 ~400px 小图，列表/网格加载更快
+function makeThumbBlob(fileOrBlob, maxSide, quality){
+  return new Promise(function(resolve){
+    try{
+      var url = URL.createObjectURL(fileOrBlob);
+      var img = new Image();
+      img.onload = function(){
+        try{
+          var w = img.naturalWidth, h = img.naturalHeight;
+          var scale = Math.min(1, (maxSide || 400) / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w * scale));
+          var ch = Math.max(1, Math.round(h * scale));
+          var cv = document.createElement('canvas');
+          cv.width = cw; cv.height = ch;
+          cv.getContext('2d').drawImage(img, 0, 0, cw, ch);
+          URL.revokeObjectURL(url);
+          cv.toBlob(function(b){ resolve(b); }, 'image/jpeg', quality || 0.8);
+        }catch(e){ try{ URL.revokeObjectURL(url); }catch(_){} resolve(null); }
+      };
+      img.onerror = function(){ try{ URL.revokeObjectURL(url); }catch(_){} resolve(null); };
+      img.src = url;
+    }catch(e){ resolve(null); }
+  });
+}
+
+// ===== 音频转 MP3（2026-09-15）=====
+// 背景：用户上传的 WAV 是无压缩格式（6.9MB 仅约 40 秒），浏览器流式播放支持差 → 卡顿
+// 处理：非 mp3/m4a/aac/ogg 的音频 → 浏览器内转成 128kbps MP3 再上传（体积约缩到 1/6）
+function pAudioNeedsConvert(file){
+  var name = (file.name || '').toLowerCase();
+  var type = (file.type || '').toLowerCase();
+  if(/\.(mp3|m4a|aac|ogg|opus)$/.test(name)) return false;
+  if(/audio\/(mpeg|mp4|aac|ogg|opus)/.test(type)) return false;
+  return true;   // wav / flac / 其他 → 需要转
+}
+
+function pConvertToMp3(file, onProgress){
+  return new Promise(function(resolve, reject){
+    if(typeof lamejs === 'undefined'){ reject(new Error('转码组件未加载')); return; }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC){ reject(new Error('浏览器不支持音频转码')); return; }
+    file.arrayBuffer().then(function(buf){
+      var ctx = new AC();
+      var done = false;
+      function finish(fn, arg){ if(!done){ done = true; try{ ctx.close(); }catch(e){} fn(arg); } }
+      ctx.decodeAudioData(buf, function(audioBuf){
+        try{
+          var ch = Math.min(2, audioBuf.numberOfChannels);
+          var sr = audioBuf.sampleRate;
+          var enc = new lamejs.Mp3Encoder(ch, sr, 128);
+          var L = audioBuf.getChannelData(0);
+          var R = ch > 1 ? audioBuf.getChannelData(1) : null;
+          var n = L.length;
+          var l16 = new Int16Array(n), r16 = R ? new Int16Array(n) : null;
+          for(var i = 0; i < n; i++){
+            l16[i] = Math.max(-1, Math.min(1, L[i])) * 0x7FFF;
+            if(r16) r16[i] = Math.max(-1, Math.min(1, R[i])) * 0x7FFF;
+          }
+          var chunks = [];
+          var BS = 1152 * 20;
+          for(var k = 0; k < n; k += BS){
+            var lb = l16.subarray(k, k + BS);
+            var rb = r16 ? r16.subarray(k, k + BS) : null;
+            var m = rb ? enc.encodeBuffer(lb, rb) : enc.encodeBuffer(lb);
+            if(m.length) chunks.push(new Int8Array(m));
+            if(onProgress && (k % (BS * 20) === 0)){ try{ onProgress(Math.min(99, Math.round(k / n * 100))); }catch(e){} }
+          }
+          var tail = enc.flush();
+          if(tail.length) chunks.push(new Int8Array(tail));
+          if(onProgress){ try{ onProgress(100); }catch(e){} }
+          finish(resolve, new Blob(chunks, {type:'audio/mpeg'}));
+        }catch(err){ finish(reject, err); }
+      }, function(err){ finish(reject, err || new Error('音频解码失败')); });
+    }).catch(function(e){ reject(e); });
+  });
 }
 
 // ===== 草稿自动保存（2026-09-14）：防止手机选图后页面被系统重载导致内容丢失 =====
@@ -1503,6 +1737,9 @@ function pbSaveDraft(){
       text: ta ? ta.value : '',
       images: (_postDraft.images || []).map(function(it){
         return { path: it.path || '', src: it.src || '', cap: it.cap || '', name: it.name || '' };
+      }),
+      videos: (_postDraft.videos || []).map(function(v){
+        return { src: v.src || '', kind: v.kind || '', embed: v.embed || '' };
       }),
       musicPath: _postDraft.musicKeep || null,
       musicTitle: _postDraft.musicKeepTitle || null,
@@ -1549,6 +1786,10 @@ function pbRestoreDraft(d){
       preview: _storageUrl(it.path || it.src || '')
     };
   });
+  _postDraft.videos = (d.videos || []).map(function(v){
+    return { src: v.src || '', kind: v.kind || pbVideoKind(v.src), embed: v.embed || pbVideoEmbedUrl(v.src) };
+  });
+  pbRenderVideoList();
   var tiR = document.getElementById('postTitle'); if(tiR) tiR.value = d.title || '';
   var ta = document.getElementById('postText'); if(ta) ta.value = d.text || '';
   var m = document.getElementById('postMood');    if(m) m.value = d.mood || '';
@@ -1560,7 +1801,7 @@ function pbRestoreDraft(d){
 async function renderPostTab(){
   const body = $('#editorBody');
   const posts = await loadTabData('post');
-  _postDraft = { images: [], existing: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
+  _postDraft = { images: [], existing: [], videos: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
 
   body.innerHTML = `
     <div>
@@ -1568,21 +1809,18 @@ async function renderPostTab(){
         <span class="post-edit-info" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)"></span>
         <button id="postCancelEdit" class="editor-btn-sm" style="flex-shrink:0">取消编辑</button>
       </div>
-      <input id="postTitle" class="post-title-input" placeholder="标题（会显示在列表里）">
-      <textarea id="postText" rows="12" placeholder="写你的文章吧。&#10;&#10;想在哪儿插照片，就把光标放到那里，再点下面的「插入照片」按钮。"></textarea>
+      <input id="postTitle" class="post-title-input" placeholder="标题">
+      <textarea id="postText" rows="12"></textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
         <button type="button" class="editor-btn editor-btn-secondary" id="postInsertImg">🖼 插入照片</button>
+        <button type="button" class="editor-btn editor-btn-secondary" id="postInsertVideo">🎬 插入视频</button>
         <label class="editor-btn editor-btn-secondary" style="cursor:pointer">🎵 加音乐
           <input type="file" accept="audio/*" style="display:none" id="postMusicInput"></label>
         <input type="file" accept="image/*" style="display:none" id="postImgInput">
       </div>
       <div id="postMusicPreview" style="margin-top:8px"></div>
       <div id="postImgList" style="margin-top:12px"></div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px">
-        <input id="postMood" class="editor-meta-input" placeholder="心情">
-        <input id="postWeather" class="editor-meta-input" placeholder="天气">
-        <input id="postLocation" class="editor-meta-input" placeholder="地点">
-      </div>
+      <div id="postVideoList" style="margin-top:10px"></div>
       <button class="editor-btn editor-btn-primary" id="postPublish" style="width:100%;margin-top:12px">发布</button>
       <div id="postStatus" style="font-size:.78rem;color:var(--text-muted);margin-top:8px;text-align:center"></div>
     </div>
@@ -1599,6 +1837,28 @@ async function renderPostTab(){
       _pbCaret = ta ? (ta.selectionStart || 0) : null;
       var inp = document.getElementById('postImgInput');
       if(inp){ inp.value = ''; inp.click(); }
+    };
+  }
+  // 插入视频（2026-09-15）：粘贴链接即可，不占存储空间
+  var insertVidBtn = document.getElementById('postInsertVideo');
+  if(insertVidBtn){
+    insertVidBtn.onclick = function(){
+      var ta = document.getElementById('postText');
+      _pbCaret = ta ? (ta.selectionStart || 0) : null;
+      var url = prompt('粘贴视频链接：\n\n· YouTube / B站链接 → 自动变成播放器\n· 或 .mp4 直链（如 GitHub Releases 的地址）');
+      if(!url || !url.trim()) return;
+      var u = url.trim();
+      _postDraft.videos = _postDraft.videos || [];
+      _postDraft.videos.push({ src: u, kind: pbVideoKind(u), embed: pbVideoEmbedUrl(u) });
+      var n = _postDraft.videos.length;
+      var marker = '[视频' + n + ']';
+      if(ta){
+        var pos = (_pbCaret == null) ? ta.value.length : Math.min(_pbCaret, ta.value.length);
+        ta.value = ta.value.slice(0, pos) + marker + ta.value.slice(pos);
+      }
+      pbRenderVideoList();
+      pbSaveDraft();
+      _postStatus('视频' + n + ' 已插入 ✓');
     };
   }
   // 内容变动自动存草稿（防止手机选图/切后台被系统重载导致内容丢失）
@@ -1656,6 +1916,11 @@ async function renderPostTab(){
       var path = 'posts/img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '.' + ext;
       _postStatus('上传照片…（稍等，不要切走）');
       await uploadToStorage(path, blob);
+      // 2026-09-15：同步生成缩略图（thumbs/posts/...）
+      // 博客列表卡片用缩略图作淡化背景，缺失会导致卡片背景空白
+      makeThumbBlob(blob, 420, 0.78).then(function(tb){
+        if(tb) return sb.storage.from('photos').upload('thumbs/' + path, tb, {upsert:true, contentType:'image/jpeg'});
+      }).catch(function(e){ console.warn('[thumb] post thumb upload failed', e); });
       _postDraft.images.push({ path: path, cap: '', name: f.name, preview: URL.createObjectURL(blob) });
       var n = _postDraft.images.length;
       var ta = document.getElementById('postText');
@@ -1672,13 +1937,44 @@ async function renderPostTab(){
     _pbCaret = null;
   };
 
-  musicInput.onchange = function(){
+  musicInput.onchange = async function(){
     var f = musicInput.files && musicInput.files[0];
     if(!f) return;
-    _postDraft.music = { file: f, name: f.name };
     musicInput.value = '';
-    _previewMusic();
-    _postStatus('已选音乐：' + f.name);
+    var sizeMB = f.size / 1024 / 1024;
+    var useFile = f;
+
+    // 1) 非 mp3/m4a 等可流式格式 → 先转成 MP3
+    if(pAudioNeedsConvert(f)){
+      _postStatus('正在转换音频格式…（' + sizeMB.toFixed(1) + ' MB，稍等）');
+      try{
+        var mp3blob = await pConvertToMp3(f, function(pct){
+          _postStatus('转换中… ' + pct + '%');
+        });
+        var base = (f.name || 'audio').replace(/\.[^.]+$/, '');
+        useFile = new File([mp3blob], base + '.mp3', {type: 'audio/mpeg'});
+        _postStatus('已转成 MP3：' + sizeMB.toFixed(1) + 'MB → ' + (useFile.size / 1024 / 1024).toFixed(1) + 'MB ✓');
+      }catch(err){
+        console.warn('[music] convert failed', err);
+        _postStatus('转换失败，改传原文件（可能播放较慢）', 'var(--danger)');
+        useFile = f;
+      }
+    }
+
+    // 2) 立即上传（和照片一致：选完就传，草稿里存路径，不怕页面重载）
+    var nameLow = (useFile.name || '').toLowerCase();
+    var mext = (nameLow.split('.').pop() || 'mp3').toLowerCase();
+    var path = 'posts/music_' + Date.now() + '.' + mext;
+    _postStatus('上传音乐中…（' + (useFile.size / 1024 / 1024).toFixed(1) + ' MB）');
+    try{
+      await uploadToStorage(path, useFile);
+      _postDraft.music = { path: path, name: useFile.name };
+      _previewMusic();
+      pbSaveDraft();
+      _postStatus('✅ 音乐已上传：' + useFile.name + '（' + (useFile.size / 1024 / 1024).toFixed(1) + ' MB）', 'var(--success)');
+    }catch(e){
+      _postStatus('❌ 音乐上传失败：' + (e.message || '请重试'), 'var(--danger)');
+    }
   };
 
   document.getElementById('postPublish').onclick = async function(){
@@ -1688,12 +1984,12 @@ async function renderPostTab(){
     var text = ta ? ta.value : '';
     var titleEl = document.getElementById('postTitle');
     var title = titleEl ? titleEl.value.trim() : '';
-    var mood = (document.getElementById('postMood').value || '').trim();
-    var weather = (document.getElementById('postWeather').value || '').trim();
-    var location = (document.getElementById('postLocation').value || '').trim();
+    // 心情/天气/地点输入框已于 2026-09-15 移除；字段保留以兼容旧数据展示
+    var mood = '', weather = '', location = '';
 
     var imgs = _postDraft.images || [];
-    if(!text.trim() && !imgs.length && !_postDraft.music && !_postDraft.musicKeep){
+    var vids = _postDraft.videos || [];
+    if(!text.trim() && !imgs.length && !vids.length && !_postDraft.music && !_postDraft.musicKeep){
       _postStatus('写点内容或加张照片吧', 'var(--danger)'); return;
     }
     btn.disabled = true; btn.textContent = isEdit ? '保存中…' : '发布中…';
@@ -1705,24 +2001,26 @@ async function renderPostTab(){
           await uploadToStorage(imgs[i].path, imgs[i].blob);
         }
       }
-      var finalBlocks = pbParseArticle(text, imgs).map(function(b){
+      var finalBlocks = pbParseArticle(text, imgs, vids).map(function(b){
         if(b.t === 'img'){
           var im = imgs[b._idx];
           if(!im) return null;
           return {t:'img', src: im.path || im.src, cap: (im.cap || '').trim()};
+        }
+        if(b.t === 'video'){
+          var vd = vids[b._vidx];
+          if(!vd) return null;
+          return {t:'video', src: vd.src, kind: vd.kind || pbVideoKind(vd.src)};
         }
         return b;
       }).filter(function(x){ return !!x; });
 
       var musicPath = _postDraft.musicKeep || null;
       var musicTitle = _postDraft.musicKeepTitle || null;
-      if(_postDraft.music){
-        _postStatus('上传音乐…');
-        var mf = _postDraft.music.file;
-        var mext = (mf.name.split('.').pop() || 'mp3').toLowerCase();
-        musicPath = 'posts/music_' + Date.now() + '.' + mext;
-        await uploadToStorage(musicPath, mf);
-        musicTitle = mf.name.replace(/\.[^.]+$/, '');
+      if(_postDraft.music && _postDraft.music.path){
+        // 2026-09-15：音乐在"选择时"已上传（含格式转换），这里直接引用路径
+        musicPath = _postDraft.music.path;
+        musicTitle = (_postDraft.music.name || '音乐').replace(/\.[^.]+$/, '');
       }
 
       var plainText = finalBlocks.filter(function(x){ return x.t !== 'img'; })
@@ -1773,6 +2071,7 @@ async function renderPostTab(){
   };
 
   pbRenderImgList();
+  pbRenderVideoList();
   renderPostOldList(posts);
 }
 

@@ -1,5 +1,5 @@
-// 旧世界密码（向天游的私人空间）
-const sitePassword = '陈科任';
+// 旧世界密码（向天游的私人空间）—— 2026-09-15 改为哈希，源码不再存明文
+const sitePasswordHash = 'c1e7d546f036642ce436612e67ab03e713e1167ca56f6dfda9176632dd8b9d58';
 // ==================== CDN图片优化配置 ====================
 // 使用jsDelivr CDN加速GitHub内容，国内访问更快
 const CDN = {
