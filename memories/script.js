@@ -1007,7 +1007,35 @@ window.navLightbox = navLightbox;
     });
   }
   if(document.readyState === 'loading'){
-      // 2026-09-18：相册照片「按住保持放大，松手回弹」
+      // ═══ 2026-09-19：导航右上角两个按钮的【终极兜底】═══
+  //   之前的做法（onclick 属性 / 各自 addEventListener）反复出现"点了没反应"，
+  //   原因是：① onclick 属性在移动端不可靠 ② 多处绑定互相覆盖 ③ 代码改动误伤
+  //   现在改为【document 级事件委托 + capture 阶段】：
+  //     - 不依赖按钮自己有没有被绑上
+  //     - capture 最先执行，抢在其他监听之前，且 stopPropagation 阻止重复触发
+  document.addEventListener('pointerdown', function(e){
+    var t = e.target;
+    if(!t || !t.closest) return;
+    // 主题切换 ☀️/🌙
+    if(t.closest('#navTheme')){
+      e.preventDefault(); e.stopPropagation();
+      try{
+        if(typeof window.toggleTheme === 'function') window.toggleTheme();
+      }catch(err){ console.warn('[nav] 切换主题失败', err); }
+      return;
+    }
+    // 管理菜单 ⚙️
+    if(t.closest('#navGear')){
+      e.preventDefault(); e.stopPropagation();
+      try{
+        if(window.EDITOR && typeof window.EDITOR.open === 'function') window.EDITOR.open();
+        else console.warn('[nav] 编辑器尚未就绪（window.EDITOR 不存在）');
+      }catch(err){ console.warn('[nav] 打开编辑器失败', err); }
+      return;
+    }
+  }, true);
+
+  // 2026-09-18：相册照片「按住保持放大，松手回弹」
   //   不用 :active —— 手机上前者不稳定（手指微动就取消）
   //   改用 JS 管理 .touching 类：按住期间【不设超时】一直保持，松手才移除
   (function(){
