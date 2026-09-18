@@ -1466,7 +1466,20 @@ function togglePlay(){
 function prevSong(){ const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx-1; if(i<0)i=s.length-1; playSong(i); }
 /* ===== 2026-09-19：播放模式（列表循环 / 单曲循环 / 随机）===== */
 var PLAY_MODE = 'list';   // list | one | shuffle
-var PLAY_MODE_ICON = { list:'🔁', one:'🔂', shuffle:'🔀' };
+/* 2026-09-19：改用内联 SVG 图标（emoji 在不同系统会渲染成蓝色方块，很突兀）
+   stroke/fill 用 currentColor → 自动跟随网站配色与主题 ✓ */
+var PLAY_MODE_ICON = {
+  list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:1.05em;height:1.05em;display:block">'
+      + '<path d="M17 2.5l3.5 3.5L17 9.5"/><path d="M3.5 11.5v-1.5a4 4 0 014-4h13"/>'
+      + '<path d="M7 21.5L3.5 18 7 14.5"/><path d="M20.5 12.5v1.5a4 4 0 01-4 4h-13"/></svg>',
+  one:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:1.05em;height:1.05em;display:block">'
+      + '<path d="M17 2.5l3.5 3.5L17 9.5"/><path d="M3.5 11.5v-1.5a4 4 0 014-4h13"/>'
+      + '<path d="M7 21.5L3.5 18 7 14.5"/><path d="M20.5 12.5v1.5a4 4 0 01-4 4h-13"/>'
+      + '<text x="12" y="15.4" font-size="8.4" font-family="system-ui,sans-serif" font-weight="700" fill="currentColor" stroke="none" text-anchor="middle">1</text></svg>',
+  shuffle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:1.05em;height:1.05em;display:block">'
+      + '<path d="M16 3.5h5v5"/><path d="M4 20.5L21 3.5"/><path d="M21 15.5v5h-5"/>'
+      + '<path d="M15.5 15.5l5.5 5.5"/><path d="M4 3.5l5.5 5.5"/></svg>'
+};
 var PLAY_MODE_NAME = { list:'列表循环', one:'单曲循环', shuffle:'随机播放' };
 (function(){
   try{
@@ -1476,7 +1489,7 @@ var PLAY_MODE_NAME = { list:'列表循环', one:'单曲循环', shuffle:'随机�
   function paint(){
     var b = document.getElementById('playMode');
     if(b){
-      b.textContent = PLAY_MODE_ICON[PLAY_MODE];
+      b.innerHTML = PLAY_MODE_ICON[PLAY_MODE];
       b.title = '播放模式：' + PLAY_MODE_NAME[PLAY_MODE] + '（点击切换）';
       b.setAttribute('data-mode', PLAY_MODE);
     }
