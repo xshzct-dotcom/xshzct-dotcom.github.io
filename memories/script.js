@@ -1921,9 +1921,8 @@ function init(){
   observeFadeUps();
 
   // 齿轮
-  const gear=$('#navGear');
-  if(gear) gear.onclick = () => { if(window.EDITOR && window.EDITOR.open) window.EDITOR.open(); };
-
+  /* gear 绑定已移至 editor.js */
+  
   // 主题切换（2026-08-27：右上角 ☀/☾ 按钮）
   initTheme();   // 2026-09-15：初始化明暗主题（默认暗色）
 
