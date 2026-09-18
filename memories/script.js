@@ -985,7 +985,35 @@ window.navLightbox = navLightbox;
     });
   }
   if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', bind);
+      // 2026-09-18：相册照片「按住保持放大，松手回弹」
+  //   不用 :active —— 手机上前者不稳定（手指微动就取消）
+  //   改用 JS 管理 .touching 类：按住期间【不设超时】一直保持，松手才移除
+  (function(){
+    var cur = null, sx = 0, sy = 0;
+    function release(){
+      if(cur) cur.classList.remove('touching');
+      cur = null;
+    }
+    document.addEventListener('touchstart', function(e){
+      var it = e.target && e.target.closest ? e.target.closest('.masonry-item') : null;
+      if(!it) return;
+      if(cur && cur !== it) cur.classList.remove('touching');
+      cur = it;
+      var t = e.touches && e.touches[0];
+      if(t){ sx = t.clientX; sy = t.clientY; }
+      it.classList.add('touching');
+    }, {passive:true});
+    document.addEventListener('touchmove', function(e){
+      if(!cur) return;
+      var t = e.touches && e.touches[0];
+      if(!t) return;
+      if(Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) release();
+    }, {passive:true});
+    document.addEventListener('touchend', release, {passive:true});
+    document.addEventListener('touchcancel', release, {passive:true});
+  })();
+
+document.addEventListener('DOMContentLoaded', bind);
   }else{
     bind();
   }
