@@ -68,7 +68,22 @@ navHamburger.onclick=()=>{ navHamburger.classList.toggle('open'); navLinks.class
 // 2026-09-15：主题切换按钮
 (function(){
   var tb = document.getElementById('navTheme');
-  if(tb) tb.onclick = function(){ if(typeof window.toggleTheme === 'function') window.toggleTheme(); };
+  if(!tb) return;
+  var _lock = 0;
+  function fire(e){
+    if(e){ e.preventDefault(); e.stopPropagation(); }
+    var now = Date.now();
+    if(now - _lock < 300) return;
+    _lock = now;
+    if(typeof window.toggleTheme === 'function') window.toggleTheme();
+  }
+  tb.onclick = null;
+  if(window.PointerEvent){
+    tb.addEventListener('pointerdown', fire, {passive:false});
+  }else{
+    tb.addEventListener('touchstart', fire, {passive:false});
+    tb.addEventListener('click', fire, {passive:false});
+  }
 })();
 $$('.nav-links a').forEach(a=>a.onclick=(e)=>{
   navHamburger.classList.remove('open');
@@ -123,10 +138,17 @@ function applyTheme(t){
 }
 window.applyTheme = applyTheme;
 window.toggleTheme = function(){
-  var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-  var next = (cur === 'light') ? 'dark' : 'light';
-  try{ localStorage.setItem('memories.theme', next); }catch(e){}
-  applyTheme(next);
+  try{
+    var cur = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    var next = (cur === 'light') ? 'dark' : 'light';
+    try{ localStorage.setItem('memories.theme', next); }catch(e){}
+    // 用 window.applyTheme 而非裸调用，避免作用域问题导致静默失败
+    if(typeof window.applyTheme === 'function') window.applyTheme(next);
+    else{
+      if(next === 'light') document.documentElement.setAttribute('data-theme','light');
+      else document.documentElement.removeAttribute('data-theme');
+    }
+  }catch(e){ console.warn('[theme] toggle 失败', e); }
 };
 /* 2026-09-15 定稿：记住用户选择；但【首次进入（无记录）默认暗色】 */
 function initTheme(){
