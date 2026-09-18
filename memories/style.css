@@ -913,7 +913,10 @@ img[src^="data:"]{ animation:none }
 
 
 
-/* 2026-09-18：图片未加载完时先给个比例占位，避免"高度从 0 突变"造成瀑布流整体重排（视觉上像闪跳） */
+/* 2026-09-18：图片未加载完时先给个比例占位，避免"高度从 0 突变"造成瀑布流整体重排（视觉上像闪跳） */
+
+
+
 
 @media (hover: hover) and (pointer: fine){
   .masonry-item:hover{ box-shadow: var(--sh-2, 0 4px 12px rgba(0,0,0,.1)) }
@@ -1106,8 +1109,19 @@ img[src^="data:"]{ animation:none }
   transition: opacity .3s ease, visibility 0s !important;
 }
 /* 同类全屏层一并加固：博客画布、编辑器遮罩、密码门 */
-#blogOverlay:not(.open):not([data-open="1"]){
+/* ★ 2026-09-19 深夜修正（严重 bug）★
+   原来写的是 `#blogOverlay:not(.open):not([data-open="1"])`，
+   但 index.html 里的 openBlog() 从来不添加 .open / data-open —— 它只设置内联的
+   visibility / opacity。于是这条规则【永久生效】：
+     博客画布打开后依然 pointer-events:none
+     → 点击和悬停全部【穿透】到底下的主页
+     → 现象：博客列表点不开、鼠标放上去没反应、还会"穿透点到主页的随笔文章"✗
+   改为 JS 真正会写的 aria-hidden（openBlog 设 false / closeBlog 设 true）。 */
+#blogOverlay[aria-hidden="true"]{
   pointer-events: none !important;
+}
+#blogOverlay[aria-hidden="false"]{
+  pointer-events: auto !important;
 }
 #editorBackdrop:not(.active){
   visibility: hidden !important;
@@ -1158,4 +1172,46 @@ img[src^="data:"]{ animation:none }
   pointer-events: auto !important;
   opacity: 1 !important;
   z-index: 260 !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   2026-09-19 · 博客列表「悬停亮起」效果 —— 浅色主题下太弱，加强
+   ──────────────────────────────────────────────────────────────────
+   现象：用户切到浅色主题后说"鼠标放上去没有那个选中效果了"。
+   实测（真实浏览器量 computed）：
+     暗色：照片 0.34 → 0.6 ，遮罩 opacity→0     → 照片明显"亮起来" ✓
+     浅色：照片 0.14 → 0.8 ，但白底色 + 白色遮罩(0.55) 把照片洗白 → 几乎看不出 ✗
+   另外 `.ml-item{border:none}` 导致原来的 `hover{border-color}` 完全无效。
+   修法：① 浅色悬停把照片推到 1.0 并把白纱压到 0.22（照片真的显出来）
+        ② 两种主题都补上"上浮 + 阴影"，让"选中感"一眼可见
+   ══════════════════════════════════════════════════════════════════ */
+@media (hover: hover) and (pointer: fine){
+  /* ① 通用：上浮 + 投影（border 是 none，只能靠阴影表达"选中"） */
+  .ml-list .ml-item:hover{
+    transform: translateY(-4px) !important;
+    box-shadow: 0 14px 32px rgba(0,0,0,.30) !important;
+  }
+  /* ② 暗色：照片再亮一点，遮罩已归零 */
+  html:not([data-theme="light"]) .ml-list .ml-item:hover .ml-bgimg{
+    opacity: .68 !important;
+    transform: scale(1.03) !important;
+  }
+  /* ③ 浅色：照片推到满、白纱大幅减弱 —— 这才是"照片亮起来" */
+  html[data-theme="light"] .ml-list .ml-item:hover{
+    background: #F4F4F6 !important;
+    box-shadow: 0 14px 32px rgba(0,0,0,.15) !important;
+  }
+  html[data-theme="light"] .ml-list .ml-item:hover .ml-bgimg{
+    opacity: 1 !important;
+    filter: brightness(1.05) saturate(1.08) !important;
+    transform: scale(1.03) !important;
+  }
+  html[data-theme="light"] .ml-list .ml-item:hover::after{
+    opacity: .22 !important;
+  }
+  /* ④ 没照片的卡片（28/36 篇没有图）：也给一个看得见的"选中"底色 */
+  html[data-theme="light"] .ml-list .ml-item.no-bg:hover{
+    background: #EFEFF2 !important;
+  }
 }
