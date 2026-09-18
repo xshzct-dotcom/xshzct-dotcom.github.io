@@ -486,7 +486,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 
 /* --- Responsive --- */
 @media(max-width:1024px){
-  .masonry-item{width:calc((100% - 18px) / 2)}
+  
   .timeline::before{left:14px;opacity:.5}
   .timeline-item:nth-child(odd),.timeline-item:nth-child(even){flex-direction:row}
   .timeline-dot{left:14px;width:10px;height:10px;top:18px}
@@ -517,7 +517,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   .hero-title{font-size:2rem}
   .section-title{font-size:1.6rem}
   .gallery-filter{padding:6px 14px;font-size:.8rem}
-  .masonry-item{width:100%}
+  
   .daily-quote .dq-text{font-size:1.1rem}
   .nav-links a{font-size:.95rem;padding:8px 2px}
   .nav{padding:0 8px}
