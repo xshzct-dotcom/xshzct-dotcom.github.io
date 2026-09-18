@@ -1850,7 +1850,6 @@ async function renderPostTab(){
       <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 10px;font-size:.8rem;color:var(--text-dim)">
         <span style="flex-shrink:0">📅 日期</span>
         <input id="postDate" type="date" style="background:rgba(var(--fg-rgb),.06);border:1px solid var(--border);border-radius:8px;padding:5px 9px;color:var(--text);font-size:.82rem;font-family:inherit">
-        <span style="font-size:.72rem;color:var(--text-muted)">改这个可以调整博客里的日期与排序</span>
       </div>
       <textarea id="postText" rows="12"></textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
