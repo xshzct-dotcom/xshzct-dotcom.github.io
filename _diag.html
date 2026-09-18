@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>网站自检</title>
+<style>
+body{font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif;padding:16px;line-height:1.9;font-size:15px;background:#111;color:#eee;margin:0}
+h2{margin:0 0 6px;font-size:18px}
+h3{margin:18px 0 6px;font-size:14px;color:#9ab}
+.row{padding:7px 0;border-bottom:1px solid #2a2a2a}
+.ok{color:#5dd879;font-weight:600}
+.bad{color:#ff6b6b;font-weight:700}
+.mid{color:#ffc857}
+code{background:#222;padding:2px 6px;border-radius:4px;font-size:12px;color:#8fd}
+iframe{width:100%;height:260px;border:1px solid #333;border-radius:8px;margin-top:8px;background:#000}
+.tip{margin-top:14px;padding:10px 12px;background:#1c2a1c;border-left:3px solid #5dd879;border-radius:6px;font-size:13px}
+</style>
+</head>
+<body>
+<h2>🔍 网站自检报告</h2>
+<div style="font-size:13px;color:#8a8a8a">这份报告会告诉我问题出在哪一层，请截图给我</div>
+
+<h3>【A】页面与环境</h3>
+<div id="env"></div>
+
+<h3>【B】主站内部状态（iframe）</h3>
+<div id="main">等待主站加载…</div>
+
+<h3>【C】模拟点击测试</h3>
+<div id="test">等待主站加载…</div>
+
+<iframe id="fr" src="./memories/?diag=1"></iframe>
+
+<div class="tip" id="howto" style="display:none"></div>
+
+<script>
+function row(name, ok, extra){
+  var cls = ok === true ? 'ok' : (ok === false ? 'bad' : 'mid');
+  var mark = ok === true ? '✓' : (ok === false ? '✗' : '?');
+  return '<div class="row"><span class="'+cls+'">'+mark+'</span> '+name+(extra?' <code>'+extra+'</code>':'')+'</div>';
+}
+
+// ── A. 环境
+var env = '';
+env += row('页面地址', null, location.href);
+env += row('Service Worker 支持', 'serviceWorker' in navigator);
+env += row('PointerEvent 支持', !!window.PointerEvent);
+env += row('localStorage 可写', (function(){ try{ localStorage.setItem('_t','1'); localStorage.removeItem('_t'); return true; }catch(e){ return false; } })());
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(function(rs){
+    var info = rs.length ? rs.map(function(r){ return (r.active?r.active.scriptURL.split('/').pop():'?'); }).join(',') : '无';
+    document.getElementById('env').innerHTML += row('已注册的 SW', rs.length>0, info);
+  }).catch(function(){});
+}
+document.getElementById('env').innerHTML = env;
+
+// ── B/C. 检测 iframe 内部
+var fr = document.getElementById('fr');
+fr.onload = function(){
+  var out = '', test = '';
+  var win, doc;
+  try{
+    win = fr.contentWindow; doc = fr.contentDocument;
+  }catch(e){
+    document.getElementById('main').innerHTML = row('无法访问 iframe（跨域）', false);
+    return;
+  }
+  if(!win || !doc){
+    document.getElementById('main').innerHTML = row('iframe 尚未就绪', false);
+    return;
+  }
+
+  // 脚本是否新版
+  var scripts = [].slice.call(doc.querySelectorAll('script[src]')).map(function(s){ return s.getAttribute('src'); });
+  var mainScript = scripts.filter(function(s){ return s.indexOf('script.js') === 0; })[0] || '(未找到)';
+  out += row('script.js 引用', null, mainScript);
+  var editorScript = scripts.filter(function(s){ return s.indexOf('editor.js') === 0; })[0] || '(未找到)';
+  out += row('editor.js 引用', null, editorScript);
+
+  // 关键对象
+  out += row('window.EDITOR 存在', !!win.EDITOR);
+  out += row('window.EDITOR.open 是函数', !!(win.EDITOR && typeof win.EDITOR.open === 'function'));
+  out += row('window.toggleTheme 是函数', typeof win.toggleTheme === 'function');
+  out += row('window.applyTheme 是函数', typeof win.applyTheme === 'function');
+  out += row('window.navLightbox 是函数', typeof win.navLightbox === 'function');
+  out += row('window.cyclePlayMode 是函数', typeof win.cyclePlayMode === 'function');
+
+  // 按钮
+  var g = doc.getElementById('navGear'), t = doc.getElementById('navTheme');
+  out += row('按钮 #navGear 存在', !!g);
+  out += row('按钮 #navTheme 存在', !!t);
+  if(g){
+    var gr = g.getBoundingClientRect();
+    out += row('齿轮按钮可见/尺寸', gr.width > 0 && gr.height > 0, Math.round(gr.width)+'x'+Math.round(gr.height));
+    var cover = doc.elementFromPoint(gr.left + gr.width/2, gr.top + gr.height/2);
+    out += row('齿轮位置最上层元素', cover === g || g.contains(cover), cover ? (cover.id || cover.className || cover.tagName) : 'null');
+  }
+  document.getElementById('main').innerHTML = out;
+
+  // ── C. 实测点击
+  if(g){
+    var before = doc.getElementById('editorPanel') ? doc.getElementById('editorPanel').className : '';
+    try{
+      g.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, cancelable:true, clientX:gr.left+gr.width/2, clientY:gr.top+gr.height/2}));
+    }catch(e){
+      try{ g.click(); }catch(e2){}
+    }
+    setTimeout(function(){
+      var panel = doc.getElementById('editorPanel');
+      var after = panel ? panel.className : '(无面板)';
+      var opened = /open/.test(after);
+      test += row('派发点击后，编辑器面板是否打开', opened, 'class="'+after+'"');
+      test += row('window.EDITOR 能否直接调用', null, (win.EDITOR && typeof win.EDITOR.open === 'function') ? '可以（说明是"点击没接住"）' : '不可以（说明是"对象没就绪"）');
+      document.getElementById('test').innerHTML = test;
+      var h = document.getElementById('howto');
+      h.style.display = 'block';
+      h.innerHTML = '<b>怎么读这份报告：</b><br>'
+        + '· 若「script.js 引用」里没有 <code>20260919-5</code> 或更高 → <b>是缓存问题</b>（浏览器还在用旧代码）<br>'
+        + '· 若「EDITOR 能否直接调用=可以」但「点击后没打开」→ <b>是事件没接住</b><br>'
+        + '· 若「EDITOR 对象=不可以」→ <b>是脚本没跑起来/报错</b><br>'
+        + '把这份报告截图给我即可 ✓';
+    }, 600);
+  }
+};
+</script>
+</body>
+</html>
