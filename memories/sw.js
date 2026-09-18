@@ -3,7 +3,7 @@
 // 策略：network-first（每次都拿最新），离线时回退缓存
 // 2026-08-11：从根目录 sw.js 复制到 memories/ 并修正路径；移除旧版编辑器死文件的预缓存
 // ============================================
-const CACHE = 'memories-v168';
+const CACHE = 'memories-v169';
 const STATIC_ASSETS = [
   '/memories/', '/memories/index.html',
   '/memories/style.css', '/data.js', '/memories/script.js',
@@ -40,7 +40,7 @@ self.addEventListener('activate', function(e) {
     caches.keys().then(function(names) {
       return Promise.all(
         names.map(function(name) {
-          // 保留 Supabase 读缓存，其它旧缓存删除
+          // 2026-09-19：旧读缓存桶（supabase-reads-v1）可能存着过期数据，一并清掉
           if (name !== CACHE && name !== SUPABASE_CACHE) return caches.delete(name);
         })
       );
@@ -60,38 +60,27 @@ function cacheIsFresh(cacheResp){
 self.addEventListener('fetch', function(e) {
   const url = new URL(e.request.url);
 
-  // Supabase REST 读请求（GET）：stale-while-revalidate
-  // 5分钟内的缓存直接用（快），同时后台刷新；无缓存或过期就走网络
+  /* ═══ 2026-09-19 ★修复★：Supabase 读请求改为【network-first】 ═══
+     原来是 stale-while-revalidate —— 5 分钟内的旧结果直接返回、后台才刷新。
+     后果：在编辑器里改完文章 / 发布完博客后，页面（含博客画布 iframe）立刻去查数据，
+     拿到的却是 5 分钟前的旧结果 → 表现为"改了看不到 / 发布了不显示 / 刷新一下才有"✗
+     现在：优先走网络（永远最新），网络失败才回退缓存（离线仍可用）。 */
   if (e.request.method === 'GET' && url.href.startsWith(SUPABASE_REST)) {
     e.respondWith(
-      caches.open(SUPABASE_CACHE).then(function(cache){
-        return cache.match(e.request).then(function(cached){
-          if(cacheIsFresh(cached)){
-            // 命中缓存：立即返回 + 后台刷新
-            fetch(e.request).then(function(fresh){
-              if(fresh && fresh.status === 200){
-                var clone = fresh.clone();
-                cache.put(e.request, new Response(clone.body, {
-                  status: clone.status, statusText: clone.statusText,
-                  headers: Object.assign({}, toObj(clone.headers), {'x-cache-time': String(Date.now())})
-                }));
-              }
-            }).catch(function(){});
-            return cached;
-          }
-          // 无缓存：走网络，成功后存缓存
-          return fetch(e.request).then(function(fresh){
-            if(fresh && fresh.status === 200){
-              var clone = fresh.clone();
-              cache.put(e.request, new Response(clone.body, {
-                status: clone.status, statusText: clone.statusText,
-                headers: Object.assign({}, toObj(clone.headers), {'x-cache-time': String(Date.now())})
-              }));
-            }
-            return fresh;
-          }).catch(function(){
-            return cached || Response.error();
+      fetch(e.request).then(function(fresh){
+        if(fresh && fresh.status === 200){
+          var clone = fresh.clone();
+          caches.open(SUPABASE_CACHE).then(function(cache){
+            cache.put(e.request, new Response(clone.body, {
+              status: clone.status, statusText: clone.statusText,
+              headers: Object.assign({}, toObj(clone.headers), {'x-cache-time': String(Date.now())})
+            }));
           });
+        }
+        return fresh;
+      }).catch(function(){
+        return caches.open(SUPABASE_CACHE).then(function(cache){
+          return cache.match(e.request).then(function(cached){ return cached || Response.error(); });
         });
       })
     );

@@ -8,16 +8,23 @@
 const SB_URL='https://mvzbkuhwapdqcdkekczh.supabase.co';
 const SB_KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
 const STORAGE_URL=SB_URL+'/storage/v1/object/public/photos';
+// 2026-09-19：复用 script.js 已创建的客户端，避免同一页面出现两个 GoTrueClient
+//   （控制台会告警 "Multiple GoTrueClient instances ... may produce undefined behavior"）
 let sb;
-try{sb=supabase.createClient(SB_URL,SB_KEY)}catch(e){sb=null}
+try{ sb = window._supabaseClient || supabase.createClient(SB_URL, SB_KEY); window._supabaseClient = sb; }catch(e){ sb=null }
 
 // ===== 编辑器相册灯箱：全局事件只绑一次（修 ESC 关不掉 + 事件累积泄漏） =====
 // window._aeGrid 由 renderAlbumPhotos 创建时设置，离开相册时置空
 let _aeDragging = false;
+let _aeResetSel = null;   // 2026-09-19：由 renderAlbumPhotos 指向"当前相册的清空多选函数"
+
 document.addEventListener('keydown', function(e){
   if(e.key !== 'Escape') return;
   var grid = window._aeGrid;
   if(grid && grid.style.display !== 'none') grid.style.display = 'none';
+  // 2026-09-19：退出多选 —— 统一走这里（原来在 renderAlbumPhotos 里每次新加一个监听，
+  //   反复开关相册会累积几十个 keydown 监听 = 内存泄漏）
+  if(_aeResetSel){ try{ _aeResetSel(); }catch(err){} }
 });
 document.addEventListener('mousemove', function(e){
   if(!_aeDragging) return;
@@ -130,9 +137,13 @@ async function ensureDataSync(){
       for(let i=0;i<allA.length;i+=50) await sb.from('albums').insert(allA.slice(i, i+50));
     } else if(typeof albums !== 'undefined'){
       for(const a of albums){
-        const {data:exist} = await sb.from('albums').select('id').eq('title', a.title).limit(1);
-        // 只补 cover，不再改 sort_order（否则覆盖用户在编辑器里排好的相册顺序）
-        if(exist && exist.length) await sb.from('albums').update({cover:a.cover||''}).eq('id', exist[0].id);
+        // 2026-09-19 优化：原来只 select('id')，然后【无条件】PATCH 一次 cover
+        //   → 每次打开编辑器都固定发出 9 个 PATCH（改了没改都发），还把数据库里的 cover
+        //     用 data.js 的值盖回去。现在连 cover 一起查出来，只有真的不一样才写。
+        const {data:exist} = await sb.from('albums').select('id,cover').eq('title', a.title).limit(1);
+        if(exist && exist.length && String(exist[0].cover||'') !== String(a.cover||'')){
+          await sb.from('albums').update({cover:a.cover||''}).eq('id', exist[0].id);
+        }
       }
     }
     // 音乐
@@ -409,7 +420,7 @@ async function renderEssayTab(){
     };
 
     if(!isNew) $('#eeDelBtn').onclick=async()=>{
-      if(!confirm('确定删除「'+title+'」？'))return;
+      if(!confirm('确定删除「'+(articleTitle||'这篇文章')+'」？'))return;   // 2026-09-19 ★修复★：原来写的是未定义的 title → ReferenceError → 按钮点了没反应
       await db().from('essays').delete().eq('id',a.id);
       invalidateCache('essay');
       if(window._essayReturnTo) window._essayReturnTo();
@@ -431,6 +442,7 @@ window.renderEssayTab=renderEssayTab;
 // ===== 相册编辑 =====
 async function renderAlbumTab(){
   window._aeGrid = null;  // 离开相册视图，释放灯箱引用
+  _aeResetSel = null;
   const body=$('#editorBody');
   var albums = await loadTabData('album');
   const list=albums||[];
@@ -846,10 +858,8 @@ function renderList(){
 
       // ESC 关闭灯箱已由模块级 keydown 统一处理（不再每次新增监听）；
       // 这里只处理"退出多选模式"
-      document.addEventListener('keydown', function(e){
-        if(e.key !== 'Escape') return;
-        if(_selectMode || _selSet.size > 0){ _selSet.clear(); _selectMode = false; updateSelUI(); }
-      });
+      // 2026-09-19 修复：不再新加 keydown 监听，只把"清空多选"的函数登记给模块级监听
+      _aeResetSel = function(){ if(_selectMode || _selSet.size > 0){ _selSet.clear(); _selectMode = false; updateSelUI(); } };
       // Upload - 用 anon key（RLS 已允许）
       $('#aeUpload').onchange=async (e)=>{
         const files=e.target.files;
@@ -1298,6 +1308,7 @@ function startEditPost(p){
   _postDraft.videos = art.videos;
   pbRenderVideoList();
   var ti0 = document.getElementById('postTitle'); if(ti0) ti0.value = p.title || '';
+  pbFillDate(p.created_at);   // 2026-09-19 ★修复★：把该篇原日期填回日期框（原来编辑时日期框一直是空的）
   var ta = document.getElementById('postText');
   if(ta) ta.value = art.text;
   pbRenderImgList();
@@ -1773,6 +1784,28 @@ function pbSaveDraft(){
   }catch(e){}
 }
 
+// ===== 2026-09-19 ★修复★：读取表单里的「发布日期」（本地 12:00 → UTC，不会跨日）=====
+//   原来只有 pbSaveDraft（草稿）用了这个逻辑，发布/保存时根本没读日期框 →
+//   "改了日期点保存，博客日期纹丝不动"。
+function pbPickDate(){
+  var el = document.getElementById('postDate');
+  var v = el && el.value;
+  if(!v) return undefined;
+  try{
+    var d = new Date(v + 'T12:00:00');
+    if(!isNaN(d.getTime())) return d.toISOString();
+  }catch(e){}
+  return undefined;
+}
+// 把 ISO 时间填回日期框（按本地时区取年月日，避免差一天）；不传参=今天
+function pbFillDate(iso){
+  var de = document.getElementById('postDate');
+  if(!de) return;
+  var d = iso ? new Date(iso) : new Date();
+  if(isNaN(d.getTime())) d = new Date();
+  de.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 function pbSaveDraftSoon(){
   if(_pbDraftTimer) clearTimeout(_pbDraftTimer);
   _pbDraftTimer = setTimeout(pbSaveDraft, 700);
@@ -1871,6 +1904,7 @@ async function renderPostTab(){
     </div>
   `;
   var _pbCaret = null;
+  pbFillDate();   // 2026-09-19：日期框默认填今天（若随后恢复草稿，会被草稿日期覆盖）
   var insertBtn = document.getElementById('postInsertImg');
   if(insertBtn){
     insertBtn.onclick = function(){
@@ -2085,8 +2119,11 @@ async function renderPostTab(){
         weather: weather || null,
         location: location || null
       };
-      // created_at 为 undefined 时不要覆盖（新建时用默认、编辑时保留原值）
-      if(!payload.created_at) delete payload.created_at;
+      // 2026-09-19 ★修复★：把日期框的值真正写进 created_at
+      //   （原来这里只写了句 `if(!payload.created_at) delete ...`，而 payload 里
+      //     压根没有 created_at 这个键 → 空操作 → 日期永远改不动）
+      var _pickedAt = pbPickDate();
+      if(_pickedAt) payload.created_at = _pickedAt;
       var res;
       if(isEdit){
         payload.updated_at = new Date().toISOString();

@@ -1006,7 +1006,11 @@ window.navLightbox = navLightbox;
       }
     });
   }
-  if(document.readyState === 'loading'){
+  /* 2026-09-19 结构修复：下面这两段（导航按钮委托 / 相册按住放大）原来被误写进了
+     `if(document.readyState === 'loading'){ }` 里面 —— 也就是说，只有当脚本执行那一刻
+     文档还在加载时才会绑定。平时能凑巧生效（<script> 在 body 里执行时正是 loading），
+     但只要脚本晚一步执行（缓存/注入/延迟加载），导航按钮和按住放大就【静默失效】。
+     现在移到外面，与文档状态无关，永远绑定。 */
       // ═══ 2026-09-19：导航右上角两个按钮的【终极兜底】═══
   //   之前的做法（onclick 属性 / 各自 addEventListener）反复出现"点了没反应"，
   //   原因是：① onclick 属性在移动端不可靠 ② 多处绑定互相覆盖 ③ 代码改动误伤
@@ -1063,7 +1067,8 @@ window.navLightbox = navLightbox;
     document.addEventListener('touchcancel', release, {passive:true});
   })();
 
-document.addEventListener('DOMContentLoaded', bind);
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', bind);
   }else{
     bind();
   }
@@ -1297,22 +1302,18 @@ function initMusic(){
   bgMusic=$('#bgMusic');
   if(!bgMusic) return;
   bgMusic.volume=0.5;
-  bgMusic.addEventListener('timeupdate',()=>{
-    if(bgMusic.duration){
-      const pct = (bgMusic.currentTime/bgMusic.duration)*100;
-      // 拖动中由手指/鼠标控制进度 UI，避免自动更新抢走显示
-      if(!isSeeking){
-        const pel = $('#playerProgress'); if(pel) pel.style.width = pct+'%';
-        const th = document.getElementById('playerThumb'); if(th) th.style.left = pct+'%';
-      }
-    }
-    // 保存当前播放进度
+
+  /* 2026-09-19 性能修复：播放进度的 localStorage 写入从"每次 timeupdate"
+     （每首歌每秒触发约 4 次）节流为"最多 2 秒一次"。
+     timeupdate 极频繁，每次都同步写 2 条 localStorage，主线程会被拖住（手机上尤其明显）。 */
+  var _lastSaveTs = 0;
+  function saveProgress(force){
+    var now = Date.now();
+    if(!force && now - _lastSaveTs < 2000) return;
+    _lastSaveTs = now;
     try{
-      const key=(bgMusic.src||'').split('/').pop();
-      localStorage.setItem('musicResume_'+key, JSON.stringify({
-        t:bgMusic.currentTime, idx:currentSongIdx
-      }));
-      // 同时更新 lastSong 里的进度
+      var key=(bgMusic.src||'').split('/').pop(); if(!key) return;
+      localStorage.setItem('musicResume_'+key, JSON.stringify({ t:bgMusic.currentTime, idx:currentSongIdx }));
       var lastRaw = localStorage.getItem('musicResume_lastSong');
       if(lastRaw){
         var lastObj = JSON.parse(lastRaw);
@@ -1322,6 +1323,18 @@ function initMusic(){
         }
       }
     }catch(e){}
+  }
+  bgMusic.addEventListener('timeupdate',()=>{
+    if(bgMusic.duration){
+      const pct = (bgMusic.currentTime/bgMusic.duration)*100;
+      // 拖动中由手指/鼠标控制进度 UI，避免自动更新抢走显示
+      if(!isSeeking){
+        const pel = $('#playerProgress'); if(pel) pel.style.width = pct+'%';
+        const th = document.getElementById('playerThumb'); if(th) th.style.left = pct+'%';
+      }
+    }
+    // 保存当前播放进度（已节流）
+    saveProgress();
   });
   bgMusic.addEventListener('ended',()=>{
     try{ localStorage.removeItem('musicResume_'+(bgMusic.src||'').split('/').pop()); }catch(e){}
@@ -1333,8 +1346,17 @@ function initMusic(){
     nextSong();
   });
   bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';});
-  bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';});
-  bgMusic.addEventListener('error',()=>{ setTimeout(nextSong,1200); });
+  bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶'; saveProgress(true);});
+  /* 2026-09-19 修复：加失败计数
+     原来任何一首歌加载失败都会 1.2 秒后自动跳下一首 —— 若整个歌单的文件都不可用，
+     就会形成【无限循环】：每 1.2 秒发一次请求，永不停止（耗电、耗流量、刷控制台）。 */
+  var _errStreak = 0;
+  bgMusic.addEventListener('play',function(){ _errStreak = 0; });
+  bgMusic.addEventListener('error',function(){
+    _errStreak++;
+    if(_errStreak > 3){ console.warn('[player] 连续 '+_errStreak+' 首加载失败，已停止自动跳过'); return; }
+    setTimeout(nextSong, 1200);
+  });
 
   // 立即用 data.js 初始化 _currentSongs（只当后备，不设标题不预加载）
   if(typeof playlist!=='undefined' && playlist.length>0){
@@ -1653,17 +1675,32 @@ window.playSongByPath = function(storagePath){
 };
 
 // ===== 滚动观察器 =====
+/* 2026-09-19 性能修复：
+   原来每次调用都 new 一个 IntersectionObserver，而它挂在 body 的 MutationObserver 上
+   —— 页面上每发生一次 DOM 变化（河流分批插图片、toast 出现、涟漪增删…）就全文查询一遍，
+   2500 张图滚动加载时开销很大。
+   现在：观察器只建一次 + 同一帧内的多次调用合并成一次。 */
+let _fadeObserver = null;
+let _fadePending = false;
 function observeFadeUps(){
-  const observer = new IntersectionObserver(entries=>{
-    entries.forEach(e=>{
-      if(e.isIntersecting){
-        e.target.classList.add('visible');
-        observer.unobserve(e.target);
-      }
-    });
-  },{rootMargin:'60px'});
-  $$('.fade-up').forEach(el=>{ if(!el.classList.contains('visible')) observer.observe(el); });
-  $$('.timeline-item').forEach(el=>{ if(!el.classList.contains('visible')) observer.observe(el); });
+  if(_fadePending) return;
+  _fadePending = true;
+  const run = function(){
+    _fadePending = false;
+    if(!_fadeObserver){
+      _fadeObserver = new IntersectionObserver(entries=>{
+        entries.forEach(e=>{
+          if(e.isIntersecting){
+            e.target.classList.add('visible');
+            _fadeObserver.unobserve(e.target);
+          }
+        });
+      },{rootMargin:'60px'});
+    }
+    $$('.fade-up').forEach(el=>{ if(!el.classList.contains('visible')) _fadeObserver.observe(el); });
+    $$('.timeline-item').forEach(el=>{ if(!el.classList.contains('visible')) _fadeObserver.observe(el); });
+  };
+  if(window.requestAnimationFrame) requestAnimationFrame(run); else setTimeout(run, 16);
 }
 
 // ===== 时间线索引填充 =====
@@ -1716,8 +1753,10 @@ async function loadSortOrderFromDB(){
 // ===== Supabase 同步（把 data.js 现有内容同步到云端，让编辑器有真实数据可改） =====
 const SB_URL = 'https://mvzbkuhwapdqcdkekczh.supabase.co';
 const SB_KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
+// 2026-09-19：复用同一个客户端实例，避免同一页面出现两个 GoTrueClient
+//   （控制台会告警 "Multiple GoTrueClient instances ... may produce undefined behavior"）
 let SB = null;
-try { SB = supabase.createClient(SB_URL, SB_KEY); } catch(e) { SB = null; }
+try { SB = window._supabaseClient || supabase.createClient(SB_URL, SB_KEY); window._supabaseClient = SB; } catch(e) { SB = null; }
 
 // 把 data.js 现有内容灌到 Supabase（完整版：表空时 bulk insert，否则 per-item merge）
 async function ensureSync(){
