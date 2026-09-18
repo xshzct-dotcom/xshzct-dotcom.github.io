@@ -561,7 +561,8 @@ function renderRiver(opts){
   if(!stream) return;
 
   var filtered = getFilteredRiver();
-  var pool = (filtered && filtered.length) ? filtered : allGalleryPhotos;
+  // 2026-09-18：顺序【固定】—— 与相册编辑器的排列一致，不再随机打乱
+  var pool = (filtered && filtered.length) ? filtered.slice() : allGalleryPhotos.slice();
   _riverTotal = pool.length;
 
   // 清掉旧的河流控件（换一批/箭头/轮回提示），并统一容器样式
@@ -578,6 +579,11 @@ function renderRiver(opts){
     if(pe0) pe0.textContent = '0 张照片';
     return;
   }
+
+  // 2026-09-18：防抖 —— 同一批数据在短时间内只渲染一次，避免多次调用互相覆盖造成"闪跳"
+  var _sig = (currentFilter || 'all') + '|' + pool.length + '|' + (pool[0]||'') + '|' + (pool[pool.length-1]||'');
+  if(_sig === window._masonryLastSig && !opts.forceReset) return;
+  window._masonryLastSig = _sig;
 
   // 当前过滤结果作为灯箱浏览序列（无重复，左右切换连续）
   _masonryPool = pool;
