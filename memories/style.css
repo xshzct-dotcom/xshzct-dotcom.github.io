@@ -1365,3 +1365,14 @@ html:not([data-theme="light"]) .hero-content::before{
 .player .play-mode-btn:hover{ color:var(--text); background:rgba(var(--fg-rgb),.08) }
 .player .play-mode-btn[data-mode="one"]{ color:var(--accent); border-color:rgba(var(--accent),0) }
 .player .play-mode-btn[data-mode="shuffle"]{ color:var(--accent-2) }
+
+/* ══ 2026-09-19 灯箱手势的 CSS 支撑 ══
+   touch-action:none 让浏览器把触摸完全交给我们（否则浏览器会抢去滚动/缩放手势）；
+   光标在缩放后变"抓取"，拖动时变"抓紧"（原 CSS 的选择器与 JS 不一致 → 从来没生效）。 */
+.lightbox-stage{ touch-action:none !important }
+.lightbox-stage.is-zoomed{ cursor:grab }
+.lightbox-stage.is-zoomed.is-dragging{ cursor:grabbing }
+.lightbox-img{ will-change:transform; backface-visibility:hidden; -webkit-user-drag:none }
+#lightbox{ will-change:opacity }
+/* 加载圈淡入淡出，避免一闪而过 */
+#lbLoader{ transition:opacity .2s ease }
