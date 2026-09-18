@@ -1,9 +1,21 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<script>
+/* 2026-09-15：主题在首帧前应用，避免闪白。
+   规则：有记录用记录；无记录默认暗色。 */
+(function(){
+  try{
+    if(localStorage.getItem('memories.theme') === 'light'){
+      document.documentElement.setAttribute('data-theme','light');
+    }
+  }catch(e){}
+})();
+</script>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache,must-revalidate">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>向天游的随笔 · Memories</title>
+<title>至少留下过些东西 · Memories</title>
 <meta name="description" content="至少留下过些东西">
 <meta name="theme-color" content="#0E1116">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
@@ -15,16 +27,16 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260914-07">
+<link rel="stylesheet" href="style.css?v=20260918-4">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>body{font-family:'Inter','Noto Serif SC',system-ui,sans-serif;background:#0E1116;color:#E8E4DA;margin:0}
+<style>body{font-family:'Inter','Noto Serif SC',system-ui,sans-serif;background:var(--bg);color:var(--text);margin:0}
 /* 灯箱核心 CSS — 内联!important 确保 SW 缓存旧版 style.css 也不影响 */
 .lightbox{position:fixed;inset:0;z-index:200;background:#000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;overflow:hidden}
 .lightbox.active{opacity:1!important;pointer-events:auto!important}
 .lightbox-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:zoom-in}
 .lightbox-img{max-width:92vw;max-height:88vh;object-fit:contain;user-select:none;-webkit-user-drag:none}
-.lightbox-close,.lightbox-prev,.lightbox-next{position:fixed;z-index:201;width:44px;height:44px;border-radius:50%;font-size:1.5rem;color:#E8E4DA;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.1);transition:all .2s}
-.lightbox-close{top:20px;right:24px}.lightbox-prev{left:20px;top:50%;transform:translateY(-50%)}.lightbox-next{right:20px;top:50%;transform:translateY(-50%)}
+.lightbox-close,.lightbox-prev,.lightbox-next{position:fixed;z-index:201;width:52px;height:52px;border-radius:50%;font-size:1.5rem;color:#E8E4DA;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.1);transition:all .2s}
+.lightbox-close{top:20px;right:24px}.lightbox-prev{left:14px;top:50%;transform:translateY(-50%)}.lightbox-next{right:14px;top:50%;transform:translateY(-50%)}
 .lightbox-counter{position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:201;color:#E8E4DA;font-size:.85rem;letter-spacing:.5px}
 .lightbox-filmstrip{position:fixed;bottom:0;left:0;right:0;z-index:201;display:flex;gap:6px;overflow-x:auto;padding:12px 16px;background:linear-gradient(0deg,#000 60%,transparent)}
 .lightbox-filmstrip .fs-item{flex:0 0 auto;width:64px;height:64px;border-radius:4px;overflow:hidden;border:2px solid transparent;cursor:pointer;transition:border .2s}
@@ -38,15 +50,15 @@
 <nav class="nav" id="nav">
   <a class="nav-brand" href="#hero">向<em>天游</em></a>
   <div class="nav-links" id="navLinks">
-    <a href="moments.html">博客</a>
+    <a href="#blog" id="navBlogLink">博客</a>
     <a href="#essays">随笔</a>
     <a href="#gallery">相册</a>
-    <a href="#about">关于</a>
   </div>
   <div class="nav-hamburger" id="navHamburger">
     <span></span><span></span><span></span>
   </div>
   <div class="nav-right">
+    <button class="nav-icon-btn" id="navTheme" title="切换明暗主题" aria-label="切换明暗主题">☀️</button>
     <button class="nav-icon-btn nav-gear" id="navGear" title="管理菜单" aria-label="管理菜单">⚙️</button>
   </div>
 </nav>
@@ -64,7 +76,7 @@
     #pwdGate .fade-in{animation:fin .6s ease .3s both}
     @keyframes fin{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
   </style>
-  <style>.pwd-authed #pwdGate{display:none!important}</style><div class="fade-in" id="pwdGate" style="max-width:340px;padding:24px;width:100%">
+  <style>.pwd-authed #pwdGate{display:none!important}</style><div class="fade-in" style="max-width:340px;padding:24px;width:100%">
     <div style="font-size:1.6rem;margin-bottom:12px;font-family:var(--font-display,'Playfair Display',serif);font-style:italic;color:var(--accent,#7C9B7E)">✦</div>
     <div style="font-size:.95rem;font-weight:500;color:var(--text,#E8E4DA);margin-bottom:16px">输入密码</div>
     <div style="position:relative;width:100%;margin-bottom:12px">
@@ -77,13 +89,163 @@
   
 </div>
 
+<!-- 博客画布（2026-09-15）：点「博客」从右侧滑入，不跳转新页面 -->
+<div id="blogOverlay" aria-hidden="true" style="position:fixed;inset:0;z-index:95;background:var(--bg,#0E1116);opacity:0;visibility:hidden;overflow:hidden">
+  <!-- 2026-09-15：顶部留出主页导航高度，避免 iframe 内容（含返回按钮）被导航遮挡 -->
+  <iframe id="blogFrame" title="博客" style="width:100%;height:calc(100% - var(--nav-h,64px));margin-top:var(--nav-h,64px);border:0;display:block;background:var(--bg,#0E1116)"></iframe>
+</div>
+<script>
+(function(){
+  var ov = document.getElementById('blogOverlay');
+  var fr = document.getElementById('blogFrame');
+  if(!ov || !fr) return;
+  var loaded = false, isOpen = false;
+  window.isBlogOpen = function(){ return isOpen; };
+
+  window.openBlog = function(){
+    // 2026-09-16：每次打开博客都重新加载 iframe —— 确保拿到编辑器最新的改动
+    //   （数据量小、且主页空闲时已预加载过静态资源，重载主要是拉一次 posts 数据）
+    var url = 'moments.html?v=20260918-4';
+    if(!loaded){
+      fr.src = url; loaded = true;
+    }else{
+      try{
+        fr.contentWindow.location.replace(url);   // 强制回到列表并重新查数据
+      }catch(e){
+        fr.src = url;                             // 兜底
+      }
+    }
+    if(isOpen) return;
+    isOpen = true;
+    ov.setAttribute('aria-hidden', 'false');
+    // 2026-09-15：锁住外层滚动，避免和 iframe 内滚动条同时出现
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    // 2026-09-15：去掉滑入动画，直接显示
+    ov.style.opacity = '1';
+    ov.style.visibility = 'visible';
+    // 2026-09-15：导航高亮切到「博客」（#blog 无对应元素，否则会残留「随笔」高亮）
+    try{
+      window._blogNavLocked = true;
+      var links = document.querySelectorAll('.nav-links a');
+      for(var i = 0; i < links.length; i++) links[i].classList.remove('active');
+      var bl = document.getElementById('navBlogLink');
+      if(bl) bl.classList.add('active');
+    }catch(e){}
+    // 2026-09-16：写入一条历史记录 —— 手机侧滑返回时能"关掉博客"而不是退出网站
+    //  （刷新仍是主页：head 里会清掉 hash）
+    try{
+      if(location.hash !== '#blog') history.pushState({blog:1}, '', '#blog');
+    }catch(e){}
+  };
+  window.closeBlog = function(skipHistory){
+    if(!isOpen) return;
+    isOpen = false;
+    ov.style.opacity = '0';
+    ov.style.visibility = 'hidden';
+    ov.setAttribute('aria-hidden', 'true');
+    document.documentElement.style.overflow = '';
+    document.body.style.overflow = '';
+    // 2026-09-15：通知 iframe 停掉正在播放的文章音乐（iframe 不会自动销毁）
+    try{ fr.contentWindow.postMessage('stop-iframe-music', '*'); }catch(e){}
+    // 2026-09-15：解锁导航高亮，交回滚动位置判断
+    try{
+      window._blogNavLocked = false;
+      var bl2 = document.getElementById('navBlogLink');
+      if(bl2) bl2.classList.remove('active');
+      window.dispatchEvent(new Event('scroll'));
+    }catch(e){}
+    if(!skipHistory && location.hash === '#blog'){
+      try{ history.back(); }catch(e){}
+    }
+  };
+  // 博客页点「← 返回」时通过 postMessage 通知主页收起
+  var _resumeTimer = null;
+  window.addEventListener('message', function(e){
+    if(!e || !e.data) return;
+    if(e.data === 'close-blog'){ window.closeBlog(); return; }
+    // 2026-09-15：音乐互斥
+    //  - 博客开播 → 取消待恢复的定时器 + 暂停主页背景乐
+    //  - 博客停下 → 延迟 400ms 再恢复（若期间又开播则被取消，避免切歌时抖动）
+    if(e.data === 'blog-music-play'){
+      if(_resumeTimer){ clearTimeout(_resumeTimer); _resumeTimer = null; }
+      try{ if(typeof window.pauseHomeMusic === 'function') window.pauseHomeMusic(); }catch(err){}
+    }
+    if(e.data === 'blog-music-stop'){
+      if(_resumeTimer) clearTimeout(_resumeTimer);
+      _resumeTimer = setTimeout(function(){
+        _resumeTimer = null;
+        try{ if(typeof window.resumeHomeMusic === 'function') window.resumeHomeMusic(); }catch(err){}
+      }, 400);
+    }
+  });
+  // 浏览器后退键
+  window.addEventListener('popstate', function(){
+    if(isOpen) window.closeBlog(true);
+  });
+
+  // 2026-09-15：刷新时【回到主页】（不自动打开博客），顺便清掉残留的 #blog
+  if(location.hash === '#blog'){
+    try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}
+  }
+
+  // 2026-09-16：编辑器改动数据后，通知博客画布立即重新拉取（无需手动刷新）
+  //  注意：iframe 可能【尚未加载】或正在加载，此时 contentWindow 为 null，
+  //  直接 postMessage 会"发了个空气"。所以用一个"待通知"标记，
+  //  iframe 的 load 事件里再补发一次，确保一定送达。
+  window._blogDataDirty = false;
+  function _sendDataChanged(){
+    try{
+      var fr = document.getElementById('blogFrame');
+      if(!fr) return false;
+      var w = fr.contentWindow;
+      if(!w) return false;
+      w.postMessage('data-changed', '*');
+      return true;
+    }catch(e){ return false; }
+  }
+  window.notifyBlogDataChanged = function(){
+    window._blogDataDirty = true;
+    // 立即试一次；若 iframe 未就绪，留待 load 时补发
+    if(_sendDataChanged()) window._blogDataDirty = false;
+  };
+  // 2026-09-15 性能：主页空闲时【预加载】博客 iframe（正文+数据+缩略图提前就绪）
+  // 这样用户点「博客」时基本是秒开，而不是从零开始加载。
+  (function(){
+    function preload(){
+      if(loaded || isOpen) return;
+      var url = 'moments.html?v=20260918-4';
+      loaded = true;
+      fr.src = url;          // 提前加载；openBlog 里会因 loaded=true 而直接显示
+      try{ fr.style.visibility = 'hidden'; }catch(e){}
+      fr.addEventListener('load', function(){
+        try{ fr.style.visibility = ''; }catch(e){}
+        // 2026-09-16：iframe 就绪后，补发主题 + 待处理的数据变更通知
+        try{
+          var light = document.documentElement.getAttribute('data-theme') === 'light';
+          fr.contentWindow.postMessage('theme:' + (light ? 'light' : 'dark'), '*');
+          if(window._blogDataDirty){
+            fr.contentWindow.postMessage('data-changed', '*');
+            window._blogDataDirty = false;
+          }
+        }catch(e){}
+      }, {once:true});
+    }
+    if('requestIdleCallback' in window){
+      requestIdleCallback(preload, {timeout: 2500});     // 浏览器空闲时立刻做
+    }else{
+      setTimeout(preload, 1500);
+    }
+  })();
+})();
+</script>
+
 <!-- Hero -->
 <section class="hero" id="hero">
   <div class="hero-bg" id="heroBg"></div>
   <canvas id="heroStars"></canvas>
   <div class="hero-content">
-    <h1 class="hero-title">向<em>天游</em>的随笔</h1>
-    <p class="hero-sub">至少留下过些东西</p>
+    <h1 class="hero-title hero-title-solo">至少<em>留下过</em>些东西</h1>
   </div>
   <div class="hero-scroll" onclick="document.getElementById('essays').scrollIntoView({behavior:'smooth'})">⌄</div>
 </section>
@@ -97,22 +259,17 @@
 <!-- Memory River — 记忆河流 -->
 <section class="section" id="gallery">
   <h2 class="section-title">我<em>眼</em>中的世界</h2>
+  <!-- 2026-09-18：河流改为瀑布流，移除「轮回提示 / 左右箭头 / 换一批」等旧控件 -->
   <div class="river-filters" id="viewerFilters"></div>
-  <div class="river-hint" id="riverHint"></div>
-  <div class="gallery-load-progress" id="galleryLoadProgress">0 / 0 张已加载</div>
-  <div class="river" id="memRiver">
-    <div class="river-stream" id="riverStream"></div>
-  </div>
-  <div class="river-controls">
-    <button class="river-ctrl river-prev" onclick="riverScroll(-1)">‹</button>
-    <button class="river-ctrl river-next" onclick="riverScroll(1)">›</button>
-    <button class="river-ctrl river-shuffle" onclick="riverShuffle()" title="换一批">换一批</button>
+  <div class="gallery-load-progress" id="galleryLoadProgress"></div>
+  <div class="masonry-wrap" id="memRiver">
+    <div class="masonry-grid" id="riverStream"></div>
   </div>
 </section>
 
 <!-- About with Year Heatmap -->
 <section class="section about" id="about">
-  <h2 class="section-title">关<em>于</em></h2>
+  <h2 class="section-title">关于<em>网站</em></h2>
   <p>创建于2026年5月3号</p>
 </section>
 
@@ -172,7 +329,7 @@
       <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:rgba(232,228,218,.4);font-size:.95rem;pointer-events:none;z-index:1;user-select:none">陈</span>
       <input type="text" id="pwdInput2" placeholder="**" style="width:100%;padding:10px 12px 10px 36px;background:rgba(232,228,218,.04);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);text-align:left;font-size:1rem;outline:none;-webkit-text-security:disc" autocomplete="off" inputmode="text">
     </div>
-    <p class="pwd-error" id="pwdError"></p>
+    <p class="pwd-error"></p>
     <button class="pwd-btn-ok" onclick="checkPwd()">确定</button>
     <button class="pwd-btn-cancel" onclick="closePwdModal()">取消</button>
   </div>
@@ -187,9 +344,9 @@
 
 <audio id="bgMusic" preload="auto"></audio>
 
-<script src="../data.js?v=20260726-2"></script>
+<script src="../data.js?v=20260918-4"></script>
 <!-- Supabase SDK：2026-09-10 改为本地托管（原来走 unpkg 外部 CDN，加载失败会导致编辑器/音乐静默变空） -->
-<script src="vendor/supabase.js?v=20260910-1"></script>
+<script src="vendor/supabase.js?v=20260918-4"></script>
 <script>
   // 本地加载失败时回退到 CDN（双保险）
   if (typeof supabase === 'undefined') {
@@ -252,7 +409,6 @@
   });
 
   // 测试按钮
-  console.log('[memories-fallback] ready, photos='+document.querySelectorAll('.masonry-item img').length);
   window._lbDebug = function(i) { console.log('[memories-fallback] photo onclick idx='+i); };
   document.addEventListener('DOMContentLoaded', function() {
     var btn = document.getElementById('testLb');
@@ -264,9 +420,10 @@
   }, 100);
 })();
 </script>
-<script src="script.js?v=20260914-07"></script>
-<script src="sound.js?v=20260811"></script>
-<script src="editor.js?v=20260914-07"></script>
+<script src="script.js?v=20260918-4"></script>
+<script src="sound.js?v=20260918-4"></script>
+<script src="vendor/lame.min.js?v=20260918-4"></script>
+<script src="editor.js?v=20260918-4"></script>
 <script>
 // 访客统计（Supabase，后台记录，不在页面上显示，不被 adblock 拦截）
 (function(){
@@ -334,20 +491,91 @@
       _visitId = rows[0].id;
       return;
     }
-    return fetch(base, {
-      method: 'POST',
-      headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=representation'},
-      body: JSON.stringify({
-        path: location.pathname,
-        ref: document.referrer || '',
-        visited_at: new Date().toISOString(),   // 2026-09-10 修正：标准 UTC
-        session_id: clientId
-      })
-    }).then(function(r){ return r.json(); }).then(function(data){
-      _visitId = data && data[0] && data[0].id;
+    // 2026-09-15：查询 IP 归属地（多源 + 6 秒超时，失败不影响主流程）
+    function _geo(){
+      return new Promise(function(res){
+        var done = false;
+        // 2026-09-16：超时 6s → 12s（国内访问境外 IP 服务经常超过 6 秒，导致地区全空）
+        var t = setTimeout(function(){ if(!done){ done = true; res({}); } }, 12000);
+        function ok(g){
+          if(done) return;
+          done = true; clearTimeout(t);
+          var out = {
+            ip: (g && g.ip) || '',
+            country: (g && (g.country || (g.location && g.location.country))) || '',
+            region: (g && (g.region || g.province || (g.location && g.location.state))) || '',
+            city: (g && (g.city || (g.location && g.location.city))) || ''
+          };
+          // 2026-09-16：同一次会话内缓存结果，避免每次刷新都发请求
+          try{ sessionStorage.setItem('memories.geo', JSON.stringify(out)); }catch(e){}
+          res(out);
+        }
+        function fail(){ if(!done){ done = true; clearTimeout(t); res({}); } }
+        // 2026-09-16：会话内已有结果则直接复用（省一次请求，也避免网络抖动导致空值）
+        try{
+          var cached = sessionStorage.getItem('memories.geo');
+          if(cached){ var c = JSON.parse(cached); if(c && (c.ip || c.country)){ done = true; clearTimeout(t); return res(c); } }
+        }catch(e){}
+        // 2026-09-16：调整源顺序 —— 优先国内可达的源（用户在境内，境外源常超时）
+        fetch('https://api.ipapi.is/', {cache:'no-store'})
+          .then(function(r){ return r.json(); })
+          .then(function(g){ if(g && g.ip) ok(g); else throw new Error('bad'); })
+          .catch(function(){
+            // 备源：ipwho.is（CORS 友好）
+            fetch('https://ipwho.is/', {cache:'no-store'})
+              .then(function(r){ return r.json(); })
+              .then(function(g){ if(g && g.success !== false && g.ip) ok(g); else throw new Error('bad'); })
+              .catch(function(){
+                // 第三源：ip-api.com（老牌，国内可达性尚可）
+                fetch('http://ip-api.com/json/?fields=status,country,regionName,city,query', {cache:'no-store'})
+                  .then(function(r){ return r.json(); })
+                  .then(function(g){
+                    if(g && g.status === 'success'){
+                      ok({ip:g.query, country:g.country, region:g.regionName, city:g.city});
+                    } else throw new Error('bad');
+                  })
+                  .catch(fail);
+              });
+          });
+      });
+    }
+    return _geo().then(function(geo){
+      return fetch(base, {
+        method: 'POST',
+        headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=representation'},
+        body: JSON.stringify({
+          path: location.pathname,
+          ref: document.referrer || '',
+          visited_at: new Date().toISOString(),   // 2026-09-10 修正：标准 UTC
+          session_id: clientId,
+          // 2026-09-15 增强：区分自己人/外人 + 设备 + IP 归属地
+          ua: navigator.userAgent || '',
+          is_authed: (function(){ try{ return localStorage.getItem('_v2pw2') === '1'; }catch(e){ return false; } })(),
+          screen: (window.screen ? (screen.width + 'x' + screen.height) : ''),
+          lang: navigator.language || '',
+          tz: (function(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){ return ''; } })(),
+          ip: geo.ip || null,
+          country: geo.country || null,
+          region: geo.region || null,
+          city: geo.city || null
+        })
+      }).then(function(r){ return r.json(); }).then(function(data){
+        _visitId = data && data[0] && data[0].id;
+      });
     });
   }).then(function(){
     if(!_visitId) return;
+    // 2026-09-15：通过密码后主动把本次访问标记为「自己人」
+    window._markAuthed = function(){
+      try{
+        fetch(base + '?id=eq.' + _visitId, {
+          method: 'PATCH',
+          headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+          body: JSON.stringify({is_authed: true}),
+          keepalive: true
+        }).catch(function(){});
+      }catch(e){}
+    };
     function save(){
       var dur = Math.max(1, Math.round((Date.now() - _visitStartMs) / 1000));
       var payload = JSON.stringify({duration: dur, left_at: new Date().toISOString()});
@@ -372,11 +600,36 @@
 // Service Worker 注册（2026-08-11 启用：加速二次访问 + 离线回退）
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js?v=20260811').catch(function(e){
+    navigator.serviceWorker.register('sw.js?v=20260918-4').catch(function(e){
       console.warn('[SW] register failed:', e);
     });
   });
 }
+  // 2026-09-16：全局点击涟漪 —— 从点击落点扩散，给交互"实感"
+  (function(){
+    function makeRipple(e){
+      var el = e.target && e.target.closest ? e.target.closest('button, .nav-icon-btn, .river-filter, .editor-btn-sm, .ml-item, .timeline-card, .tl-group-header, .mp-play, .mp-music-btn') : null;
+      if(!el) return;
+      // 2026-09-18 修复：绝不改动 position / overflow！
+      //   灯箱的 ‹ › 按钮是 position:fixed，被改成 relative 会脱离原位 → "按了没反应"
+      //   改为：只在元素本身已是定位上下文时才画涟漪，否则直接跳过。
+      var cs = getComputedStyle(el);
+      if(cs.position === 'static' || cs.overflow === 'visible') return;
+      if(el.dataset.rippleSkip === '1') return;
+      var r = el.getBoundingClientRect();
+      var size = Math.max(r.width, r.height);
+      var x = (e.clientX != null ? e.clientX : r.left + r.width/2) - r.left;
+      var y = (e.clientY != null ? e.clientY : r.top + r.height/2) - r.top;
+      var d = document.createElement('span');
+      d.className = 'ripple';
+      d.style.width = d.style.height = size + 'px';
+      d.style.left = (x - size/2) + 'px';
+      d.style.top  = (y - size/2) + 'px';
+      el.appendChild(d);
+      setTimeout(function(){ d.remove(); }, 600);
+    }
+    document.addEventListener('pointerdown', makeRipple, {passive:true});
+  })();
 </script>
 </body>
 </html>

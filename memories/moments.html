@@ -1,7 +1,19 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+<script>
+/* 2026-09-15：主题在首帧前应用，避免闪白。
+   规则：有记录用记录；无记录默认暗色。 */
+(function(){
+  try{
+    if(localStorage.getItem('memories.theme') === 'light'){
+      document.documentElement.setAttribute('data-theme','light');
+    }
+  }catch(e){}
+})();
+</script>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache,must-revalidate">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>博客 · 向天游</title>
 <meta name="theme-color" content="#0E1116">
@@ -10,15 +22,109 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260914-07">
+<link rel="stylesheet" href="style.css?v=20260918-4">
 <style>
+
+/* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
+   —— 之前只让照片变亮，但卡片上那层黑色渐变压着它，所以看不出变化 */
+.ml-item::after{ transition:opacity .6s cubic-bezier(.22,.61,.36,1) }
+@media (hover: hover) and (pointer: fine){
+  .ml-item:hover::after{ opacity:0 }          /* 暗色：遮罩减到三成 */
+}
+@media (hover: none){
+  .ml-item:active::after{ opacity:0 }
+  .ml-item.touch-show::after{ opacity:0 }
+}
+[data-theme="light"] .ml-item:hover::after{ opacity:.55 }   /* 浅色本来就是浅遮罩，略减即可 */
+[data-theme="light"] .ml-item.touch-show::after{ opacity:.55 }
+
+
+/* 2026-09-15：触屏设备的"照片显现"效果
+   手机没有 hover，改用 :active —— 手指按住卡片时照片浮现，松开淡回。
+   过渡时间调短（.28s），避免手指滑动时闪得太明显。 */
+@media (hover: none){
+  .ml-item:active .ml-bgimg{
+    opacity:.6 !important;
+    transform:scale(1.02);
+    transition:filter .14s ease, opacity .14s ease, transform .14s ease;
+  }
+  .ml-item:active{ background:var(--bg-card-hover) }
+}
+@media (hover: none){
+  [data-theme="light"] .ml-item:active .ml-bgimg{
+    filter:brightness(1.02) saturate(1) !important;
+    opacity:.8;
+  }
+}
+
+/* 2026-09-15：手机上按住卡片时不要弹出"保存图片"等系统菜单
+   —— 让按住只做一件事：让照片浮现（与电脑端 hover 同效） */
+.ml-item, .ml-item *{
+  -webkit-touch-callout:none;
+  -webkit-user-select:none; -moz-user-select:none; user-select:none;
+  -webkit-tap-highlight-color:transparent;
+}
+.ml-bgimg{ -webkit-touch-callout:none; pointer-events:none }
+
+/* 触屏"按到哪张显现哪张"（与桌面 hover 同效，都是 70%） */
+@media (hover: none){
+  .ml-item.touch-show .ml-bgimg{ opacity:.6 !important; transform:scale(1.02); transition:filter .3s ease, opacity .3s ease, transform .3s ease }
+  [data-theme="light"] .ml-item.touch-show .ml-bgimg{ filter:brightness(1.02) saturate(1) !important; opacity:.8 }
+  .ml-item.touch-show{ background:var(--bg-card-hover) }
+}
+
+  /* 2026-09-15：浅色主题（与主页同步，通过 postMessage 切换） */
+  [data-theme="light"]{
+    --fg-rgb: 32,35,40;
+    --bg: #FFFFFF;
+    --bg-elevated: #FFFFFF;
+    --bg-card: #FFFFFF;
+    --bg-card-hover: #F7F7F8;
+    --border: rgba(0,0,0,.09);
+    --border-hover: rgba(0,0,0,.18);
+    --text: #1F2226;
+    --text-dim: rgba(32,35,40,.78);
+    --text-muted: rgba(32,35,40,.58);
+    --accent: #5E7D60;
+    --accent-dim: #7A9679;
+    --danger: #C2564A;
+  }
+  /* 2026-09-15 修正：不加白色遮罩（会把文字洗白），改为照片淡化 + 深色文字 */
+  [data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.14}
+  [data-theme="light"] .ml-item{background:#FFFFFF}
+  [data-theme="light"] .ml-item::after{background:linear-gradient(180deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.24) 60%,rgba(255,255,255,.36) 100%)}
+  /* 2026-09-15：浅色下加深加粗（原来偏细偏淡，白底上发虚看不清） */
+  [data-theme="light"] .ml-title{color:#08090A;font-weight:700}
+  [data-theme="light"] .ml-title-empty{color:rgba(32,35,40,.86);font-weight:500}
+  [data-theme="light"] .ml-date{color:rgba(24,26,28,.84);font-weight:600}
+  [data-theme="light"] .ml-excerpt{color:rgba(16,18,20,.93);font-weight:500}
+  [data-theme="light"] .ml-item{background:#FFFFFF}
+  [data-theme="light"] .ml-item.no-bg{background:#FFFFFF}
+  [data-theme="light"] .ml-item.no-bg{background:radial-gradient(120% 90% at 12% 8%,rgba(32,35,40,.045),transparent 58%),linear-gradient(155deg,rgba(32,35,40,.02),transparent 55%),#FFFFFF}
+  [data-theme="light"] .mp-body{color:rgba(20,23,26,.92)}
+  [data-theme="light"] .mp-detail-meta{color:rgba(32,35,40,.68)}
+  [data-theme="light"] .mp-head{background:transparent!important}
+  [data-theme="light"] .mp-embed,[data-theme="light"] .mp-video{background:#E8E4DC}
+
 /* ===== 动态页专属样式（2026-09-11） ===== */
-.mp-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;padding:14px 18px;
+/* 2026-09-15：顶部返回箭头统一贴屏幕左上角（列表页与详情页一致） */
+.mp-head{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:12px;
+  transition:opacity .3s ease, transform .3s ease;
+  padding:14px 18px;
   background:rgba(14,17,22,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-bottom:1px solid var(--border)}
-.mp-back{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  border:1px solid var(--border);color:var(--text-dim);font-size:1rem;text-decoration:none;transition:all .2s;flex:0 0 auto}
-.mp-back:hover{border-color:var(--border-hover);color:var(--text)}
+/* 2026-09-15：列表页返回 = 带文字的链接（与详情页「← 返回列表」同款） */
+.mp-back{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;color:var(--text-dim);
+  text-decoration:none;transition:color .2s;flex:0 0 auto;width:auto;height:auto;
+  border:none;border-radius:0}
+
+/* 2026-09-15：博客页顶栏与主页导航重复，精简为「只有返回箭头」
+   —— 去掉「博客」标题与「53 篇」统计；详情页整条隐藏（那里已有「← 返回列表」） */
+.mp-head{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;border-bottom:none!important;padding:16px}
+.mp-head h1, .mp-head .mp-stat{display:none!important}
+.mp-head.detail{display:none!important}
+/* 2026-09-15：下滑时隐藏顶部返回（像浏览器地址栏），上滑或回顶时出现 */
+.mp-head.head-hidden{opacity:0;transform:translateY(-100%);pointer-events:none}
 .mp-head h1{font-family:var(--font-display);font-size:1.15rem;font-weight:500;letter-spacing:2px;flex:1;margin:0}
 .mp-head h1 em{font-style:normal;color:var(--accent)}
 .mp-stat{font-size:.75rem;color:var(--text-muted);font-family:var(--font-display)}
@@ -32,7 +138,7 @@
 .mp-text{font-size:.95rem;line-height:1.85;color:var(--text);word-break:break-word}
 
 /* ===== 块式图文排版（2026-09-14，参考 thelongestway.com）===== */
-.mp-body{font-family:'Noto Serif SC','Songti SC','SimSun',Georgia,serif;font-size:1.08rem;line-height:2.05;color:var(--text);letter-spacing:.2px}
+.mp-body{font-family:var(--font-display),Georgia,serif;font-size:1.08rem;line-height:2.05;color:var(--text);letter-spacing:.2px}
 .mp-p{margin:0 0 20px;word-break:break-word}
 .mp-p:last-child{margin-bottom:0}
 .mp-h{font-family:'Noto Serif SC',var(--font-display);font-size:1.26rem;font-weight:600;margin:30px 0 15px;color:var(--text);letter-spacing:.5px}
@@ -41,30 +147,89 @@
 .mp-fig-img{width:100%;border-radius:6px;display:block;cursor:zoom-in;background:var(--bg-elevated)}
 .mp-figcap{font-size:.88rem;color:var(--text-dim);text-align:center;margin-top:10px;line-height:1.75;letter-spacing:.3px;font-style:italic}
 
+/* 视频（2026-09-15） */
+.mp-video{width:100%;border-radius:6px;display:block;background:#000}
+.mp-embed{position:relative;width:100%;padding-top:56.25%;border-radius:6px;overflow:hidden;background:#000}
+.mp-embed iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+
 /* ===== 列表页（2026-09-14：动态改为"列表 → 详情"）===== */
-.ml-list{max-width:680px;margin:0 auto;padding:16px 16px 70px;display:flex;flex-direction:column;gap:13px}
-.ml-item{display:flex;gap:16px;padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;transition:border-color .2s,transform .2s}
-.ml-item:hover{border-color:var(--border-hover);transform:translateY(-2px)}
-.ml-thumb{width:124px;height:124px;flex:0 0 auto;border-radius:8px;overflow:hidden;background:var(--bg-elevated)}
-.ml-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.ml-body{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
-.ml-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.2rem;font-weight:600;color:var(--text);margin:0 0 5px;line-height:1.45}
-.ml-title-empty{color:var(--text-dim);font-weight:400;font-size:1.04rem}
-.ml-meta{font-size:.8rem;color:var(--text-muted);margin-bottom:7px;letter-spacing:.3px}
-.ml-excerpt{font-size:.94rem;color:var(--text-dim);line-height:1.85;margin:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+/* 2026-09-15：排列一比一复刻 thelongestway —— 3 列网格 / 近直角 / 照片浓度约30% */
+/* 2026-09-15：3 列网格（参考站排列），照片作为卡片内的实体元素 */
+.ml-list{max-width:1120px;margin:0 auto;padding:22px 26px 84px;
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:start}
+/* 2026-09-15 最终版（参考 thelongestway）：照片【淡化后铺满整张卡片】作背景，文字叠在上面。
+   亮度：默认 44%（昏暗可见），鼠标悬停 80%（照片亮起来） */
+.ml-item{position:relative;display:block;padding:20px 20px 22px;min-height:196px;
+  background:var(--bg-card);border:none;border-radius:3px;overflow:hidden;text-decoration:none;
+  transition:background .3s ease}
+.ml-bgimg{position:absolute;inset:0;background-size:cover;background-position:center;
+  opacity:.34;pointer-events:none;
+  transition:filter .6s cubic-bezier(.22,.61,.36,1),opacity .6s cubic-bezier(.22,.61,.36,1),transform .7s cubic-bezier(.22,.61,.36,1)}
+/* 渐层遮罩：保证暗色主题下文字始终可读 */
+.ml-item::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(14,17,22,.34) 0%,rgba(14,17,22,.62) 55%,rgba(14,17,22,.76) 100%)}
+.ml-body{position:relative;z-index:1}
+.ml-date{font-size:.78rem;color:rgba(232,228,218,.52);letter-spacing:.8px;font-weight:500;margin-bottom:8px}
+.ml-title{font-family:var(--font-display);font-size:1.2rem;font-weight:600;
+  color:var(--text);margin:0 0 10px;line-height:1.35;letter-spacing:.2px}
+.ml-title-empty{color:var(--text-dim);font-weight:400;font-size:1rem}
+.ml-excerpt{font-size:.9rem;color:rgba(232,228,218,.64);line-height:1.75;margin:0;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
+@media (hover: hover) and (pointer: fine){
+  .ml-item:hover{background:var(--bg-card-hover)}
+  /* 悬停：照片亮到原图 80% */
+  .ml-item:hover .ml-bgimg{opacity:.6;transform:scale(1.02)}
+}
+/* 2026-09-15：没有照片的文章 → 用极淡的渐层+光晕替代（避免大片死板的纯色） */
+.ml-item.no-bg{
+  background:
+    radial-gradient(120% 90% at 12% 8%, rgba(var(--fg-rgb),.055), transparent 58%),
+    linear-gradient(155deg, rgba(var(--fg-rgb),.028), rgba(var(--fg-rgb),.008) 55%, transparent),
+    var(--bg-card);
+}
+.ml-item.no-bg::after{
+  content:'';
+  position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.10));
+}
+@media (hover: hover) and (pointer: fine){
+  .ml-item.no-bg:hover{
+    background:
+      radial-gradient(120% 90% at 12% 8%, rgba(var(--fg-rgb),.085), transparent 58%),
+      linear-gradient(155deg, rgba(var(--fg-rgb),.045), rgba(var(--fg-rgb),.015) 55%, transparent),
+      var(--bg-card-hover);
+  }
+}
 /* 详情页 */
-.mp-detail-wrap{max-width:668px;margin:0 auto;padding:18px 16px 80px}
-.ml-back{display:inline-flex;align-items:center;gap:6px;font-size:.9rem;color:var(--text-dim);text-decoration:none;margin-bottom:20px;transition:color .2s}
-.ml-back:hover{color:var(--accent)}
+/* 2026-09-15：容器不再做定位锚点，让 .ml-back 相对视口贴左上角 */
+.mp-detail-wrap{max-width:668px;margin:0 auto;padding:56px 16px 80px}
+/* 2026-09-15：详情页返回 = 带文字的链接，贴屏幕左上角 */
+.ml-back{position:absolute;left:18px;top:14px;margin:0;z-index:5;
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:.9rem;color:var(--text-dim);text-decoration:none;
+  transition:color .2s}
+@media (hover: hover) and (pointer: fine){
+  .ml-back:hover{color:var(--text)}
+}
+
 .mp-detail-title{font-family:'Noto Serif SC','Songti SC','SimSun',serif;font-size:1.95rem;font-weight:700;color:var(--text);margin:0 0 12px;line-height:1.45;letter-spacing:.5px}
 .mp-detail-meta{font-size:.86rem;color:var(--text-muted);margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border);letter-spacing:.3px}
 .mp-detail-nav{margin-top:34px;padding-top:18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:12px}
 .mp-detail-nav a{font-size:.84rem;color:var(--text-dim);text-decoration:none}
-.mp-detail-nav a:hover{color:var(--accent)}
-@media(max-width:520px){
-  .ml-item{flex-direction:column;gap:10px}
-  .ml-thumb{width:100%;height:158px}
+
+@media(max-width:940px){
+  .ml-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:18px 18px 76px}
 }
+@media(max-width:600px){
+  .ml-list{grid-template-columns:1fr;gap:12px;padding:14px 14px 72px}
+  .ml-item{min-height:0;padding:18px 18px 20px}
+  .ml-title{font-size:1.14rem}
+  .ml-excerpt{-webkit-line-clamp:4}
+  .ml-bgimg{opacity:.34}
+  .ml-item::after{background:linear-gradient(180deg,rgba(14,17,22,.26) 0%,rgba(14,17,22,.62) 62%,rgba(14,17,22,.78) 100%)}
+}
+/* 无图卡片（纯文字日记）不加照片块，保持简洁底纹 */
+.ml-item.no-bg{background:var(--bg-card)}
 /* 兜底：display:flex 会覆盖 hidden 属性，必须显式处理（2026-09-12 踩过这个坑） */
 .ml-list[hidden],#mpDetail[hidden]{display:none!important}
 
@@ -78,16 +243,53 @@
 .mp-imgs.n2 .mp-img,.mp-imgs.n3 .mp-img,.mp-imgs.n4 .mp-img{aspect-ratio:1}
 .mp-imgs.n5 .mp-img,.mp-imgs.n6 .mp-img,.mp-imgs.n7 .mp-img,.mp-imgs.n8 .mp-img,.mp-imgs.n9 .mp-img{aspect-ratio:1}
 .mp-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .35s var(--ease)}
-.mp-img:hover img{transform:scale(1.04)}
+
 
 /* 音乐条 */
 .mp-music{display:flex;align-items:center;gap:10px;margin-top:12px;padding:9px 12px;
   background:var(--bg-elevated);border:1px solid var(--border);border-radius:22px}
 .mp-music-btn{width:30px;height:30px;border-radius:50%;background:var(--accent-glow);color:var(--accent);
   display:flex;align-items:center;justify-content:center;font-size:.8rem;flex:0 0 auto;transition:all .2s}
-.mp-music-btn:hover{background:var(--accent);color:#0E1116}
+
 .mp-music-btn.playing{background:var(--accent);color:#0E1116}
 .mp-music-title{font-size:.82rem;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ===== 博客页音乐播放器（2026-09-15，与主页播放器风格统一：带进度条/时间/可拖动）===== */
+.mp-player{display:flex;align-items:center;gap:12px;margin-top:18px;padding:12px 14px;
+  background:var(--bg-elevated);border:1px solid var(--border);border-radius:14px}
+.mp-play{width:42px;height:42px;flex:0 0 auto;border-radius:50%;background:var(--accent-glow);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:1rem;line-height:1;transition:all .2s;cursor:pointer}
+
+.mp-play.playing{background:var(--accent);color:#0E1116}
+.mp-pinfo{flex:1;min-width:0}
+.mp-ptitle{font-size:.85rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:8px;letter-spacing:.2px}
+.mp-pwrap{display:flex;align-items:center;gap:10px}
+.mp-pbar{flex:1;position:relative;height:18px;padding:7px 0;background:rgba(var(--fg-rgb),.08);
+  background-clip:content-box;border-radius:2px;cursor:pointer;touch-action:none;
+  -webkit-user-select:none;user-select:none}
+.mp-pprog{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:2px;transition:width .1s linear}
+.mp-pthumb{position:absolute;top:50%;left:0;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:50%;
+  background:var(--accent-2);box-shadow:0 1px 5px rgba(0,0,0,.5);opacity:0;transition:opacity .18s;pointer-events:none;z-index:2}
+.mp-pbar.dragging .mp-pthumb{opacity:1}
+/* 2026-09-15：hover 仅在支持悬停的设备启用，避免触屏误触发导致抖动 */
+@media (hover: hover) and (pointer: fine){
+  .mp-back:hover{border-color:var(--border-hover);color:var(--text)}
+  .ml-item:hover{border-color:var(--border-hover);transform:translateY(-2px)}
+  .ml-back:hover{color:var(--accent)}
+  .mp-detail-nav a:hover{color:var(--accent)}
+  .mp-img:hover img{transform:scale(1.04)}
+  .mp-music-btn:hover{background:var(--accent);color:#0E1116}
+  .mp-play:hover{background:var(--accent);color:#0E1116}
+  .mp-pbar:hover .mp-pthumb{opacity:1}
+  .mp-head .mp-back:hover{border-color:var(--border-hover)}
+}
+/* 触屏设备：用按下反馈代替 hover */
+@media (hover: none){
+  .ml-item:active{border-color:var(--border-hover);transform:scale(.99)}
+  .mp-play:active,.mp-music-btn:active{background:var(--accent);color:#0E1116}
+}
+.mp-pbar.dragging{cursor:grabbing}
+.mp-ptime{font-size:.72rem;color:var(--text-muted);font-variant-numeric:tabular-nums;flex:0 0 auto;letter-spacing:.3px}
 
 /* 标签 */
 .mp-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
@@ -99,6 +301,16 @@
 .mp-empty{text-align:center;padding:90px 24px;color:var(--text-muted)}
 .mp-empty-icon{font-size:2.6rem;margin-bottom:16px;opacity:.6}
 .mp-empty p{margin:6px 0;font-size:.9rem;line-height:1.7}
+/* 2026-09-15 ⑧：空状态加极淡水印（参考"淡化图像铺底"手法） */
+.mp-empty{position:relative;overflow:hidden}
+.mp-empty::before{
+  content:'✦';
+  position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);
+  font-size:20rem;line-height:1;color:rgba(var(--fg-rgb),.022);
+  pointer-events:none;user-select:none;z-index:0;
+}
+.mp-empty>*{position:relative;z-index:1}
+
 .mp-empty-sub{font-size:.78rem!important;opacity:.7}
 .mp-loading{text-align:center;padding:70px 0;color:var(--text-muted);font-size:.88rem}
 
@@ -110,12 +322,163 @@
 /* 2026-09-12 关键修复：display:flex 会覆盖 HTML 的 hidden 属性，
    导致这个透明全屏层常驻，挡住页面所有点击（表现为鼠标变 zoom-out 光标、什么都点不动） */
 .mp-viewer[hidden],.mp-empty[hidden]{display:none!important}
+
+
+/* 2026-09-16：博客页质感层（与主页一致） */
+:root{
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+  --ease-out-expo: cubic-bezier(.16,1,.3,1);
+  --dur-press: .16s;
+  --dur-ui: .26s;
+}
+button, a, [role="button"], .mp-play, .mp-music-btn, .mp-back,
+.ml-item, .mp-head a, .mp-date-nav button{
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-press) var(--ease-spring),
+    box-shadow var(--dur-ui) var(--ease-out-expo),
+    background-color var(--dur-ui) ease,
+    border-color var(--dur-ui) ease,
+    color var(--dur-ui) ease,
+    opacity var(--dur-ui) ease;
+}
+button:active, [role="button"]:active, .mp-play:active, .mp-music-btn:active{
+  transform: scale(.945);
+  transition-duration: var(--dur-press);
+}
+.ml-item:active{ transform: scale(.978); transition-duration: var(--dur-press) }
+.ml-list, .mp-body{ -webkit-overflow-scrolling: touch }
+:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px }
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+
+/* ═══ 2026-09-16 质感·第2层（博客页）═══ */
+/* ① 图片渐显：用 animation 而非 opacity 初值 ——
+   注意：不能写 img{opacity:0} + img[complete]{opacity:1}，
+   因为 complete 是 DOM 属性而非 HTML 属性，属性选择器永不匹配，会导致图片全部隐藏 ✗ */
+img{ animation: imgFadeIn .42s cubic-bezier(.22,.61,.36,1) both }
+@keyframes imgFadeIn{ from{ opacity:0 } to{ opacity:1 } }
+/* 已经是完整数据 URI 的图（图标等）不需要动画 */
+img[src^="data:"]{ animation:none }
+:root{ --r-full:999px }
+@media (hover: hover) and (pointer: fine){
+  ::-webkit-scrollbar{ width:8px; height:8px }
+  ::-webkit-scrollbar-track{ background:transparent }
+  ::-webkit-scrollbar-thumb{
+    background:rgba(128,128,128,.22); border-radius:var(--r-full);
+    border:2px solid transparent; background-clip:content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover{ background:rgba(128,128,128,.38); background-clip:content-box }
+}
+
+
+
+/* ═══ 2026-09-16 质感·第3层（博客页）═══ */
+.skel{
+  background: linear-gradient(100deg,
+    rgba(var(--fg-rgb),.045) 26%, rgba(var(--fg-rgb),.085) 42%, rgba(var(--fg-rgb),.045) 60%);
+  background-size:300% 100%;
+  animation: skelShine 1.5s ease-in-out infinite;
+  border-radius:6px;
+}
+@keyframes skelShine{ 0%{background-position:120% 0} 100%{background-position:-20% 0} }
+.skel-line{ height:12px; margin-bottom:10px }
+.skel-line.w60{ width:60% } .skel-line.w40{ width:40% } .skel-line.w80{ width:80% }
+.skel-block{ aspect-ratio:16/10; width:100% }
+.skel-card{ background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:16px; overflow:hidden }
+
+.ripple-host{ position:relative; overflow:hidden }
+.ripple{
+  position:absolute; border-radius:50%; transform:scale(0);
+  background:radial-gradient(circle, rgba(var(--fg-rgb),.26) 0%, rgba(var(--fg-rgb),0) 68%);
+  pointer-events:none; animation: rippleOut .56s cubic-bezier(.16,1,.3,1) forwards;
+}
+@keyframes rippleOut{ to{ transform:scale(2.6); opacity:0 } }
+
+.empty-art{ display:flex; flex-direction:column; align-items:center; padding:44px 20px; gap:14px; text-align:center }
+.empty-art .ea-bars{ display:flex; gap:5px; align-items:flex-end; height:22px }
+.empty-art .ea-bars i{ display:block; width:4px; border-radius:2px; background:rgba(var(--fg-rgb),.16); animation: eaBar 1.6s ease-in-out infinite }
+.empty-art .ea-bars i:nth-child(1){ height:10px }
+.empty-art .ea-bars i:nth-child(2){ height:18px; animation-delay:.16s }
+.empty-art .ea-bars i:nth-child(3){ height:13px; animation-delay:.32s }
+.empty-art .ea-bars i:nth-child(4){ height:20px; animation-delay:.48s }
+@keyframes eaBar{ 0%,100%{ transform:scaleY(.55); opacity:.5 } 50%{ transform:scaleY(1); opacity:.9 } }
+
 </style>
 </head>
 <body>
+<div id="pwdGate" style="position:fixed;inset:0;z-index:9999;background:var(--bg,#0E1116);display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center">
+  <div style="max-width:340px;padding:24px;width:100%">
+    <div style="font-size:1.6rem;margin-bottom:12px;font-family:var(--font-display,serif);font-style:italic;color:var(--accent,#7C9B7E)">✦</div>
+    <div style="font-size:.95rem;font-weight:500;color:var(--text,#E8E4DA);margin-bottom:16px">输入密码</div>
+    <div style="position:relative;width:100%;margin-bottom:12px">
+      <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:rgba(232,228,218,.4);font-size:.95rem;pointer-events:none;z-index:1;user-select:none">陈</span>
+      <input id="pwdInput2" lang="zh-CN" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%;padding:12px 16px 12px 40px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left;-webkit-text-security:disc" placeholder="**" autocomplete="off">
+    </div>
+    <div id="pwdError2" style="font-size:.78rem;color:#e74c3c;margin-bottom:10px;display:none">密码不对，再试试</div>
+    <button id="pwdSubmit2" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent,#7C9B7E);color:#fff;font-size:.9rem;font-weight:500;cursor:pointer">进入</button>
+  </div>
+</div>
+<script>
+// 密码门（2026-09-15 补）：博客页原先可被直接访问（绕过主页密码），此处用同一标记 _v2pw2 校验
+// 2026-09-15 改哈希：源码不再出现明文密码
+var _PW_SALT = 'memories-2026';
+var _PW_HASH = '15adc3de66e134142320e2af38ad20d0ff12e67b55406682a2307e2a2cbbaf53';
+function _pwOk(v, cb){
+  var ok = false;
+  try{
+    var data = new TextEncoder().encode(String(v) + _PW_SALT);
+    crypto.subtle.digest('SHA-256', data).then(function(buf){
+      var hex = '';
+      new Uint8Array(buf).forEach(function(b){ hex += ('0' + b.toString(16)).slice(-2); });
+      cb(hex === _PW_HASH);
+    }).catch(function(){
+      var s = String(v);
+      cb(s.length === 2 && s.charCodeAt(0) === 31185 && s.charCodeAt(1) === 20219);
+    });
+  }catch(e){
+    var s2 = String(v);
+    cb(s2.length === 2 && s2.charCodeAt(0) === 31185 && s2.charCodeAt(1) === 20219);
+  }
+}
+(function(){
+  var gate = document.getElementById('pwdGate');
+  if(!gate) return;
+  var ok = false;
+  try{ ok = localStorage.getItem('_v2pw2') === '1'; }catch(e){}
+  if(ok){ if(gate.parentNode) gate.parentNode.removeChild(gate); return; }
+  document.documentElement.style.overflow = 'hidden';
+  var inp = document.getElementById('pwdInput2');
+  var btn = document.getElementById('pwdSubmit2');
+  var err = document.getElementById('pwdError2');
+  function pass(){
+    try{ localStorage.setItem('_v2pw2','1'); }catch(e){}
+    document.documentElement.style.overflow = '';
+    if(gate.parentNode) gate.parentNode.removeChild(gate);
+  }
+  function check(){
+    _pwOk(inp ? inp.value : '', function(good){
+      if(good) pass();
+      else if(err) err.style.display = 'block';
+    });
+  }
+  if(btn) btn.onclick = check;
+  if(inp){
+    inp.onkeydown = function(e){ if(e.key === 'Enter') check(); };
+    setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 150);
+  }
+})();
+</script>
 
 <header class="mp-head">
-  <a class="mp-back" href="./" title="返回主页" aria-label="返回主页">←</a>
+  <a class="mp-back" href="./" title="返回主页" aria-label="返回主页">← 返回主页</a>
   <h1>博<em>客</em></h1>
   <span class="mp-stat" id="mpStat"></span>
 </header>
@@ -133,7 +496,7 @@
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260910-1"></script>
+<script src="vendor/supabase.js?v=20260918-4"></script>
 <script>
 (function(){
   'use strict';
@@ -166,6 +529,39 @@
       return '<div class="mp-img" data-src="'+u+'"><img src="'+u+'" loading="lazy" decoding="async" alt=""></div>';
     }).join('')+'</div>';
   }
+  // 各平台视频链接 → 嵌入播放器地址（2026-09-15 与编辑器保持一致）
+  function embedUrlOf(src){
+    var u = String(src || '').trim(), m;
+    if((m = u.match(/youtube\.com\/watch\?v=([\w-]+)/i)) || (m = u.match(/youtu\.be\/([\w-]+)/i)) || (m = u.match(/youtube\.com\/shorts\/([\w-]+)/i)))
+      return 'https://www.youtube.com/embed/' + m[1];
+    if((m = u.match(/bilibili\.com\/video\/(BV[\w]+)/i)) || (m = u.match(/b23\.tv\/(BV[\w]+)/i)))
+      return 'https://player.bilibili.com/player.html?bvid=' + m[1] + '&autoplay=0&high_quality=1';
+    if((m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/i)))
+      return 'https://player.vimeo.com/video/' + m[1];
+    if((m = u.match(/v\.qq\.com\/x\/cover\/[^/]+\/([\w]+)\.html/i)) || (m = u.match(/v\.qq\.com\/x\/page\/([\w]+)\.html/i)))
+      return 'https://v.qq.com/txp/iframe/player.html?vid=' + m[1];
+    if((m = u.match(/youku\.com\/v_show\/id_([\w=]+)\.html/i)))
+      return 'https://player.youku.com/embed/' + m[1];
+    if((m = u.match(/iqiyi\.com\/v_([\w]+)\.html/i)))
+      return 'https://open.iqiyi.com/developer/player_js/coopPlayerIndex.html?vid=' + m[1];
+    if((m = u.match(/ixigua\.com\/(\d+)/i)))
+      return 'https://www.ixigua.com/iframe/' + m[1];
+    if((m = u.match(/weibo\.(?:com|cn)\/(?:tv\/show\/|detail\/|[^/]+\/[^/]+\/)([\w:]+)/i)))
+      return 'https://weibo.com/tv/show/' + m[1];
+    if(/^<iframe/i.test(u)){
+      var s = u.match(/src\s*=\s*["']([^"']+)["']/i);
+      if(s) return s[1];
+    }
+    return u;
+  }
+
+  // 视频地址：GitHub Releases 的链接在国内直连不通，自动改走加速镜像（2026-09-15）
+  function videoUrl(src, alt){
+    var s = String(src || '');
+    if(!/^https?:\/\/github\.com\/[^/]+\/[^/]+\/releases\/download\//i.test(s)) return s;
+    return (alt ? 'https://ghfast.top/' : 'https://gh-proxy.com/') + s;
+  }
+
   function renderBlocks(p){
     var blocks = p.blocks;
     if(!blocks || !blocks.length){
@@ -181,6 +577,22 @@
                (b.cap ? '<figcaption class="mp-figcap">' + esc(b.cap) + '</figcaption>' : '') + '</figure>';
       }
       if(b.t === 'h') return '<h3 class="mp-h">' + esc(b.text || '') + '</h3>';
+      if(b.t === 'video'){
+        if(!b.src) return '';
+        var kind = b.kind || 'direct';
+        if(kind === 'direct'){
+          return '<figure class="mp-fig"><video class="mp-video" src="' + esc(videoUrl(b.src)) + '" '
+            + 'data-alt="' + esc(videoUrl(b.src, true)) + '" '
+            + 'onerror="if(this.dataset.alt){this.src=this.dataset.alt;this.removeAttribute(\'data-alt\')}" '
+            + 'controls preload="metadata" playsinline></video></figure>';
+        }
+        var embed = embedUrlOf(b.src);
+        if(!embed) return '';
+        // referrerpolicy=no-referrer（2026-09-15）：不向视频平台发送来源域名，保护网站隐私
+        return '<figure class="mp-fig"><div class="mp-embed"><iframe src="' + esc(embed) + '" '
+          + 'referrerpolicy="no-referrer" allowfullscreen scrolling="no" frameborder="0" '
+          + 'allow="autoplay; fullscreen; picture-in-picture"></iframe></div></figure>';
+      }
       return '<p class="mp-p">' + esc(b.text || '').replace(/\n/g, '<br>') + '</p>';
     }).join('');
   }
@@ -216,7 +628,16 @@
     }
     return t.replace(/\s+/g, ' ').trim();
   }
+  // 列表用缩略图（2026-09-15）：上传时会同步生成 thumbs/ 小图，列表加载更快
   function thumbOf(p){
+    var blocks = p.blocks || [];
+    for(var i = 0; i < blocks.length; i++){
+      if(blocks[i].t === 'img' && blocks[i].src) return STORAGE + 'thumbs/' + blocks[i].src;
+    }
+    if(p.images && p.images.length) return STORAGE + 'thumbs/' + p.images[0];
+    return '';
+  }
+  function thumbFallback(p){
     var blocks = p.blocks || [];
     for(var i = 0; i < blocks.length; i++){
       if(blocks[i].t === 'img' && blocks[i].src) return fileUrl(blocks[i].src);
@@ -243,24 +664,38 @@
     var thumb = thumbOf(p);
     var ex = excerptOf(p).slice(0, 90);
     var hasTitle = !!(p.title || '').trim();
-    return '<a class="ml-item" href="?id=' + encodeURIComponent(p.id) + '">' +
-      (thumb ? '<div class="ml-thumb"><img src="' + esc(thumb) + '" loading="lazy" decoding="async" alt=""></div>' : '') +
+    // 2026-09-15：标题与日期分开显示（统一保留日期，不因标题是日期而隐藏）
+    var meta = dateOf(p);
+    if(p.location) meta += (meta ? ' · ' : '') + '📍' + esc(p.location);
+    // 2026-09-15：照片淡化铺底（参考 thelongestway）；文字顺序改为 日期→标题→摘要
+    var bgStyle = thumb ? "background-image:url('" + String(thumb).replace(/'/g, '%27') + "')" : '';
+    return '<a class="ml-item' + (thumb ? '' : ' no-bg') + '" href="?id=' + encodeURIComponent(p.id) + '">' +
+      (thumb ? '<span class="ml-bgimg" style="' + bgStyle + '" aria-hidden="true"></span>' : '') +
       '<div class="ml-body">' +
+        '<div class="ml-date">' + meta + '</div>' +
         '<h2 class="ml-title' + (hasTitle ? '' : ' ml-title-empty') + '">' + esc(titleOf(p)) + '</h2>' +
-        '<div class="ml-meta">' + dateOf(p) + (p.location ? ' · 📍' + esc(p.location) : '') + '</div>' +
         (ex ? '<p class="ml-excerpt">' + esc(ex) + '</p>' : '') +
       '</div>' +
     '</a>';
   }
   function renderMusicBar(p){
-    return '<div class="mp-music">' +
-      '<button class="mp-music-btn" data-src="' + esc(fileUrl(p.music_path)) + '" data-title="' + esc(p.music_title || '') + '" aria-label="播放">▶</button>' +
-      '<span class="mp-music-title">' + esc(p.music_title || '音乐') + '</span>' +
+    return '<div class="mp-player">' +
+      '<button class="mp-play" data-src="' + esc(fileUrl(p.music_path)) + '" aria-label="播放音乐">▶</button>' +
+      '<div class="mp-pinfo">' +
+        '<div class="mp-ptitle">' + esc(p.music_title || '音乐') + '</div>' +
+        '<div class="mp-pwrap">' +
+          '<div class="mp-pbar"><div class="mp-pprog"></div><div class="mp-pthumb"></div></div>' +
+          '<span class="mp-ptime">0:00 / --:--</span>' +
+        '</div>' +
+      '</div>' +
     '</div>';
   }
   function renderDetailView(p, prev, next){
+    // 2026-09-15：返回列表已改为无刷新切换（点击由事件委托拦截）；
+    // 这里只需在点击时同步告知主页恢复背景音乐
+    var backJs = "try{window.parent.postMessage('blog-music-stop','*')}catch(e){}";
     return '<div class="mp-detail-wrap">' +
-      '<a class="ml-back" href="./moments.html">← 返回列表</a>' +
+      '<a class="ml-back" href="./moments.html" onclick="' + backJs + '">← 返回列表</a>' +
       '<h1 class="mp-detail-title">' + esc(titleOf(p)) + '</h1>' +
       '<div class="mp-detail-meta">' + dateOf(p) +
         (p.mood ? ' · ' + esc(p.mood) : '') +
@@ -270,27 +705,104 @@
       '<div class="mp-body">' + renderBlocks(p) + '</div>' +
       (p.music_path ? renderMusicBar(p) : '') +
       '<div class="mp-detail-nav">' +
-        (prev ? '<a href="?id=' + encodeURIComponent(prev.id) + '">← ' + esc(shortTitle(prev)) + '</a>' : '<span></span>') +
-        (next ? '<a href="?id=' + encodeURIComponent(next.id) + '">' + esc(shortTitle(next)) + ' →</a>' : '<span></span>') +
+        (prev ? '<a href="?id=' + encodeURIComponent(prev.id) + '">← 上一篇：' + esc(shortTitle(prev)) + '</a>' : '<span></span>') +
+        (next ? '<a href="?id=' + encodeURIComponent(next.id) + '">下一篇：' + esc(shortTitle(next)) + ' →</a>' : '<span></span>') +
       '</div>' +
     '</div>';
   }
 
-  // 单例音频（避免多条音乐同时播放）
-  var audio=null, curBtn=null;
+  // ===== 音乐播放器（2026-09-15：与主页风格统一，带进度条/时间/可拖动）=====
+  var audio = null, curBar = null;
+  function fmtT(s){
+    if(!isFinite(s) || s < 0) s = 0;
+    var m = Math.floor(s / 60), ss = Math.floor(s % 60);
+    return m + ':' + (ss < 10 ? '0' : '') + ss;
+  }
+  function ensureAudio(){
+    if(audio) return audio;
+    audio = new Audio();
+    audio.preload = 'metadata';
+    audio.addEventListener('timeupdate', function(){
+      if(!curBar || !audio.duration) return;
+      var pct = (audio.currentTime / audio.duration) * 100;
+      var pr = curBar.querySelector('.mp-pprog'), th = curBar.querySelector('.mp-pthumb');
+      if(pr) pr.style.width = pct + '%';
+      if(th) th.style.left = pct + '%';
+      var tm = curBar.querySelector('.mp-ptime');
+      if(tm) tm.textContent = fmtT(audio.currentTime) + ' / ' + fmtT(audio.duration);
+    });
+    audio.addEventListener('loadedmetadata', function(){
+      if(!curBar) return;
+      var tm = curBar.querySelector('.mp-ptime');
+      if(tm) tm.textContent = '0:00 / ' + fmtT(audio.duration);
+    });
+    audio.addEventListener('play', function(){
+      // 2026-09-15：先发通知（必须在 curBar 判空之前，否则页面切换时发不出去）
+      try{ window.parent.postMessage('blog-music-play', '*'); }catch(e){}
+      if(!curBar) return;
+      var b = curBar.querySelector('.mp-play');
+      if(b){ b.textContent = '⏸'; b.classList.add('playing'); }
+    });
+    audio.addEventListener('pause', function(){
+      // 2026-09-15：先发通知（同上），让主页从原进度继续
+      try{ window.parent.postMessage('blog-music-stop', '*'); }catch(e){}
+      if(!curBar) return;
+      var b = curBar.querySelector('.mp-play');
+      if(b){ b.textContent = '▶'; b.classList.remove('playing'); }
+    });
+    audio.addEventListener('waiting', function(){
+      if(curBar){ var b = curBar.querySelector('.mp-play'); if(b) b.textContent = '⋯'; }
+    });
+    audio.addEventListener('playing', function(){
+      if(curBar){ var b = curBar.querySelector('.mp-play'); if(b){ b.textContent = '⏸'; b.classList.add('playing'); } }
+    });
+    audio.addEventListener('ended', function(){
+      if(!curBar) return;
+      var b = curBar.querySelector('.mp-play');
+      if(b){ b.textContent = '▶'; b.classList.remove('playing'); }
+      var pr = curBar.querySelector('.mp-pprog'), th = curBar.querySelector('.mp-pthumb');
+      if(pr) pr.style.width = '0%';
+      if(th) th.style.left = '0%';
+    });
+    audio.addEventListener('error', function(){
+      if(!curBar) return;
+      var b = curBar.querySelector('.mp-play');
+      if(b){ b.textContent = '▶'; b.classList.remove('playing'); }
+      var tm = curBar.querySelector('.mp-ptime');
+      if(tm) tm.textContent = '加载失败';
+      console.warn('[music] load error');
+    });
+    return audio;
+  }
   function toggleMusic(btn){
-    var src=btn.getAttribute('data-src');
+    var bar = btn.closest ? btn.closest('.mp-player') : null;
+    if(!bar) return;
+    var src = btn.getAttribute('data-src');
     if(!src) return;
-    if(!audio){ audio=new Audio(); audio.preload='none'; }
-    if(curBtn===btn && !audio.paused){
-      audio.pause(); btn.textContent='▶'; btn.classList.remove('playing'); return;
+    var a = ensureAudio();
+    if(curBar === bar && !a.paused){ a.pause(); return; }
+    if(curBar && curBar !== bar){
+      var ob = curBar.querySelector('.mp-play');
+      if(ob){ ob.textContent = '▶'; ob.classList.remove('playing'); }
     }
-    if(curBtn && curBtn!==btn){ curBtn.textContent='▶'; curBtn.classList.remove('playing'); }
-    curBtn=btn;
-    if(audio.src!==src){ audio.src=src; }
-    btn.textContent='⏸'; btn.classList.add('playing');
-    audio.play().catch(function(){ btn.textContent='▶'; btn.classList.remove('playing'); });
-    audio.onended=function(){ btn.textContent='▶'; btn.classList.remove('playing'); };
+    curBar = bar;
+    if(a.src !== src){
+      a.src = src;
+      var pr = bar.querySelector('.mp-pprog'), th = bar.querySelector('.mp-pthumb');
+      if(pr) pr.style.width = '0%';
+      if(th) th.style.left = '0%';
+      var tm = bar.querySelector('.mp-ptime');
+      if(tm) tm.textContent = '0:00 / --:--';
+    }
+    a.play().catch(function(err){ console.warn('[music] play failed', err); });
+  }
+  function seekTo(e, barEl){
+    var a = audio;
+    if(!a || !isFinite(a.duration)) return;
+    var rect = barEl.getBoundingClientRect();
+    var cx = (e.clientX != null) ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+    var pct = Math.max(0, Math.min(1, (cx - rect.left) / rect.width));
+    a.currentTime = pct * a.duration;
   }
 
   var viewer=document.getElementById('mpViewer');
@@ -307,16 +819,120 @@
   viewer.addEventListener('click', closeViewer);
   document.addEventListener('keydown', function(e){ if(e.key==='Escape' && !viewer.hidden) closeViewer(); });
 
+  // ===== 无刷新路由（2026-09-15）=====
+  // 目的：进出文章不重载页面，返回列表时保持原来的滚动位置
+  var _postsCache = null;    // 列表数据缓存
+  var _listScrollY = 0;      // 列表滚动位置
+
+  function renderRoute(){
+    var list = _postsCache || [];
+    var listEl = document.getElementById('mpList');
+    var detailEl = document.getElementById('mpDetail');
+    var hd = document.querySelector('.mp-head');
+    var stat = document.getElementById('mpStat');
+    var id = null;
+    try{ id = new URLSearchParams(location.search).get('id'); }catch(e){}
+
+    if(id){
+      var p = null;
+      for(var i = 0; i < list.length; i++){
+        if(String(list[i].id) === String(id)){ p = list[i]; break; }
+      }
+      if(!p){
+        listEl.hidden = false;
+        detailEl.hidden = true;
+        listEl.innerHTML = '<div class="mp-loading">这篇内容不存在（可能已被删除）<br><br><a href="./moments.html" style="color:var(--accent);text-decoration:none">← 返回列表</a></div>';
+        return;
+      }
+      var idx = list.indexOf(p);
+      listEl.hidden = true;
+      listEl.innerHTML = '';
+      detailEl.innerHTML = renderDetailView(p, idx - 1 >= 0 ? list[idx - 1] : null, idx + 1 < list.length ? list[idx + 1] : null);
+      detailEl.hidden = false;
+      if(hd) hd.classList.add('detail');
+      if(stat) stat.textContent = '';
+      document.title = titleOf(p) + ' · 向天游';
+      window.scrollTo(0, 0);
+    }else{
+      if(stat) stat.textContent = list.length ? list.length + ' 篇' : '';
+      listEl.innerHTML = list.map(renderListItem).join('');
+      listEl.hidden = false;
+      detailEl.hidden = true;
+      if(hd) hd.classList.remove('detail');
+      document.title = '博客 · 向天游';
+      // 2026-09-15：回到列表时停掉文章里的音乐
+      // （原来是靠整页跳转自然停止，改成无刷新后必须主动暂停）
+      try{ if(audio && !audio.paused) audio.pause(); }catch(e){}
+      // 关键：恢复进入文章前的滚动位置
+      // 2026-09-15：临时关掉全局 smooth，做到"无感"（否则会看到滚下去的过程）
+      var _prevSB = document.documentElement.style.scrollBehavior;
+      document.documentElement.style.scrollBehavior = 'auto';
+      window.scrollTo(0, _listScrollY);
+      requestAnimationFrame(function(){
+        document.documentElement.style.scrollBehavior = _prevSB || '';
+      });
+    }
+    try{ if(typeof observeFadeUps === 'function') observeFadeUps(); }catch(e){}
+  }
+
+  // 浏览器前进/后退
+  window.addEventListener('popstate', function(){
+    if(_postsCache) renderRoute();
+  });
+
   function bindEvents(){
     if(bindEvents._done) return;
     bindEvents._done = true;
     document.addEventListener('click', function(e){
+      var playBtn = e.target.closest('.mp-play');
+      if(playBtn){ toggleMusic(playBtn); return; }
       var musicBtn = e.target.closest('.mp-music-btn');
       if(musicBtn){ toggleMusic(musicBtn); return; }
       var figImg = e.target.closest('.mp-fig-img');
       if(figImg){ openViewer(figImg.getAttribute('src')); return; }
       var imgWrap = e.target.closest('.mp-img');
-      if(imgWrap){ openViewer(imgWrap.getAttribute('data-src')); }
+      if(imgWrap){ openViewer(imgWrap.getAttribute('data-src')); return; }
+      // 2026-09-15：无刷新进入文章（记住列表滚动位置）
+      var item = e.target.closest('.ml-item');
+      if(item){
+        e.preventDefault();
+        var href = item.getAttribute('href') || '';
+        var mm = href.match(/[?&]id=([^&]+)/);
+        if(mm){
+          _listScrollY = window.scrollY;
+          try{ history.pushState({id: mm[1]}, '', '?id=' + mm[1]); }catch(err){}
+          renderRoute();
+        }
+        return;
+      }
+      // 2026-09-15：无刷新返回列表（恢复滚动位置）
+      var backBtn = e.target.closest('.ml-back');
+      if(backBtn){
+        e.preventDefault();
+        try{ history.pushState({list: 1}, '', location.pathname); }catch(err){}
+        renderRoute();
+        return;
+      }
+    });
+    // 进度条：点击 / 拖动跳转（2026-09-15）
+    var dragBar = null;
+    document.addEventListener('pointerdown', function(e){
+      var barEl = e.target.closest('.mp-pbar');
+      if(!barEl) return;
+      if(!curBar || barEl !== curBar.querySelector('.mp-pbar')) return;
+      dragBar = barEl;
+      barEl.classList.add('dragging');
+      seekTo(e, barEl);
+      try{ barEl.setPointerCapture(e.pointerId); }catch(err){}
+    });
+    document.addEventListener('pointermove', function(e){
+      if(dragBar) seekTo(e, dragBar);
+    });
+    document.addEventListener('pointerup', function(){
+      if(dragBar){ dragBar.classList.remove('dragging'); dragBar = null; }
+    });
+    document.addEventListener('pointercancel', function(){
+      if(dragBar){ dragBar.classList.remove('dragging'); dragBar = null; }
     });
   }
 
@@ -327,7 +943,118 @@
     if(msg){ el.querySelector('p').textContent=msg; el.querySelector('.mp-empty-sub').textContent=''; }
   }
 
-  async function load(){
+  // 2026-09-15：若在主页的横滑层(iframe)里打开，点「← 返回」时通知父页收起
+  (function(){
+    if(window.self === window.top) return;   // 独立打开时不变
+    var backs = document.querySelectorAll('.mp-back');
+    Array.prototype.forEach.call(backs, function(a){
+      a.setAttribute('href', 'javascript:void(0)');
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        try{ window.parent.postMessage('close-blog', '*'); }catch(err){}
+      });
+    });
+  })();
+
+  // 2026-09-15：离开本页（返回列表/切换文章/关闭博客）时，通知主页恢复背景音乐。
+  // 因为「← 返回列表」是整页跳转，audio 的 pause 事件不会触发，必须靠 pagehide 兜底。
+  (function(){
+    function notifyStop(){
+      try{ window.parent.postMessage('blog-music-stop', '*'); }catch(e){}
+    }
+    window.addEventListener('pagehide', notifyStop);
+    window.addEventListener('beforeunload', notifyStop);
+  })();
+
+  // 2026-09-15：接收主页指令（关闭博客画布时停掉正在播放的文章音乐）
+// 2026-09-15：接收主页指令（停音乐 / 同步明暗主题）
+  window.addEventListener('message', function(e){
+    if(!e || !e.data) return;
+    if(e.data === 'stop-iframe-music'){
+      try{ if(audio){ audio.pause(); } }catch(err){}
+      return;
+    }
+    // 2026-09-16：编辑器改动数据后，父页通知博客立即重新拉取（免手动刷新）
+    if(e.data === 'data-changed'){
+      try{
+        if(typeof load === 'function') load();          // 重新查 Supabase 并重渲染
+        else if(typeof renderRoute === 'function') renderRoute();
+      }catch(err){}
+      return;
+    }
+    if(typeof e.data === 'string' && e.data.indexOf('theme:') === 0){
+      var t = e.data.slice(6);
+      if(t === 'light') document.documentElement.setAttribute('data-theme','light');
+      else document.documentElement.removeAttribute('data-theme');
+    }
+  });
+  // 2026-09-15：按记录应用主题（无记录=暗色）；父页面还会 postMessage 同步
+  (function(){
+    try{
+      if(localStorage.getItem('memories.theme') === 'light') document.documentElement.setAttribute('data-theme','light');
+      else document.documentElement.removeAttribute('data-theme');
+    }catch(e){}
+  })();
+
+  // 访问上报（2026-09-15）：博客页也记录，含"是否通过密码"与设备信息
+  (function(){
+    try{
+      var key='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
+      var base='https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1/visits';
+      var cid = null;
+      try{ cid = localStorage.getItem('memories.cid'); }catch(e){}
+      if(!cid){
+        cid = 'c_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+        try{ localStorage.setItem('memories.cid', cid); }catch(e){}
+      }
+      var body = {
+        path: location.pathname + (location.search || ''),
+        ref: document.referrer || '',
+        visited_at: new Date().toISOString(),
+        session_id: cid,
+        ua: navigator.userAgent || '',
+        is_authed: (function(){ try{ return localStorage.getItem('_v2pw2') === '1'; }catch(e){ return false; } })(),
+        screen: (window.screen ? (screen.width + 'x' + screen.height) : ''),
+        lang: navigator.language || '',
+        tz: (function(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){ return ''; } })()
+      };
+      fetch(base, {
+        method: 'POST',
+        headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json','Prefer':'return=representation'},
+        body: JSON.stringify(body)
+      }).then(function(r){ return r.json(); }).then(function(data){
+        var vid = data && data[0] && data[0].id;
+        if(!vid) return;
+        var t0 = Date.now();
+        function upd(){
+          var dur = Math.max(1, Math.round((Date.now() - t0) / 1000));
+          fetch(base + '?id=eq.' + vid, {
+            method: 'PATCH',
+            headers: {'apikey':key,'Authorization':'Bearer '+key,'Content-Type':'application/json'},
+            body: JSON.stringify({duration: dur, left_at: new Date().toISOString()}),
+            keepalive: true
+          }).catch(function(){});
+        }
+        setInterval(upd, 10000);
+        window.addEventListener('beforeunload', upd);
+        document.addEventListener('visibilitychange', function(){ if(document.hidden) upd(); });
+      }).catch(function(){});
+    }catch(e){}
+  })();
+
+    // 2026-09-16：加载时显示骨架屏（等待时刻也要有质感）
+  function showSkeleton(){
+    var el = document.getElementById('mpList');
+    if(!el) return;
+    var one = '<div class="skel-card"><div class="skel skel-block" style="margin-bottom:14px"></div>'
+            + '<div class="skel skel-line w80"></div><div class="skel skel-line w60"></div>'
+            + '<div class="skel skel-line w40"></div></div>';
+    el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:22px;padding:8px 0">'
+                 + one + one + one + one + one + one + '</div>';
+  }
+async function load(){
+    // 2026-09-16：先出骨架屏（仅首次/列表为空时，避免每次刷新都闪）
+    try{ if(document.getElementById('mpList') && !document.querySelector('#mpList .ml-item')) showSkeleton(); }catch(e){}
     var listEl = document.getElementById('mpList');
     var detailEl = document.getElementById('mpDetail');
     if(!sb){
@@ -344,45 +1071,74 @@
         return;
       }
       var list = res.data || [];
-      var idParam = null;
-      try{ idParam = new URLSearchParams(location.search).get('id'); }catch(e){}
-
-      if(idParam){
-        var p = null;
-        for(var i = 0; i < list.length; i++){
-          if(String(list[i].id) === String(idParam)){ p = list[i]; break; }
-        }
-        if(!p){
-          listEl.innerHTML = '<div class="mp-loading">这篇内容不存在（可能已被删除）<br><br><a href="./moments.html" style="color:var(--accent);text-decoration:none">← 返回列表</a></div>';
-          return;
-        }
-        var idx = list.indexOf(p);
-        var prev = (idx + 1 < list.length) ? list[idx + 1] : null;
-        var next = (idx - 1 >= 0) ? list[idx - 1] : null;
-        listEl.hidden = true;
-        listEl.innerHTML = '';
-        detailEl.innerHTML = renderDetailView(p, prev, next);
-        detailEl.hidden = false;
-        var stat = document.getElementById('mpStat');
-        if(stat) stat.textContent = '';
-        document.title = titleOf(p) + ' · 向天游';
-        bindEvents();
-        window.scrollTo(0, 0);
-        return;
-      }
-
-      var stat2 = document.getElementById('mpStat');
-      if(stat2) stat2.textContent = list.length ? list.length + ' 篇' : '';
+      _postsCache = list;
+      // 2026-09-15：统一交给无刷新路由渲染（列表/详情由 URL 的 id 参数决定）
       if(!list.length){ showEmpty(); return; }
-      listEl.innerHTML = list.map(renderListItem).join('');
-      listEl.hidden = false;
-      detailEl.hidden = true;
-      bindEvents();
+      renderRoute();
     }catch(err){
       listEl.innerHTML = '<div class="mp-loading">加载出错，请刷新重试</div>';
     }
   }
 
+  // 2026-09-15：移动端顶部返回键"下滑隐藏/上滑显示"（避免一直占着左上角）
+  (function(){
+    var hd = document.querySelector('.mp-head');
+    if(!hd) return;
+    var lastY = window.scrollY, ticking = false;
+    window.addEventListener('scroll', function(){
+      if(ticking) return;
+      ticking = true;
+      requestAnimationFrame(function(){
+        var y = window.scrollY;
+        if(y > lastY + 6 && y > 80){ hd.classList.add('head-hidden'); }
+        else if(y < lastY - 6 || y <= 80){ hd.classList.remove('head-hidden'); }
+        lastY = y;
+        ticking = false;
+      });
+    }, {passive:true});
+  })();
+  // 2026-09-15：卡片上长按不要弹系统菜单（否则会打断"按住显现"的手感）
+  (function(){
+    document.addEventListener('contextmenu', function(e){
+      var t = e.target;
+      if(t && t.closest && t.closest('.ml-item')) e.preventDefault();
+    }, {passive:false});
+    // 触屏：手指按到哪张，哪张显现（用类代替 :active，避免多点触控/滑动的怪异表现）
+    function clearAll(){ 
+      var els = document.querySelectorAll('.ml-item.touch-show');
+      for(var i=0;i<els.length;i++) els[i].classList.remove('touch-show');
+    }
+    document.addEventListener('touchstart', function(e){
+      var it = e.target && e.target.closest ? e.target.closest('.ml-item') : null;
+      if(!it) return;
+      clearAll();
+      it.classList.add('touch-show');
+    }, {passive:true});
+    document.addEventListener('touchend', function(){ setTimeout(clearAll, 220); }, {passive:true});
+    document.addEventListener('touchcancel', function(){ clearAll(); }, {passive:true});
+  })();
+  // 2026-09-16：全局点击涟漪 —— 从点击落点扩散，给交互"实感"
+  (function(){
+    function makeRipple(e){
+      var el = e.target && e.target.closest ? e.target.closest('button, .nav-icon-btn, .river-filter, .editor-btn-sm, .ml-item, .timeline-card, .tl-group-header, .mp-play, .mp-music-btn, .polaroid') : null;
+      if(!el) return;
+      if(getComputedStyle(el).position === 'static') el.style.position = 'relative';
+      if(getComputedStyle(el).overflow === 'visible') el.style.overflow = 'hidden';
+      var r = el.getBoundingClientRect();
+      var size = Math.max(r.width, r.height);
+      var x = (e.clientX != null ? e.clientX : r.left + r.width/2) - r.left;
+      var y = (e.clientY != null ? e.clientY : r.top + r.height/2) - r.top;
+      var d = document.createElement('span');
+      d.className = 'ripple';
+      d.style.width = d.style.height = size + 'px';
+      d.style.left = (x - size/2) + 'px';
+      d.style.top  = (y - size/2) + 'px';
+      el.appendChild(d);
+      setTimeout(function(){ d.remove(); }, 600);
+    }
+    document.addEventListener('pointerdown', makeRipple, {passive:true});
+  })();
+  bindEvents();   // 2026-09-15：事件委托只绑一次（含无刷新路由的点击拦截）
   load();
 })();
 </script>

@@ -47,6 +47,70 @@
   --ease-spring: cubic-bezier(.34,1.56,.64,1);
   --nav-h: 60px;
 }
+/* 2026-09-15：浅色主题下的滚动条（否则浏览器沿用暗色 color-scheme，滚动条会是黑的） */
+[data-theme="light"]{color-scheme:light}
+[data-theme="light"] ::-webkit-scrollbar-track{background:rgba(32,35,40,.04)}
+[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(32,35,40,.22)}
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover{background:rgba(32,35,40,.34)}
+[data-theme="light"] .river-stream::-webkit-scrollbar{height:6px}
+[data-theme="light"] .river-stream::-webkit-scrollbar-thumb{background:rgba(32,35,40,.24);border-radius:6px}
+[data-theme="light"] .river-stream::-webkit-scrollbar-track{background:rgba(32,35,40,.06)}
+/* 浅色下更多细节微调：标签/按钮对比 */
+[data-theme="light"] .river-filter{background:rgba(32,35,40,.05);border-color:rgba(32,35,40,.10);color:rgba(32,35,40,.78)}
+[data-theme="light"] .river-filter.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+[data-theme="light"] .tl-group-header{color:rgba(32,35,40,.82)}
+[data-theme="light"] .tl-group-footer{color:rgba(32,35,40,.42)}
+[data-theme="light"] .section-sub,[data-theme="light"] .tl-count{color:rgba(32,35,40,.62)}
+
+
+/* ===== 2026-09-15：浅色（白色）主题 =====
+   用法：给 <html> 加 data-theme="light" 即整体切换。
+   核心是 --fg-rgb（所有半透明前景色的基色）与几个底色/阴影/主色。 */
+[data-theme="light"]{
+  --fg-rgb: 32,35,40;              /* 深灰：浅底上的一切半透明前景色自动适配 */
+  --bg: #FFFFFF;                   /* 2026-09-16：纯白（参考站那种冷净的白） */
+  --bg-elevated: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F7F7F8;
+  --border: rgba(0,0,0,.09);
+  --border-hover: rgba(0,0,0,.18);
+  --text: #1F2226;                 /* 墨色 */
+  --text-dim: rgba(32,35,40,.80);
+  --text-muted: rgba(32,35,40,.62);
+  --accent: #5E7D60;               /* 深一点的鼠尾草绿，浅底更清晰 */
+  --accent-2: #B06A4C;
+  --accent-glow: rgba(94,125,96,.14);
+  --accent-2-glow: rgba(176,106,76,.14);
+  --accent-dim: #7A9679;
+  --danger: #C2564A;
+  --success: #5E7D60;
+  --glass: rgba(250,250,250,.86);
+  --glass-border: rgba(32,35,40,.08);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.04);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.05);
+}
+/* 浅色下 hero 遮罩减轻，照片更亮 */
+[data-theme="light"] .hero::after{background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,.92))}
+[data-theme="light"] .nav{background:rgba(255,255,255,.60)}
+[data-theme="light"] .nav.scrolled{background:rgba(255,255,255,.92);border-bottom-color:rgba(32,35,40,.08)}
+/* 2026-09-15 修正：浅色下【不再用白色遮罩】（那会把文字洗白看不清）
+   改为：照片用不透明度淡化，文字保持深色直接压在上面 —— 与参考站一致 */
+[data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.14}
+[data-theme="light"] .ml-item{background:#FFFFFF}
+[data-theme="light"] .ml-item::after{background:linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.18) 60%,rgba(255,255,255,.30) 100%)}
+[data-theme="light"] .ml-title{color:#08090A;font-weight:700}
+[data-theme="light"] .ml-title-empty{color:rgba(32,35,40,.80)}
+[data-theme="light"] .ml-date{color:rgba(24,26,28,.84);font-weight:600}
+[data-theme="light"] .ml-excerpt{color:rgba(16,18,20,.93);font-weight:500}
+[data-theme="light"] .ml-item.no-bg{
+  background:radial-gradient(120% 90% at 12% 8%,rgba(32,35,40,.045),transparent 58%),
+             linear-gradient(155deg,rgba(32,35,40,.02),transparent 55%),#FFFFFF;
+}
+@media (hover: hover) and (pointer: fine){
+  [data-theme="light"] .ml-item:hover .ml-bgimg{filter:brightness(1.02) saturate(1); opacity:.8; transform:scale(1.02)}
+}
+
 
 /* --- Reset --- */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -68,7 +132,13 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .nav-brand{font-family:var(--font-display);font-size:1.25rem;font-weight:700;color:var(--text);letter-spacing:.5px;cursor:pointer;user-select:none}
 .nav-brand em{font-style:italic;color:var(--accent);font-weight:400}
 .nav-right{display:flex;align-items:center;gap:6px}
-.nav-links{display:flex;gap:24px;align-items:center}
+/* 2026-09-15：导航项在屏幕正中（绝对居中，不受左右元素宽度影响） */
+.nav-links{display:flex;gap:24px;align-items:center;
+  position:absolute;left:50%;transform:translateX(-50%)}
+@media(max-width:820px){
+  /* 窄屏：恢复流式排布，避免与品牌/按钮重叠 */
+  .nav-links{position:static;transform:none}
+}
 .nav-links a{font-size:.9rem;color:var(--text-dim);font-weight:500;letter-spacing:.3px;position:relative;padding:4px 0}
 .nav-links a::after{content:'';position:absolute;bottom:-2px;left:0;width:0;height:1.5px;background:var(--accent);transition:width .3s var(--ease)}
 .nav-links a:hover,.nav-links a.active{color:var(--text)}
@@ -151,7 +221,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .river-stream::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
 .river-stream::-webkit-scrollbar-track{background:transparent}
 
-.polaroid{flex:0 0 auto;width:260px;height:340px;scroll-snap-align:center;background:linear-gradient(180deg,#fdfaf3 0%,#f5efe2 100%);border-radius:2px;box-shadow:0 4px 16px rgba(0,0,0,.3),0 1px 4px rgba(0,0,0,.15);transition:transform .4s cubic-bezier(.25,.1,.25,1),box-shadow .4s ease;cursor:pointer;position:relative;display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(0,0,0,.06);
+.polaroid{flex:0 0 auto;width:260px;height:340px;scroll-snap-align:center;background:linear-gradient(180deg,#FDFDFD 0%,#F5F5F5 100%);border-radius:2px;box-shadow:0 4px 16px rgba(0,0,0,.3),0 1px 4px rgba(0,0,0,.15);transition:transform .4s cubic-bezier(.25,.1,.25,1),box-shadow .4s ease;cursor:pointer;position:relative;display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(0,0,0,.06);
   /* 2026-09-11 移动端滑动卡顿修复：屏外卡片跳过渲染（只渲染可见区域的卡片，大幅减负） */
   content-visibility:auto;contain-intrinsic-size:260px 340px;
   /* 隔离渲染，卡片变化不影响外部布局 */
@@ -352,6 +422,16 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .pi-file{color:var(--text-muted);font-size:.72rem;margin-left:6px}
 .pi-cap{width:100%;padding:6px 10px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:6px;color:var(--text-dim);font-size:.8rem;font-family:inherit;outline:none;transition:border-color .2s}
 .pi-cap:focus{border-color:var(--accent)}
+
+/* ===== 跨页面横向滑动过渡（2026-09-15）=====
+   点「博客」或返回主页时，不是白屏跳转，而是像横向翻页一样滑动
+   浏览器原生 View Transitions：自动判断前进/后退方向（Chrome 126+ / Safari 18+）
+   不支持的浏览器 → 自动降级为普通跳转，不影响使用 */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: vtSlideOut .34s cubic-bezier(.4,0,.2,1) both; }
+::view-transition-new(root) { animation: vtSlideIn  .34s cubic-bezier(.4,0,.2,1) both; }
+@keyframes vtSlideOut { to   { opacity: 0; transform: translateX(-22%); } }
+@keyframes vtSlideIn  { from { opacity: 0; transform: translateX(22%);  } }
 .editor-btn-sm.del{border-color:rgba(216,123,107,.2);color:rgba(216,123,107,.7)}
 .editor-btn-sm.del:hover{background:rgba(216,123,107,.15);color:var(--danger)}
 .editor-form-group{margin-bottom:16px}
@@ -511,3 +591,375 @@ html,body,.nav,.nav-icon-btn,.section,.nav-brand,.hero-title,.hero-sub,.hero-con
 /* 白色模式选择文本颜色 */
 
 /* 白色模式滚动条 */
+
+
+/* ===== 2026-09-15 全局质感与无障碍提升 ===== */
+
+/* 键盘焦点可见（鼠标点击时不显示，避免视觉噪音） */
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+:focus:not(:focus-visible){outline:none}
+
+/* 尊重系统「减少动效」偏好（无障碍） */
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+  }
+}
+
+/* 图片占位底色：加载时不再白闪/跳动 */
+img{background-color:rgba(var(--fg-rgb),.04)}
+
+/* 触屏设备统一按下反馈（替代 hover 的轻量版） */
+@media (hover: none){
+  button:active, .nav-icon-btn:active, .river-card:active{opacity:.75;transition:opacity .08s}
+}
+
+/* 2026-09-15：触屏设备的"照片显现"效果
+   手机没有 hover，改用 :active —— 手指按住卡片时照片浮现，松开淡回。
+   过渡时间调短（.28s），避免手指滑动时闪得太明显。 */
+@media (hover: none){
+  .ml-item:active .ml-bgimg{
+    opacity:.6 !important;
+    transform:scale(1.02);
+    transition:filter .14s ease, opacity .14s ease, transform .14s ease;
+  }
+  .ml-item:active{ background:var(--bg-card-hover) }
+}
+@media (hover: none){
+  [data-theme="light"] .ml-item:active .ml-bgimg{
+    filter:brightness(1.02) saturate(1) !important;
+    opacity:.8;
+  }
+}
+
+/* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
+   —— 之前只让照片变亮，但卡片上那层黑色渐变压着它，所以看不出变化 */
+.ml-item::after{ transition:opacity .6s cubic-bezier(.22,.61,.36,1) }
+@media (hover: hover) and (pointer: fine){
+  .ml-item:hover::after{ opacity:0 }          /* 暗色：遮罩减到三成 */
+}
+@media (hover: none){
+  .ml-item:active::after{ opacity:0 }
+  .ml-item.touch-show::after{ opacity:0 }
+}
+[data-theme="light"] .ml-item:hover::after{ opacity:.55 }   /* 浅色本来就是浅遮罩，略减即可 */
+[data-theme="light"] .ml-item.touch-show::after{ opacity:.55 }
+
+/* ===== 2026-09-15：照片河流在触屏上的滑动优化（修"卡着滑不动"） ===== */
+@media (hover: none), (pointer: coarse){
+  .river-stream{
+    scroll-behavior:auto !important;   /* 触屏关掉平滑滚动：它会和手指滑动打架 */
+    touch-action:manipulation;         /* 允许横竖滑动与缩放，仅禁用双击缩放（不要用 pan-x，那会禁掉上下滚） */
+    cursor:auto !important;            /* 触屏不需要 grab 光标 */
+    -webkit-overflow-scrolling:touch;
+  }
+  .river-stream:active{cursor:auto}
+  /* 触屏：只去掉过渡（减少重绘），不动 transform（避免干扰手势判定） */
+  .polaroid{transition:none !important}
+}
+
+/* 2026-09-15：触屏上禁用 content-visibility
+   —— 它让屏外卡片延迟渲染，横向滑动时"即时渲染"跟不上手指 → 偶尔卡死 */
+@media (hover: none), (pointer: coarse){
+  .polaroid{
+    content-visibility:visible !important;
+    contain-intrinsic-size:auto !important;
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .polaroid img{
+    -webkit-user-drag:none; user-select:none;
+    pointer-events:none;
+  }
+  /* 容器本身也禁止选中/长按菜单，保证"按着照片滑"顺畅交给滚动处理 */
+  .river-stream{
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+}
+
+/* 2026-09-16：hero 只留一行标题（「至少留下过些东西」）
+   —— 8 个汉字，原 -1px 紧排会挤，字号也收敛一档更从容 */
+.hero-title-solo{
+  font-size:clamp(1.7rem,4.6vw,3.4rem);
+  font-weight:600;
+  letter-spacing:.06em;
+  line-height:1.28;
+  margin-bottom:0;
+}
+
+/* 2026-09-16：浅色主题下给随笔卡片一点底色，补足"全白没层次"的问题
+   选极浅的微绿灰（与主色鼠尾草绿呼应），克制到"看得出是一张卡"即可 */
+[data-theme="light"] .timeline-card{
+  background:#FAFBFA;
+  border-color:rgba(0,0,0,.10);
+  box-shadow:0 1px 2px rgba(0,0,0,.03), 0 2px 8px rgba(0,0,0,.025);
+}
+[data-theme="light"] .timeline-card:hover{
+  background:#F7F9F7;
+  border-color:rgba(94,125,96,.34);
+  box-shadow:0 4px 16px rgba(0,0,0,.07), 0 1px 3px rgba(0,0,0,.04);
+}
+/* 「关于网站」等 section 卡片同样处理，保持全站层次一致 */
+[data-theme="light"] .section-card{
+  background:#FAFBFA;
+  border-color:rgba(0,0,0,.10);
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   2026-09-16：全局质感层（"高级感"的核心）
+   —— 原则：一切交互都要"有重量"。
+      普通网站用线性缓动（轻飘飘）；高级网站用弹簧曲线 + 按压反馈。
+   ═══════════════════════════════════════════════════════════ */
+
+/* ① 统一缓动曲线库（写死的一堆 ease 是廉价感来源） */
+:root{
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);      /* 弹簧：松手回弹 */
+  --ease-out-expo: cubic-bezier(.16,1,.3,1);        /* 出场：快起慢收 */
+  --ease-in-out-quart: cubic-bezier(.76,0,.24,1);   /* 稳重：两端都缓 */
+  --ease-out-soft: cubic-bezier(.22,.61,.36,1);     /* 柔和 */
+  --dur-press: .16s;                                /* 按压：必须短促 */
+  --dur-ui: .26s;                                   /* 常规 UI */
+  --dur-large: .42s;                                /* 大幅位移 */
+}
+
+/* ② 所有可点元素：按下"沉下去"，松手"弹回来"（这是"重力感"的本体） */
+button, a, [role="button"], .nav-icon-btn, .river-filter,
+.ml-item, .timeline-card, .tl-group-header, .tl-group-footer,
+.polaroid, .editor-btn-sm, .mp-play, .mp-music-btn{
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-press) var(--ease-spring),
+    box-shadow var(--dur-ui) var(--ease-out-expo),
+    background-color var(--dur-ui) ease,
+    border-color var(--dur-ui) ease,
+    color var(--dur-ui) ease,
+    filter var(--dur-ui) ease,
+    opacity var(--dur-ui) ease;
+}
+
+/* ③ 按压反馈：触屏与桌面都生效（桌面用 :active 也合理） */
+button:active, [role="button"]:active, .nav-icon-btn:active,
+.river-filter:active, .editor-btn-sm:active, .mp-play:active, .mp-music-btn:active{
+  transform: scale(.945);
+  transition-duration: var(--dur-press);
+}
+/* 卡片类：按下位移更小更"重"（大物体压缩感弱） */
+.ml-item:active, .timeline-card:active, .polaroid:active, .tl-group-header:active{
+  transform: scale(.978);
+  transition-duration: var(--dur-press);
+}
+
+/* ④ 触屏滚动惯性（iOS/Android 都吃这套） */
+.ml-list, .scroll, .mp-body, .lightbox-filmstrip, .river-stream{
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ⑤ 全局字体渲染：让文字"站得住"（细笔画发虚=廉价感） */
+html{
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ⑥ 焦点可见性：键盘操作的质感（不影响鼠标用户） */
+:focus-visible{
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ⑦ 尊重"减少动态效果"的系统偏好（高级站必备素养） */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/* ═══ 2026-09-16 质感·第2层：视觉秩序 ═══ */
+
+/* ① 图片渐显：用 animation 而非 opacity 初值 ——
+   注意：不能写 img{opacity:0} + img[complete]{opacity:1}，
+   因为 complete 是 DOM 属性而非 HTML 属性，属性选择器永不匹配，会导致图片全部隐藏 ✗ */
+img{ animation: imgFadeIn .42s cubic-bezier(.22,.61,.36,1) both }
+@keyframes imgFadeIn{ from{ opacity:0 } to{ opacity:1 } }
+/* 已经是完整数据 URI 的图（图标等）不需要动画 */
+img[src^="data:"]{ animation:none }
+
+/* ② 圆角统一（原来是各处 2px/3px/4px 混用，显得随意） */
+:root{
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-full: 999px;
+}
+
+/* ③ 阴影分层：定义 3 级，全站只用这 3 级（层次感来自克制） */
+:root{
+  --sh-1: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.04);
+  --sh-2: 0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+  --sh-3: 0 12px 32px rgba(0,0,0,.12), 0 4px 8px rgba(0,0,0,.05);
+}
+
+/* ④ 交互元素统一"落点"：避免 hover 时元素跳来跳去 */
+@media (hover: hover) and (pointer: fine){
+  .ml-item:hover, .timeline-card:hover, .polaroid:hover{
+    translate: 0 -1px;
+  }
+}
+
+/* ⑤ 滚动条美化（桌面）：细、圆、低对比，不抢视线 */
+@media (hover: hover) and (pointer: fine){
+  ::-webkit-scrollbar{ width: 8px; height: 8px }
+  ::-webkit-scrollbar-track{ background: transparent }
+  ::-webkit-scrollbar-thumb{
+    background: rgba(128,128,128,.22);
+    border-radius: var(--r-full);
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover{ background: rgba(128,128,128,.38); background-clip: content-box }
+}
+
+
+/* ═══ 2026-09-16 质感·第3层：交互与显示的"贵气" ═══ */
+
+/* ① 骨架屏：加载时用"呼吸的灰块"占位，而不是空白或转圈
+   —— 高级站与普通站最大的观感差距就在"等待时刻" */
+.skel{
+  background: linear-gradient(100deg,
+    rgba(var(--fg-rgb),.045) 26%,
+    rgba(var(--fg-rgb),.085) 42%,
+    rgba(var(--fg-rgb),.045) 60%);
+  background-size: 300% 100%;
+  animation: skelShine 1.5s var(--ease-in-out-quart, ease-in-out) infinite;
+  border-radius: var(--r-sm, 6px);
+}
+@keyframes skelShine{
+  0%{ background-position: 120% 0 }
+  100%{ background-position: -20% 0 }
+}
+.skel-line{ height: 12px; margin-bottom: 10px }
+.skel-line.w60{ width: 60% }
+.skel-line.w40{ width: 40% }
+.skel-line.w80{ width: 80% }
+.skel-block{ aspect-ratio: 16/10; width: 100% }
+
+/* 骨架卡片：与真实卡片同尺寸，切换时"不跳" */
+.skel-card{
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 10px);
+  padding: 16px;
+  overflow: hidden;
+}
+
+/* ② 点击涟漪：从指/鼠标落点扩散（触觉反馈的自然延伸） */
+.ripple-host{ position: relative; overflow: hidden }
+.ripple{
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  background: radial-gradient(circle, rgba(var(--fg-rgb),.28) 0%, rgba(var(--fg-rgb),0) 68%);
+  pointer-events: none;
+  animation: rippleOut .56s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)) forwards;
+}
+@keyframes rippleOut{
+  to{ transform: scale(2.6); opacity: 0 }
+}
+
+/* ③ 空状态：用图形而非干巴巴一行字（视觉上"有人设计过"） */
+.empty-art{
+  display: flex; flex-direction: column; align-items: center;
+  padding: 44px 20px; gap: 14px; text-align: center;
+}
+.empty-art .ea-ring{
+  width: 62px; height: 62px; border-radius: 50%;
+  border: 1.5px dashed rgba(var(--fg-rgb),.22);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  animation: eaFloat 3.4s var(--ease-in-out-quart, ease-in-out) infinite;
+}
+.empty-art .ea-ring::after{
+  content: ''; width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(var(--fg-rgb),.10);
+}
+.empty-art .ea-bars{ display:flex; gap:5px; align-items:flex-end; height:22px }
+.empty-art .ea-bars i{
+  display:block; width:4px; border-radius:2px; background:rgba(var(--fg-rgb),.16);
+  animation: eaBar 1.6s var(--ease-in-out-quart, ease-in-out) infinite;
+}
+.empty-art .ea-bars i:nth-child(1){ height:10px; animation-delay:0s }
+.empty-art .ea-bars i:nth-child(2){ height:18px; animation-delay:.16s }
+.empty-art .ea-bars i:nth-child(3){ height:13px; animation-delay:.32s }
+.empty-art .ea-bars i:nth-child(4){ height:20px; animation-delay:.48s }
+@keyframes eaFloat{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-5px) } }
+@keyframes eaBar{ 0%,100%{ transform:scaleY(.55); opacity:.5 } 50%{ transform:scaleY(1); opacity:.9 } }
+
+/* ④ 数字/统计值：切换时轻微上浮淡入（而不是瞬间替换） */
+.value-swap{ animation: valueIn .3s var(--ease-out-expo, cubic-bezier(.16,1,.3,1)) both }
+@keyframes valueIn{ from{ opacity:0; transform: translateY(4px) } to{ opacity:1; transform:none } }
+
+
+/* ═══ 2026-09-18：相册展示改为【瀑布流】 ═══
+   用 CSS columns 实现：浏览器原生排版，无需 JS 计算，天然流畅不卡 */
+.masonry-grid{
+  display: block;
+  column-count: 4;
+  column-gap: 14px;
+  padding: 4px 0 32px;
+}
+@media (max-width: 1200px){ .masonry-grid{ column-count: 3 } }
+@media (max-width: 820px){  .masonry-grid{ column-count: 2; column-gap: 10px } }
+
+.masonry-item{
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+  margin: 0 0 14px;
+  border-radius: var(--r-sm, 6px);
+  overflow: hidden;
+  background: var(--bg-card);
+  cursor: zoom-in;
+  position: relative;
+  transition: transform var(--dur-press,.16s) var(--ease-spring,cubic-bezier(.34,1.56,.64,1)),
+              box-shadow var(--dur-ui,.26s) ease;
+}
+@media (max-width: 820px){ .masonry-item{ margin-bottom: 10px } }
+
+.masonry-item img{
+  display: block;
+  width: 100%;
+  height: auto;
+  transition: transform .5s var(--ease-out-expo, cubic-bezier(.16,1,.3,1));
+}
+/* 2026-09-18：图片未加载完时先给个比例占位，避免"高度从 0 突变"造成瀑布流整体重排（视觉上像闪跳） */
+.masonry-item{
+  aspect-ratio: 4 / 3;
+}
+.masonry-item img{ height: 100%; object-fit: cover }
+.masonry-item:active{ transform: scale(.985) }
+
+@media (hover: hover) and (pointer: fine){
+  .masonry-item:hover{ box-shadow: var(--sh-2, 0 4px 12px rgba(0,0,0,.1)) }
+  .masonry-item:hover img{ transform: scale(1.035) }
+}
+
+/* 隐藏旧的河流专属控件（换一批 / 左右箭头 / 轮回提示） */
+.river-hint, .river-nav, .river-shuffle, .river-arrow,
+#riverHint, #riverShuffle, #riverPrev, #riverNext{
+  display: none !important;
+}
+/* 旧河流容器不再横滚 */
+.river-stream{ overflow: visible !important; }
