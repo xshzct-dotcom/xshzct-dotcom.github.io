@@ -945,6 +945,52 @@ function navLightbox(dir){
 }
 window.navLightbox = navLightbox;
 
+/* 2026-09-18：灯箱 ‹ › 按钮的可靠绑定
+   问题：手机浏览器存在触摸事件优先 + 点击延迟，HTML 的 onclick 属性
+        在某些情况下不触发（尤其 stage 上有 touch 监听时）。
+   方案：
+     ① 用 JS 主动绑定（不依赖 onclick 属性）
+     ② 同时监听 pointerdown（触摸/鼠标统一，响应最快）
+     ③ 加 250ms 防抖，避免 pointerdown + click 双触发 = 一次跳两张
+     ④ 用 capture 阶段绑定，抢在 stage 的 touch 处理之前 */
+(function(){
+  var _lastNav = 0;
+  function go(dir){
+    var now = Date.now();
+    if(now - _lastNav < 250) return;      // 防抖：防止双触发跳两张
+    _lastNav = now;
+    navLightbox(dir);
+  }
+  function bind(){
+    var prev = document.querySelector('.lightbox-prev');
+    var next = document.querySelector('.lightbox-next');
+    [[prev, -1], [next, 1]].forEach(function(pair){
+      var el = pair[0], dir = pair[1];
+      if(!el || el.dataset._navBound === '1') return;
+      el.dataset._navBound = '1';
+      // 去掉 HTML 属性，避免双触发
+      el.removeAttribute('onclick');
+      // pointerdown：触摸与鼠标统一，最快响应
+      el.addEventListener('pointerdown', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        go(dir);
+      }, {passive:false, capture:true});
+      // 兜底：老浏览器没有 pointerdown 时用 click
+      if(!window.PointerEvent){
+        el.addEventListener('click', function(e){
+          e.preventDefault(); e.stopPropagation(); go(dir);
+        }, {capture:true});
+      }
+    });
+  }
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', bind);
+  }else{
+    bind();
+  }
+})();
+
 function closeLightbox(){
   const lb = $('#lightbox');
   lb.classList.remove('active');
