@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20260919-4">
+<link rel="stylesheet" href="style.css?v=20260919-9">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -496,7 +496,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20260919-4"></script>
+<script src="vendor/supabase.js?v=20260919-9"></script>
 <script>
 (function(){
   'use strict';
@@ -828,6 +828,10 @@ function _pwOk(v, cb){
     var list = _postsCache || [];
     var listEl = document.getElementById('mpList');
     var detailEl = document.getElementById('mpDetail');
+    // 2026-09-19 修复：只要开始渲染列表/详情，就必须收起"还没有留下什么"空状态
+    //   （原来只有首次加载为空时显示，之后哪怕有了内容也一直留着）
+    var emptyEl = document.getElementById('mpEmpty');
+    if(emptyEl) emptyEl.hidden = true;
     var hd = document.querySelector('.mp-head');
     var stat = document.getElementById('mpStat');
     var id = null;
