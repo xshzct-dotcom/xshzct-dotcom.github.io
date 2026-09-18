@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>博客自检</title>
+<style>
+body{font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif;padding:14px;line-height:1.85;font-size:15px;background:#111;color:#eee;margin:0}
+h2{margin:0 0 4px;font-size:17px}
+h3{margin:16px 0 4px;font-size:14px;color:#9ab}
+.row{padding:6px 0;border-bottom:1px solid #262626}
+.ok{color:#5dd879;font-weight:600}
+.bad{color:#ff6b6b;font-weight:700}
+.mid{color:#ffc857}
+code{background:#222;padding:1px 5px;border-radius:4px;font-size:12px;color:#8fd;word-break:break-all}
+.box{margin-top:8px;padding:9px 11px;background:#1b1b1b;border-left:3px solid #555;border-radius:6px;font-size:13px}
+.good{border-color:#5dd879}.warn{border-color:#ff6b6b}
+iframe{width:100%;height:300px;border:1px solid #333;border-radius:8px;margin-top:8px;background:#000}
+</style>
+</head>
+<body>
+<h2>🔍 博客页自检</h2>
+<div style="font-size:13px;color:#8a8a8a">这份报告会把"为什么悬停没反应 / 点不开"的答案直接写出来 —— 请把整页截图给我</div>
+
+<h3>【A】你现在的浏览器环境</h3>
+<div id="env"></div>
+
+<h3>【B】Service Worker（缓存的老代码藏在这里）</h3>
+<div id="sw"></div>
+
+<h3>【C】博客页真实文件版本</h3>
+<div id="ver"></div>
+
+<h3>【D】卡片位置的"最上层元素"（谁挡住了就写在这）</h3>
+<div id="hit"></div>
+
+<h3>【E】所有可能挡住点击的图层</h3>
+<div id="layers"></div>
+
+<h3>【F】结论</h3>
+<div id="concl"></div>
+
+<iframe id="fr" src="./memories/moments.html"></iframe>
+
+<script>
+var R = { issues: [] };
+function row(name, ok, extra){
+  var cls = ok === true ? 'ok' : (ok === false ? 'bad' : 'mid');
+  var mark = ok === true ? '✓' : (ok === false ? '✗' : '?');
+  return '<div class="row"><span class="' + cls + '">' + mark + '</span> ' + name + (extra ? ' <code>' + extra + '</code>' : '') + '</div>';
+}
+var UA = navigator.userAgent;
+
+/* ── A. 环境 ── */
+(function(){
+  var mob = /Mobile|Android|iPhone|iPad|iPod/i.test(UA);
+  var h = window.matchMedia('(hover: hover)').matches;
+  var p = window.matchMedia('(pointer: fine)').matches;
+  var hn = window.matchMedia('(hover: none)').matches;
+  var html = '';
+  html += row('设备', null, mob ? '手机 / 平板' : '电脑');
+  html += row('浏览器', null, UA.replace(/^Mozilla\/5\.0 /,'').slice(0,110));
+  html += row('屏幕', null, screen.width + 'x' + screen.height + '   窗口 ' + window.innerWidth + 'x' + window.innerHeight);
+  html += row('(hover: hover) 悬停可用', h, h ? '有悬停 → 悬停效果应该生效' : '无悬停 → 所有 :hover 规则【全部失效】');
+  html += row('(pointer: fine) 精确指针', p);
+  html += row('(hover: none)', hn, hn ? '浏览器认为你是触屏为主' : '');
+  if(!h){ R.issues.push('浏览器报告【没有悬停能力】(hover: hover = false) —— 这就是"鼠标放上去没反应"的原因：所有悬停效果都被浏览器关掉了'); }
+  document.getElementById('env').innerHTML = html;
+})();
+
+/* ── B. Service Worker ── */
+(function(){
+  var el = document.getElementById('sw');
+  el.innerHTML = '<div class="row">检查中…</div>';
+  if(!navigator.serviceWorker){ el.innerHTML = row('浏览器不支持 SW', null, ''); return; }
+  navigator.serviceWorker.getRegistrations().then(function(rs){
+    var html = '';
+    if(!rs.length){ html += row('没有已注册的 Service Worker', true, '（不会用缓存' + '旧代码）'); }
+    rs.forEach(function(r){
+      var u = (r.active || r.installing || r.waiting || {}).scriptURL || '?';
+      var scope = r.scope;
+      var isRoot = scope.replace(location.origin,'') === '/';
+      html += row('已注册', isRoot ? false : null, u.replace(location.origin,'') + '   scope=' + scope.replace(location.origin,'') + (isRoot ? '   ⚠ 这是老版残留（根目录的）' : ''));
+      if(isRoot) R.issues.push('存在【根目录老 Service Worker】（scope=/）—— 老代码会一直缓存，会把旧文件喂给页面');
+    });
+    if(navigator.serviceWorker.controller){
+      html += row('当前页面被 SW 控制', null, navigator.serviceWorker.controller.scriptURL.replace(location.origin,''));
+    }else{
+      html += row('当前页面【没有】被 SW 控制', true, '很好，不会走缓存');
+    }
+    el.innerHTML = html;
+    return caches.keys().then(function(ks){
+      el.innerHTML += row('缓存桶', null, ks.join(' , ') || '(无)');
+    }).catch(function(){});
+  }).catch(function(e){ el.innerHTML = row('查询失败', false, String(e.message)); });
+})();
+
+/* ── C/D/E. 检查 iframe 里的博客页 ── */
+var fr = document.getElementById('fr');
+fr.onload = function(){
+  var out = '', ver = '', hit = '', lay = '';
+  var w, d;
+  try{ w = fr.contentWindow; d = fr.contentDocument; }catch(e){ document.getElementById('ver').innerHTML = row('无法访问 iframe', false, String(e.message)); return; }
+  if(!w || !d){ document.getElementById('ver').innerHTML = row('iframe 未就绪', false); return; }
+
+  /* C. 版本 */
+  var cssLink = d.querySelector('link[href*="style.css"]');
+  var scripts = [].slice.call(d.querySelectorAll('script[src]')).map(function(s){ return s.getAttribute('src'); });
+  ver += row('博客页 style.css', null, cssLink ? cssLink.getAttribute('href') : '(未找到)');
+  ver += row('博客页脚本', null, scripts.join('  '));
+  var theme = d.documentElement.getAttribute('data-theme') || '(暗色)';
+  ver += row('当前主题', null, theme);
+  // 检查 style.css 里有没有"悬停加强"那段（新版才有）
+  fetch('./memories/style.css?probe=' + Date.now()).then(function(r){ return r.text(); }).then(function(t){
+    var hasNew = t.indexOf('浅色主题下太弱，加强') >= 0;
+    var hasLbFix = t.indexOf('#lightbox:not(.active) .lightbox-close') >= 0;
+    document.getElementById('ver').innerHTML = ver
+      + row('style.css 含"悬停加强"新版规则', hasNew, hasNew ? '' : '你拿到的是旧 CSS')
+      + row('style.css 含"灯箱按钮不再挡点击"修复', hasLbFix, hasLbFix ? '' : '你拿到的是旧 CSS');
+    if(!hasNew || !hasLbFix){ R.issues.push('浏览器里的 style.css 还是【旧版】（缺新规则）→ 请清一次缓存/无痕窗口'); }
+    finish();
+  }).catch(function(){ document.getElementById('ver').innerHTML = ver; finish(); });
+
+  function finish(){
+    var items = d.querySelectorAll('.ml-item');
+    if(!items.length){ hit = row('iframe 里没有卡片', false, '可能还在加载，或密码门没放行'); }
+    else{
+      var el = items[0], r = el.getBoundingClientRect();
+      var x = r.left + r.width/2, y = r.top + Math.min(80, r.height/2);
+      var stack = [];
+      try{ stack = w.document.elementsFromPoint(x, y); }catch(e){}
+      var top = stack.length ? stack[0] : null;
+      var desc = top ? (top.tagName.toLowerCase() + (top.id ? '#' + top.id : '') + (typeof top.className==='string'&&top.className ? '.' + top.className.trim().split(/\s+/)[0] : '')) : '(空)';
+      var isCard = top && (top.closest ? top.closest('.ml-item') : null);
+      hit += row('卡片数', items.length);
+      hit += row('卡片位置上最上层元素', isCard ? true : false, desc);
+      hit += row('最上层的 5 层', null, stack.slice(0,5).map(function(e){ return e.tagName.toLowerCase() + (e.id ? '#' + e.id : ''); }).join('  ←  '));
+      if(!isCard){ R.issues.push('卡片上面压着别的东西：' + desc + ' —— 这就是"悬停没反应 + 点不开"的原因'); }
+      var im = w.matchMedia('(hover: hover)').matches;
+      hit += row('iframe 内 (hover: hover)', im, im ? '应该有效果' : '悬停规则在 iframe 里也被关掉了');
+    }
+
+    /* E. 图层体检 */
+    ['mpViewer','mpEmpty','pwdGate','mpDetail','mpList','mp-head'].forEach(function(id){
+      var e = d.getElementById(id) || d.querySelector('.' + id);
+      if(!e) return;
+      var s = w.getComputedStyle(e), b = e.getBoundingClientRect();
+      var bad = (s.display !== 'none' && s.visibility !== 'hidden' && s.pointerEvents !== 'none' && b.width > w.innerWidth*0.85 && b.height > w.innerHeight*0.85);
+      lay += row(id, bad ? false : null, 'display=' + s.display + ' 可见=' + s.visibility + ' 可点=' + s.pointerEvents + ' 尺寸=' + Math.round(b.width) + 'x' + Math.round(b.height) + (bad ? '  ⚠ 盖住整页！' : ''));
+      if(bad) R.issues.push(id + ' 铺满整页且可点 —— 挡住了博客内容');
+    });
+    // 外部主页有没有层压着博客画布
+    ['editorBackdrop','pwdOverlay','lightbox','essayModal','editorPanel','dailyQuote'].forEach(function(id){
+      var e = document.getElementById(id);
+      if(!e) return;
+      var s = getComputedStyle(e), b = e.getBoundingClientRect();
+      var onScreen = b.left < window.innerWidth - 4 && b.right > 4 && b.top < window.innerHeight - 4 && b.bottom > 4;
+      var bad = (s.display !== 'none' && s.visibility !== 'hidden' && s.pointerEvents !== 'none' && onScreen && b.width>200 && b.height>200);
+      lay += row('主页层 ' + id, bad ? false : null, 'display=' + s.display + ' 可点=' + s.pointerEvents + ' 位置=[' + Math.round(b.left) + ',' + Math.round(b.top) + ' ' + Math.round(b.width) + 'x' + Math.round(b.height) + ']' + (bad ? '  ⚠ 压在屏幕上！' : ''));
+      if(bad) R.issues.push('主页的 ' + id + ' 没关干净，正压在屏幕上挡住了博客');
+    });
+    document.getElementById('hit').innerHTML = hit;
+    document.getElementById('layers').innerHTML = lay;
+
+    var c = document.getElementById('concl');
+    if(R.issues.length){
+      c.className = 'box warn';
+      c.innerHTML = '<b>发现问题 ' + R.issues.length + ' 处：</b><br>' + R.issues.map(function(x,i){ return (i+1) + '. ' + x; }).join('<br>');
+    }else{
+      c.className = 'box good';
+      c.innerHTML = '<b>这份自检没发现问题</b> —— 说明你浏览器里是好的。如果实际还是"点了没反应"，请把这份报告 + 你操作的截图一起给我。';
+    }
+  }
+};
+</script>
+</body>
+</html>
