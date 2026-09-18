@@ -329,7 +329,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 .lightbox-prev{left:20px}.lightbox-next{right:20px}
 .lightbox-prev:hover,.lightbox-next:hover{background:rgba(255,255,255,.15)}
 /* 自动隐藏 */
-.lb-hidden{opacity:0!important;pointer-events:none}
+
 .lightbox-counter{position:fixed;top:24px;left:50%;transform:translateX(-50%);color:var(--text-dim);font-size:.85rem;z-index:201;background:rgba(0,0,0,.4);padding:4px 12px;border-radius:12px;backdrop-filter:blur(8px);align-self:flex-start;width:fit-content;height:fit-content}
 .lightbox-zoom-indicator{position:fixed;top:20px;left:24px;color:var(--text-dim);font-size:.78rem;z-index:201;background:rgba(0,0,0,.4);padding:4px 10px;border-radius:10px;backdrop-filter:blur(8px);display:none}
 .lightbox-zoom-indicator.show{display:block}
@@ -970,3 +970,20 @@ img[src^="data:"]{ animation:none }
   .masonry-grid{ gap: 8px !important }
   .masonry-item{ width: calc(50% - 4px) !important }       /* 手机：2 列 */
 }
+
+
+/* 2026-09-18：灯箱按钮"点了没反应"的终极修复
+      一旦被加上就永久失效，且没有任何代码会移除它）
+   ② 这里再给按钮上双保险：强制可见、强制可点、强制在最上层 */
+.lightbox-close, .lightbox-prev, .lightbox-next{
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  z-index: 260 !important;
+  touch-action: manipulation !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+.lightbox-stage{ z-index: 200 !important }
+.lightbox-filmstrip{ z-index: 210 !important }

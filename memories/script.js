@@ -707,12 +707,9 @@ window.riverShuffle = riverShuffle;
 
 // ===== 灯箱 v2 =====// ===== 灯箱 v2 =====
 let zoom = {scale: 1, x: 0, y: 0};
-let lbHideTimer = null;
+
 // 按钮一直显示，不自动隐藏
-function lbAutoHideControls(){
-  clearTimeout(lbHideTimer);
-  $$('#lightbox button, #lightbox .lightbox-counter, #lightbox .lightbox-filmstrip').forEach(el => el.classList.remove('lb-hidden'));
-}
+
 
 // ===== 灯箱（用 <img> + transform 实现 Windows Photo Viewer 风格平滑缩放） =====
 let lbZoom = {scale:1, x:0, y:0, dragging:false, lastX:0, lastY:0};
@@ -978,7 +975,7 @@ function bindLightboxInteractions(){
     } else {
       zoomTo(2, e.clientX, e.clientY);
     }
-    lbAutoHideControls();
+    
   });
 
   // 滚轮：光标居中缩放（小步长 1.1x，丝滑）
@@ -987,7 +984,7 @@ function bindLightboxInteractions(){
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 1/1.1;
     zoomTo(lbZoom.scale * factor, e.clientX, e.clientY);
-    lbAutoHideControls();
+    
   }, {passive:false});
 
   // 鼠标拖动（缩放时平移）
@@ -999,7 +996,7 @@ function bindLightboxInteractions(){
     lbZoom.lastX = e.clientX;
     lbZoom.lastY = e.clientY;
     applyTransform();
-    lbAutoHideControls();
+    
   });
   window.addEventListener('mousemove', e => {
     if(!lbZoom.dragging) return;
@@ -1055,7 +1052,7 @@ function bindLightboxInteractions(){
       tdScaleAtStart = lbZoom.scale;
       tdMode = 'pinch';
     }
-    lbAutoHideControls();
+    
   }, {passive:false});
 
   stage.addEventListener('touchmove', function(e){
