@@ -349,7 +349,7 @@ async function renderEssayTab(){
       <div class="editor-form-group"><label>标题</label><input id="eeTitle" value="${esc(articleTitle)}" placeholder="文章标题"></div>
       <div class="editor-form-group"><label>日期</label>
         <div style="display:flex;gap:8px;align-items:center">
-          <input id="eeDate" type="date" value="${esc(toDateInputValue(date))}" placeholder="无日期" style="flex:1;padding:12px 16px;background:rgba(232,228,218,.06);border:1px solid rgba(232,228,218,.12);border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left;font-family:inherit">
+          <input id="eeDate" type="date" value="${esc(toDateInputValue(date))}" placeholder="无日期" style="flex:1;padding:12px 16px;background:rgba(var(--fg-rgb),.06);border:1px solid rgba(var(--fg-rgb),.12);border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left;font-family:inherit">
           <button id="eeDateToday" type="button" class="editor-btn editor-btn-secondary" style="font-size:.8rem">今天</button>
           <button id="eeDateClear" type="button" class="editor-btn editor-btn-secondary" style="font-size:.8rem">无</button>
         </div>

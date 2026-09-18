@@ -60,6 +60,18 @@ function thumbAlt(p){ return _thumbWith(p, THUMB_BASE_ALT); }
 function full(p){ return _fullWith(p, IMG_BASE); }
 function fullAlt(p){ return _fullWith(p, IMG_BASE_ALT); }
 
+// ===== 2026-09-19：全站 UI 图标（单色 SVG + currentColor，随主题变色）=====
+//   背景：emoji 的渲染颜色由系统字体决定（☀️ 是黄的、🔁 是蓝的），改不了 → 一律用 SVG。
+var ICON = {
+  sun: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M4.6 12H2.4M21.6 12h-2.2M6.9 6.9L5.3 5.3M18.7 18.7l-1.6-1.6M17.1 6.9l1.6-1.6M5.3 18.7l1.6-1.6"/></svg>',
+  moon: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 14.3A8.7 8.7 0 019.7 3.4a8.9 8.9 0 1010.9 10.9z"/></svg>',
+  gear: '<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.2 14.6a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5v.2a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H2.6a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3h.1a1.7 1.7 0 001-1.5V2.6a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9v.1a1.7 1.7 0 001.5 1h.2a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>',
+  play: '<svg class="i" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.1l11.2 6.9L8 18.9z"/></svg>',
+  pause: '<svg class="i" viewBox="0 0 24 24" fill="currentColor"><rect x="7.2" y="4.9" width="3.5" height="14.2" rx="1.2"/><rect x="13.3" y="4.9" width="3.5" height="14.2" rx="1.2"/></svg>',
+  prev: '<svg class="i" viewBox="0 0 24 24" fill="currentColor"><path d="M18.6 5.1v13.8L8.1 12z"/><rect x="4.5" y="5.1" width="2.7" height="13.8" rx="1.1"/></svg>',
+  next: '<svg class="i" viewBox="0 0 24 24" fill="currentColor"><path d="M5.4 5.1v13.8L15.9 12z"/><rect x="16.8" y="5.1" width="2.7" height="13.8" rx="1.1"/></svg>'
+};
+
 // ===== 导航 =====
 const nav=$('#nav');
 const navLinks=$('#navLinks');
@@ -127,7 +139,8 @@ function applyTheme(t){
   if(light) document.documentElement.setAttribute('data-theme','light');
   else document.documentElement.removeAttribute('data-theme');
   var btn = document.getElementById('navTheme');
-  if(btn) btn.textContent = light ? '🌙' : '☀️';
+  // 2026-09-19：主题图标改用单色 SVG（emoji 的颜色是系统字体决定的，改不了）
+  if(btn) btn.innerHTML = light ? ICON.moon : ICON.sun;
   var meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', light ? '#F7F5F0' : '#0E1116');
   // 同步通知 iframe（博客页）
@@ -1345,8 +1358,8 @@ function initMusic(){
     }
     nextSong();
   });
-  bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';});
-  bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶'; saveProgress(true);});
+  bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').innerHTML=ICON.pause;});
+  bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').innerHTML=ICON.play; saveProgress(true);});
   /* 2026-09-19 修复：加失败计数
      原来任何一首歌加载失败都会 1.2 秒后自动跳下一首 —— 若整个歌单的文件都不可用，
      就会形成【无限循环】：每 1.2 秒发一次请求，永不停止（耗电、耗流量、刷控制台）。 */
