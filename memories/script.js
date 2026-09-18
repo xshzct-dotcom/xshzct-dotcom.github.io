@@ -554,8 +554,8 @@ function updateRiverHint(){
 }
 
 function renderRiver(opts){
-  // 2026-09-18：河流 → 瀑布流（原横向分批河流问题多，改为纵向瀑布流）
-  //   瀑布流用 CSS columns 实现（无需 JS 计算布局，天然不卡）
+  // 2026-09-18：瀑布流（分批渲染 + 滚动增量加载）
+  //   一次性渲染 2700+ 张会卡死，所以首屏只渲染 120 张，滚到底再增量加载。
   opts = opts || {};
   var stream = document.getElementById('riverStream');
   if(!stream) return;
@@ -564,42 +564,68 @@ function renderRiver(opts){
   var pool = (filtered && filtered.length) ? filtered : allGalleryPhotos;
   _riverTotal = pool.length;
 
+  // 清掉旧的河流控件（换一批/箭头/轮回提示），并统一容器样式
+  stream.className = 'masonry-grid';
+  stream.style.overflow = 'visible';
+  stream.style.display = 'block';
+
   if(!pool || !pool.length){
-    stream.className = 'masonry-grid';
     stream.innerHTML = '<div class="empty-art">'
       + '<div class="ea-bars"><i></i><i></i><i></i><i></i></div>'
       + '<div style="color:var(--text-muted);font-size:.9rem">这里还没有照片</div>'
       + '</div>';
+    var pe0 = document.getElementById('galleryLoadProgress');
+    if(pe0) pe0.textContent = '0 张照片';
     return;
   }
 
-  // 记入灯箱的浏览序列（供放大后左右切换）
-  stream.className = 'masonry-grid';
-  stream.innerHTML = pool.map(function(p, i){
+  // 当前过滤结果作为灯箱浏览序列（无重复，左右切换连续）
+  _masonryPool = pool;
+  _masonryShown = 0;
+
+  var BATCH = 120;
+  function makeItem(p, i){
     var nm = String(p).split('/').pop().replace(/\.[^.]+$/, '');
     return '<figure class="masonry-item" data-idx="' + i + '">'
          +   '<img src="' + thumb(p) + '" alt="" loading="lazy" decoding="async"'
          +        ' data-path="' + esc(getPath(p)).replace(/"/g,'&quot;') + '"'
          +        ' data-full="' + full(p) + '">'
          + '</figure>';
-  }).join('');
-
-  // 缩略图失败回退（与相册灯箱同一套链）
-  var imgs = stream.querySelectorAll('img');
-  for(var k = 0; k < imgs.length; k++){
-    (function(img){
-      img.onerror = function(){
-        var st = img.dataset.fb || '0';
-        var path = img.dataset.path || '';
-        if(st === '0'){ img.dataset.fb='1'; img.src = thumbAlt(path); }
-        else if(st === '1'){ img.dataset.fb='2'; img.src = full(path); }
-        else if(st === '2'){ img.dataset.fb='3'; img.src = fullAlt(path); }
-        else { img.style.visibility='hidden'; }
-      };
-    })(imgs[k]);
+  }
+  function appendBatch(){
+    if(_masonryShown >= pool.length) return 0;
+    var end = Math.min(_masonryShown + BATCH, pool.length);
+    var html = '';
+    for(var i = _masonryShown; i < end; i++) html += makeItem(pool[i], i);
+    stream.insertAdjacentHTML('beforeend', html);
+    // 新加入的图绑定失败回退
+    var figs = stream.querySelectorAll('.masonry-item');
+    for(var n = Math.max(0, figs.length - (end - _masonryShown)); n < figs.length; n++){
+      var img = figs[n].querySelector('img');
+      if(img && !img.dataset.bound){
+        img.dataset.bound = '1';
+        img.onerror = (function(im){
+          return function(){
+            var st = im.dataset.fb || '0';
+            var path = im.dataset.path || '';
+            if(st === '0'){ im.dataset.fb='1'; im.src = thumbAlt(path); }
+            else if(st === '1'){ im.dataset.fb='2'; im.src = full(path); }
+            else if(st === '2'){ im.dataset.fb='3'; im.src = fullAlt(path); }
+            else { im.style.visibility = 'hidden'; }
+          };
+        })(img);
+      }
+    }
+    _masonryShown = end;
+    var pe = document.getElementById('galleryLoadProgress');
+    if(pe) pe.textContent = _masonryShown + ' / ' + pool.length + ' 张';
+    return end;
   }
 
-  // 点击 → 打开灯箱（把当前过滤结果作为浏览序列，天然去重连续）
+  stream.innerHTML = '';
+  appendBatch();
+
+  // 点击 → 灯箱
   stream.onclick = function(e){
     var fig = e.target && e.target.closest ? e.target.closest('.masonry-item') : null;
     if(!fig) return;
@@ -610,9 +636,19 @@ function renderRiver(opts){
     openLightbox(idx);
   };
 
-  var pEl = document.getElementById('galleryLoadProgress');
-  if(pEl) pEl.textContent = pool.length + ' 张照片';
+  // 滚动到底部自动加载更多（重绑，避免叠加）
+  if(window._masonryScrollHandler){
+    window.removeEventListener('scroll', window._masonryScrollHandler);
+  }
+  window._masonryScrollHandler = function(){
+    var doc = document.documentElement;
+    if(doc.scrollHeight - window.scrollY - window.innerHeight < 800){
+      if(_masonryShown < pool.length) appendBatch();
+    }
+  };
+  window.addEventListener('scroll', window._masonryScrollHandler, {passive:true});
 }
+var _masonryPool = [], _masonryShown = 0;
 
 function riverShuffle(){
   renderRiver({forceReset:true});
