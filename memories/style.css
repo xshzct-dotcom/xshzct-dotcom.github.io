@@ -1053,3 +1053,37 @@ img[src^="data:"]{ animation:none }
     border-radius: 8px !important;
   }
 }
+
+
+/* 2026-09-19：播放模式按钮（最右端、大一点、好点） */
+.player .play-mode-btn{
+  flex: 0 0 auto;
+  margin-left: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(var(--fg-rgb),.08);
+  border: 1px solid rgba(var(--fg-rgb),.12);
+  color: var(--text);
+  font-size: 1.15rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background .22s ease, border-color .22s ease, transform .18s cubic-bezier(.34,1.56,.64,1);
+}
+@media (hover: hover) and (pointer: fine){
+  .player .play-mode-btn:hover{
+    background: rgba(var(--fg-rgb),.14);
+    border-color: var(--accent);
+    transform: scale(1.08);
+  }
+}
+.player .play-mode-btn:active{ transform: scale(.92) }
+/* 各模式给一点颜色暗示：单曲=主色、随机=橙 */
+.player .play-mode-btn[data-mode="one"]{ border-color: var(--accent); color: var(--accent) }
+.player .play-mode-btn[data-mode="shuffle"]{ border-color: var(--accent-2); color: var(--accent-2) }
+@media (max-width: 820px){
+  .player .play-mode-btn{ width: 30px; height: 30px; font-size: 1.05rem; margin-left: 8px }
+}
