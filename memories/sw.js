@@ -3,7 +3,7 @@
 // 策略：network-first（每次都拿最新），离线时回退缓存
 // 2026-08-11：从根目录 sw.js 复制到 memories/ 并修正路径；移除旧版编辑器死文件的预缓存
 // ============================================
-const CACHE = 'memories-v169';
+const CACHE = 'memories-v170';
 const STATIC_ASSETS = [
   '/memories/', '/memories/index.html',
   '/memories/style.css', '/data.js', '/memories/script.js',
@@ -90,6 +90,24 @@ self.addEventListener('fetch', function(e) {
   // 仅处理同源 GET
   if (!url.href.startsWith(self.location.origin)) return;
   if (e.request.method !== 'GET') return;
+
+  /* ═══ 2026-09-19 ★重要★：HTML 导航请求【绕过 HTTP 缓存】 ═══
+     GitHub Pages 给 .html 的响应头是 Cache-Control: max-age=600（10 分钟）。
+     后果：我这边刚改完代码、甚至刚刷新，浏览器仍会用缓存里的旧 HTML →
+           旧 HTML 里引的是旧的 ?v=xxx → 于是拿到的还是旧 CSS/JS →
+           表现就是"我明明改了/刷了，怎么还是旧的、按钮还是点了没反应"✗
+     现在：导航请求强制 cache:'no-store'，永远拿最新 HTML（只是几 KB，很快）。
+     ★ 以后不会再出现"改了看不到，等十分钟才好"这种情况。 */
+  if (e.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/')) {
+    e.respondWith(
+      fetch(e.request, { cache: 'no-store' }).catch(function(){
+        return caches.match(e.request).then(function(r){
+          return r || (e.request.mode === 'navigate' ? caches.match('/memories/index.html') : null);
+        });
+      })
+    );
+    return;
+  }
 
   // 图片（/thumbs/, /images/）：**只走网络，不缓存**
   // 之前错误地重定向到 Supabase Storage，但照片都在 GitHub 仓库里，导致 404
