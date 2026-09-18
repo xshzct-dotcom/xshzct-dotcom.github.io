@@ -131,8 +131,11 @@
     rgba(255,255,255,.30) 74%,
     rgba(255,255,255,.84) 100%);
 }
-[data-theme="light"] .nav{background:rgba(255,255,255,.60)}
-[data-theme="light"] .nav.scrolled{background:rgba(255,255,255,.92);border-bottom-color:rgba(32,35,40,.08)}
+/* 2026-09-19：原来未滚动时也给导航铺了 60% 白底 ——
+   它的下边缘正好在照片上压出一条可见的水平线（用户截图反馈）。
+   改成完全透明：照片直接从顶部开始，导航字靠文字投影保证可读（见下方 .nav:not(.scrolled) 规则）。 */
+[data-theme="light"] .nav{background:transparent}
+[data-theme="light"] .nav.scrolled{background:rgba(255,255,255,.92)}
 /* 2026-09-15 修正：浅色下【不再用白色遮罩】（那会把文字洗白看不清）
    改为：照片用不透明度淡化，文字保持深色直接压在上面 —— 与参考站一致 */
 [data-theme="light"] .ml-bgimg{filter:brightness(1.02) saturate(.92); opacity:.14}
@@ -167,7 +170,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 
 /* --- Navigation --- */
 .nav{position:fixed;top:0;left:0;right:0;height:var(--nav-h);z-index:var(--z-nav);display:flex;align-items:center;justify-content:space-between;padding:0 32px;transition:background var(--dur-slow),box-shadow var(--dur-slow),border-color var(--dur-slow);background:transparent;border-bottom:1px solid transparent}
-.nav.scrolled{background:rgba(14,17,22,.85);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 1px 0 var(--border);border-bottom-color:var(--border)}
+/* 2026-09-19：原来滚动后同时有 box-shadow 0 1px 0 与 border-bottom 两条线，重复。
+   用户要求不要那条线 —— 保留毛玻璃与半透明底即可，靠明暗对比分隔。 */
+.nav.scrolled{background:rgba(14,17,22,.85);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
 .nav-brand{font-family:var(--font-display);font-size:1.25rem;font-weight:700;color:var(--text);letter-spacing:.5px;cursor:pointer;user-select:none}
 .nav-brand em{font-style:italic;color:var(--accent);font-weight:400}
 .nav-right{display:flex;align-items:center;gap:6px}
@@ -1323,11 +1328,10 @@ html:not([data-theme="light"]) .hero-content::before{
 [data-theme="light"] .nav:not(.scrolled) .nav-brand{
   text-shadow:0 1px 10px rgba(255,255,255,.9);
 }
-/* 浅色主题下，首屏照片亮处可能吃掉深色导航字 —— 未滚动时给导航加一层极淡白纱 */
-[data-theme="light"] .nav:not(.scrolled){
-  background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0));
-  backdrop-filter:none;
-}
+/* 2026-09-19 二次修正：上一版给未滚动导航加了"白纱渐变"，但用户明确不要这个带状效果
+   （截图反馈"这条线不要"）。改为完全透明 —— 可读性交给 .hero 的顶部压暗/提亮层
+   与导航字自己的投影（下面两条 text-shadow 规则）。 */
+[data-theme="light"] .nav:not(.scrolled){ background:transparent }
 
 /* ══ 2026-09-19 图标与播放器的视觉一致性 ══
    问题：主题/齿轮是彩色 emoji、播放键大小与颜色各不相同（◀◀ 小且灰、▶ 大且绿），
