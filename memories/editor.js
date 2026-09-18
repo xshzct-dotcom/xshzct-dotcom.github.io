@@ -1329,6 +1329,13 @@ function startEditPost(p){
 function cancelEditPost(){
   _postDraft = { images: [], videos: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
   var tiC = document.getElementById('postTitle'); if(tiC) tiC.value = '';
+  (function(){
+    var de = document.getElementById('postDate');
+    if(de){
+      var now = new Date();
+      de.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+    }
+  })();
   var ta = document.getElementById('postText'); if(ta) ta.value = '';
   pbRenderImgList();
   pbRenderVideoList();
@@ -1734,6 +1741,17 @@ function pbSaveDraft(){
     var locEl = document.getElementById('postLocation');
     var d = {
       title: (document.getElementById('postTitle') || {}).value || '',
+      // 2026-09-19：用表单里的日期覆盖 created_at（取本地 12:00 转 UTC，避免跨日）
+      created_at: (function(){
+        var el = document.getElementById('postDate');
+        var v = el && el.value;
+        if(!v) return undefined;
+        try{
+          var d = new Date(v + 'T12:00:00');
+          if(!isNaN(d.getTime())) return d.toISOString();
+        }catch(e){}
+        return undefined;
+      })(),
       text: ta ? ta.value : '',
       images: (_postDraft.images || []).map(function(it){
         return { path: it.path || '', src: it.src || '', cap: it.cap || '', name: it.name || '' };
@@ -1791,6 +1809,25 @@ function pbRestoreDraft(d){
   });
   pbRenderVideoList();
   var tiR = document.getElementById('postTitle'); if(tiR) tiR.value = d.title || '';
+  // 2026-09-19：把 created_at 转成本地日期填入（UTC → 本地，避免差一天）
+  (function(){
+    var de = document.getElementById('postDate');
+    if(!de) return;
+    if(d.created_at){
+      try{
+        var dt = new Date(d.created_at);
+        if(!isNaN(dt.getTime())){
+          var mm = String(dt.getMonth()+1).padStart(2,'0');
+          var dd = String(dt.getDate()).padStart(2,'0');
+          de.value = dt.getFullYear() + '-' + mm + '-' + dd;
+        }
+      }catch(e){}
+    }
+    if(!de.value){
+      var now = new Date();
+      de.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+    }
+  })();
   var ta = document.getElementById('postText'); if(ta) ta.value = d.text || '';
   var m = document.getElementById('postMood');    if(m) m.value = d.mood || '';
   var w = document.getElementById('postWeather'); if(w) w.value = d.weather || '';
@@ -1810,6 +1847,11 @@ async function renderPostTab(){
         <button id="postCancelEdit" class="editor-btn-sm" style="flex-shrink:0">取消编辑</button>
       </div>
       <input id="postTitle" class="post-title-input" placeholder="标题">
+      <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 10px;font-size:.8rem;color:var(--text-dim)">
+        <span style="flex-shrink:0">📅 日期</span>
+        <input id="postDate" type="date" style="background:rgba(var(--fg-rgb),.06);border:1px solid var(--border);border-radius:8px;padding:5px 9px;color:var(--text);font-size:.82rem;font-family:inherit">
+        <span style="font-size:.72rem;color:var(--text-muted)">改这个可以调整博客里的日期与排序</span>
+      </div>
       <textarea id="postText" rows="12"></textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
         <button type="button" class="editor-btn editor-btn-secondary" id="postInsertImg">🖼 插入照片</button>
@@ -2044,12 +2086,14 @@ async function renderPostTab(){
         weather: weather || null,
         location: location || null
       };
+      // created_at 为 undefined 时不要覆盖（新建时用默认、编辑时保留原值）
+      if(!payload.created_at) delete payload.created_at;
       var res;
       if(isEdit){
         payload.updated_at = new Date().toISOString();
         res = await db().from('posts').update(payload).eq('id', _postDraft.editingId);
       }else{
-        payload.created_at = new Date().toISOString();
+        if(!payload.created_at) payload.created_at = new Date().toISOString();
         res = await db().from('posts').insert(payload);
       }
       if(res && res.error){
