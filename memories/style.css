@@ -486,7 +486,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 
 /* --- Responsive --- */
 @media(max-width:1024px){
-  .masonry-item{width:calc((100% - 18px) / 2)}
+  
   .timeline::before{left:14px;opacity:.5}
   .timeline-item:nth-child(odd),.timeline-item:nth-child(even){flex-direction:row}
   .timeline-dot{left:14px;width:10px;height:10px;top:18px}
@@ -517,7 +517,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
   .hero-title{font-size:2rem}
   .section-title{font-size:1.6rem}
   .gallery-filter{padding:6px 14px;font-size:.8rem}
-  .masonry-item{width:100%}
+  
   .daily-quote .dq-text{font-size:1.1rem}
   .nav-links a{font-size:.95rem;padding:8px 2px}
   .nav{padding:0 8px}
@@ -912,44 +912,8 @@ img[src^="data:"]{ animation:none }
 @keyframes valueIn{ from{ opacity:0; transform: translateY(4px) } to{ opacity:1; transform:none } }
 
 
-/* ═══ 2026-09-18：相册展示改为【瀑布流】 ═══
-   用 CSS columns 实现：浏览器原生排版，无需 JS 计算，天然流畅不卡 */
-.masonry-grid{
-  display: block;
-  column-count: 4;
-  column-gap: 14px;
-  padding: 4px 0 32px;
-}
-@media (max-width: 1200px){ .masonry-grid{ column-count: 3 } }
-@media (max-width: 820px){  .masonry-grid{ column-count: 2; column-gap: 10px } }
 
-.masonry-item{
-  break-inside: avoid;
-  -webkit-column-break-inside: avoid;
-  page-break-inside: avoid;
-  margin: 0 0 14px;
-  border-radius: var(--r-sm, 6px);
-  overflow: hidden;
-  background: var(--bg-card);
-  cursor: zoom-in;
-  position: relative;
-  transition: transform var(--dur-press,.16s) var(--ease-spring,cubic-bezier(.34,1.56,.64,1)),
-              box-shadow var(--dur-ui,.26s) ease;
-}
-@media (max-width: 820px){ .masonry-item{ margin-bottom: 10px } }
-
-.masonry-item img{
-  display: block;
-  width: 100%;
-  height: auto;
-  transition: transform .5s var(--ease-out-expo, cubic-bezier(.16,1,.3,1));
-}
-/* 2026-09-18：图片未加载完时先给个比例占位，避免"高度从 0 突变"造成瀑布流整体重排（视觉上像闪跳） */
-.masonry-item{
-  aspect-ratio: 4 / 3;
-}
-.masonry-item img{ height: 100%; object-fit: cover }
-.masonry-item:active{ transform: scale(.985) }
+/* 2026-09-18：图片未加载完时先给个比例占位，避免"高度从 0 突变"造成瀑布流整体重排（视觉上像闪跳） */
 
 @media (hover: hover) and (pointer: fine){
   .masonry-item:hover{ box-shadow: var(--sh-2, 0 4px 12px rgba(0,0,0,.1)) }
@@ -963,3 +927,46 @@ img[src^="data:"]{ animation:none }
 }
 /* 旧河流容器不再横滚 */
 .river-stream{ overflow: visible !important; }
+
+
+/* ═══════════════════════════════════════════════════════════
+   2026-09-18 最终版：相册网格（经典 flex，强制生效）
+   —— 之前 columns / grid 反复被历史残留规则干扰，这次：
+      ① 只用 flex（最经典、兼容性最好）
+      ② 全部加 !important（不再被任何残留覆盖）
+      ③ 清空所有旧的 .masonry-* 规则
+   ═══════════════════════════════════════════════════════════ */
+.masonry-grid{
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-content: flex-start !important;
+  gap: 12px !important;
+  padding: 4px 0 32px !important;
+  overflow: visible !important;
+  column-count: auto !important;
+}
+.masonry-item{
+  width: calc(25% - 9px) !important;   /* 桌面：4 列 */
+  margin: 0 !important;
+  padding: 0 !important;
+  flex: 0 0 auto !important;
+  aspect-ratio: 4 / 3 !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+  background: rgba(128,128,128,.08) !important;
+  cursor: zoom-in !important;
+  position: relative !important;
+}
+.masonry-item img{
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+@media (max-width: 1200px){
+  .masonry-item{ width: calc(33.333% - 8px) !important }   /* 3 列 */
+}
+@media (max-width: 820px){
+  .masonry-grid{ gap: 8px !important }
+  .masonry-item{ width: calc(50% - 4px) !important }       /* 手机：2 列 */
+}
