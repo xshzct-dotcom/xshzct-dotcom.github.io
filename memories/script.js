@@ -554,35 +554,64 @@ function updateRiverHint(){
 }
 
 function renderRiver(opts){
-  opts=opts||{};
-  var stream=document.getElementById('riverStream');
+  // 2026-09-18：河流 → 瀑布流（原横向分批河流问题多，改为纵向瀑布流）
+  //   瀑布流用 CSS columns 实现（无需 JS 计算布局，天然不卡）
+  opts = opts || {};
+  var stream = document.getElementById('riverStream');
   if(!stream) return;
-  var filtered=getFilteredRiver();
-  var pool=filtered.length>0?filtered:allGalleryPhotos;
-  _riverTotal=pool.length;
 
-  if(opts.forceReset || _riverPoolKey!==currentFilter){
-    _riverQueue=[]; _riverCycle=0; _riverPoolKey=currentFilter;
-    stream.scrollLeft=0;
+  var filtered = getFilteredRiver();
+  var pool = (filtered && filtered.length) ? filtered : allGalleryPhotos;
+  _riverTotal = pool.length;
+
+  if(!pool || !pool.length){
+    stream.className = 'masonry-grid';
+    stream.innerHTML = '<div class="empty-art">'
+      + '<div class="ea-bars"><i></i><i></i><i></i><i></i></div>'
+      + '<div style="color:var(--text-muted);font-size:.9rem">这里还没有照片</div>'
+      + '</div>';
+    return;
   }
 
-  ensureRiverQueue(pool);
-  var n=Math.min(POLAROID_COUNT, pool.length);
-  var indices=[];
-  for(var i=0; i<n && _riverQueue.length>0; i++) indices.push(_riverQueue.shift());
-  if(indices.length===0){ updateRiverHint(); return; }
+  // 记入灯箱的浏览序列（供放大后左右切换）
+  stream.className = 'masonry-grid';
+  stream.innerHTML = pool.map(function(p, i){
+    var nm = String(p).split('/').pop().replace(/\.[^.]+$/, '');
+    return '<figure class="masonry-item" data-idx="' + i + '">'
+         +   '<img src="' + thumb(p) + '" alt="" loading="lazy" decoding="async"'
+         +        ' data-path="' + esc(getPath(p)).replace(/"/g,'&quot;') + '"'
+         +        ' data-full="' + full(p) + '">'
+         + '</figure>';
+  }).join('');
 
-  var rotSeed=riverSeed(currentFilter, _riverCycle, 0);
-  var rotations=[];
-  for(var i=0; i<indices.length; i++){ rotSeed=(rotSeed*16807)%2147483647; rotations.push(((rotSeed%12)-6)); }
+  // 缩略图失败回退（与相册灯箱同一套链）
+  var imgs = stream.querySelectorAll('img');
+  for(var k = 0; k < imgs.length; k++){
+    (function(img){
+      img.onerror = function(){
+        var st = img.dataset.fb || '0';
+        var path = img.dataset.path || '';
+        if(st === '0'){ img.dataset.fb='1'; img.src = thumbAlt(path); }
+        else if(st === '1'){ img.dataset.fb='2'; img.src = full(path); }
+        else if(st === '2'){ img.dataset.fb='3'; img.src = fullAlt(path); }
+        else { img.style.visibility='hidden'; }
+      };
+    })(imgs[k]);
+  }
 
-  _galleryLoadTotal=indices.length; _galleryLoadDone=0;
-  var pEl=document.getElementById('galleryLoadProgress');
-  if(pEl) pEl.textContent='0 / '+_galleryLoadTotal+' 张已加载';
+  // 点击 → 打开灯箱（把当前过滤结果作为浏览序列，天然去重连续）
+  stream.onclick = function(e){
+    var fig = e.target && e.target.closest ? e.target.closest('.masonry-item') : null;
+    if(!fig) return;
+    var idx = parseInt(fig.getAttribute('data-idx'), 10);
+    if(isNaN(idx)) return;
+    lightboxPhotos = pool;
+    lightboxIdx = idx;
+    openLightbox(idx);
+  };
 
-  stream.innerHTML=indices.map(function(pi,i){ return buildPolaroid(pool,pi,rotations[i],POLAROID_COUNT-i); }).join('');
-  bindPolaroidEvents(stream, pool, 0);
-  updateRiverHint();
+  var pEl = document.getElementById('galleryLoadProgress');
+  if(pEl) pEl.textContent = pool.length + ' 张照片';
 }
 
 function riverShuffle(){
