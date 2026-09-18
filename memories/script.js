@@ -1295,7 +1295,15 @@ function initMusic(){
       }
     }catch(e){}
   });
-  bgMusic.addEventListener('ended',()=>{ try{localStorage.removeItem('musicResume_'+(bgMusic.src||'').split('/').pop());}catch(e){}; nextSong(); });
+  bgMusic.addEventListener('ended',()=>{
+    try{ localStorage.removeItem('musicResume_'+(bgMusic.src||'').split('/').pop()); }catch(e){}
+    // 2026-09-19：单曲循环 → 重播当前；其余 → 交给 nextSong（它会按模式处理）
+    if(PLAY_MODE === 'one'){
+      try{ bgMusic.currentTime = 0; bgMusic.play().catch(function(){}); }catch(e){}
+      return;
+    }
+    nextSong();
+  });
   bgMusic.addEventListener('play',()=>{isPlaying=true;$('#playBtn').textContent='⏸';});
   bgMusic.addEventListener('pause',()=>{isPlaying=false;$('#playBtn').textContent='▶';});
   bgMusic.addEventListener('error',()=>{ setTimeout(nextSong,1200); });
@@ -1428,7 +1436,47 @@ function togglePlay(){
   bgMusic.play().catch(()=>{});
 }
 function prevSong(){ const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx-1; if(i<0)i=s.length-1; playSong(i); }
-function nextSong(){ const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx+1; if(i>=s.length)i=0; playSong(i); }
+/* ===== 2026-09-19：播放模式（列表循环 / 单曲循环 / 随机）===== */
+var PLAY_MODE = 'list';   // list | one | shuffle
+var PLAY_MODE_ICON = { list:'🔁', one:'🔂', shuffle:'🔀' };
+var PLAY_MODE_NAME = { list:'列表循环', one:'单曲循环', shuffle:'随机播放' };
+(function(){
+  try{
+    var m = localStorage.getItem('memories.playMode');
+    if(m && PLAY_MODE_ICON[m]) PLAY_MODE = m;
+  }catch(e){}
+  function paint(){
+    var b = document.getElementById('playMode');
+    if(b){
+      b.textContent = PLAY_MODE_ICON[PLAY_MODE];
+      b.title = '播放模式：' + PLAY_MODE_NAME[PLAY_MODE] + '（点击切换）';
+      b.setAttribute('data-mode', PLAY_MODE);
+    }
+  }
+  window.cyclePlayMode = function(){
+    var order = ['list','one','shuffle'];
+    var i = order.indexOf(PLAY_MODE);
+    PLAY_MODE = order[(i+1) % order.length];
+    try{ localStorage.setItem('memories.playMode', PLAY_MODE); }catch(e){}
+    paint();
+    if(window.SFX) window.SFX.tick();
+  };
+  window.getPlayMode = function(){ return PLAY_MODE; };
+  // 初次渲染 + DOM 就绪后补一次（按钮可能晚于脚本出现）
+  paint();
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paint);
+})();
+
+function nextSong(){
+  const s=window._currentSongs; if(!s||!s.length) return;
+  // 随机：换一首不同的（只有一首时直接重播）
+  if(PLAY_MODE === 'shuffle'){
+    var ri = currentSongIdx;
+    if(s.length > 1){ for(var g=0; g<20 && ri === currentSongIdx; g++) ri = Math.floor(Math.random()*s.length); }
+    playSong(ri); return;
+  }
+  let ni = currentSongIdx + 1; if(ni >= s.length) ni = 0; playSong(ni);
+}
 // ===== 进度条拖动（鼠标拖动 + 手机手指拖动，统一用 Pointer Events）=====
 // 2026-09-10：原来只有 onclick 点击跳转，无法拖动；改为 pointerdown/move/up 全流程
 function _seekRatio(clientX){
