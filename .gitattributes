@@ -1,0 +1,18 @@
+# 2026-09-19：统一行尾为 LF
+# 背景：memories/style.css 原本 927 行是 CRLF，被编辑脚本归一成 LF 后，
+#       git 逐行比对认为整个文件都变了（1954 行红绿），历史从此不可读。
+#       加了这个文件以后，git 在入库时统一按 LF 存储、检出时也按 LF，
+#       再也不会出现"改几行却显示整文件改动"的情况。
+* text=auto eol=lf
+
+# 二进制资源不要做行尾转换
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.mp3  binary
+*.mp4  binary
+*.ttf  binary
+*.woff2 binary

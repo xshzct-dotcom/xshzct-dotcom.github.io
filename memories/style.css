@@ -1165,6 +1165,12 @@ img[src^="data:"]{ animation:none }
 #lightbox:not(.active) .lightbox-filmstrip{
   pointer-events: none !important;
 }
+/* 2026-09-19 审查补漏：影片条在没有 .show 时是 opacity:0，但依然参与命中测试 ——
+   灯箱打开后它会在"底部居中"压出一条看不见的点击带，挡住拖动/手势。
+   （而且全站没有任何代码给它加 .show，等于一直是不可见的死 UI） */
+.lightbox-filmstrip:not(.show){
+  pointer-events: none !important;
+}
 #lightbox.active .lightbox-close,
 #lightbox.active .lightbox-prev,
 #lightbox.active .lightbox-next{
@@ -1191,6 +1197,12 @@ img[src^="data:"]{ animation:none }
   .ml-list .ml-item:hover{
     transform: translateY(-4px) !important;
     box-shadow: 0 14px 32px rgba(0,0,0,.30) !important;
+  }
+  /* ①b 回归修复：上面的 :hover 带 !important，会把原来的
+     `.ml-item:active{transform:scale(.978)}`（按下缩小）压掉 —— 按下就没反馈了。
+     这里补回按下态（:active 同时也满足 :hover，所以必须同权重 + 写在后面）。 */
+  .ml-list .ml-item:active{
+    transform: translateY(-2px) scale(.985) !important;
   }
   /* ② 暗色：照片再亮一点，遮罩已归零 */
   html:not([data-theme="light"]) .ml-list .ml-item:hover .ml-bgimg{
