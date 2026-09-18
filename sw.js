@@ -1,133 +1,28 @@
-// ============================================
-// Service Worker - 照片从 Supabase Storage 加载
-// 策略：network-first（每次都拿最新），离线时回退缓存
-// 2026-07-21 升级：从 cache-first 改为 network-first，解决"改了却看不到"的缓存锁死
-// 2026-08-01 升级：Supabase REST 读请求 stale-while-revalidate（二次访问秒开）
-// ============================================
-const CACHE = 'blog-v57';
-const STATIC_ASSETS = [
-  '/', '/index.html',
-  '/style.css', '/data.js', '/script.js',
-  '/essay-editor.js', '/album-editor.js', '/music-editor.js', '/settings-menu.js'
-];
+/* ══════════════════════════════════════════════════════════════════
+   2026-09-19：根目录这个 Service Worker 是【v1 老站】留下的，作用域是 "/"，
+   它会缓存旧文件、并且和 memories/sw.js 共用同一个 Supabase 读缓存桶
+   （supabase-reads-v1）—— 两个 SW 抢同一个缓存，很容易出现"改了看不到"。
+   v1 站现在只剩一个跳转页，不再需要 SW，所以这里改成【自杀式注销】：
+   任何浏览器只要还装着它，下次更新检查时就会自动清空缓存并注销自己。
+   ══════════════════════════════════════════════════════════════════ */
+self.addEventListener('install', function(e){ self.skipWaiting(); });
 
-const SUPABASE_STORAGE = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos';
-const SUPABASE_REST = 'https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1';
-// Supabase 读请求缓存名 + 有效期（5分钟内直接用缓存，后台再刷新）
-const SUPABASE_CACHE = 'supabase-reads-v1';
-const SUPABASE_TTL = 5 * 60 * 1000;
-
-// Headers → 普通对象
-function toObj(headers){
-  const o = {};
-  if(!headers || !headers.forEach) return o;
-  headers.forEach(function(v, k){ o[k] = v; });
-  return o;
-}
-
-self.addEventListener('install', function(e) {
-  self.skipWaiting();
-  e.waitUntil(
-    caches.open(CACHE).then(function(cache) {
-      // 失败也不阻塞安装
-      return cache.addAll(STATIC_ASSETS).catch(function() {});
-    })
-  );
+self.addEventListener('activate', function(e){
+  e.waitUntil((async function(){
+    // 1) 删掉本 SW 建过的所有缓存
+    try{
+      var keys = await caches.keys();
+      await Promise.all(keys.map(function(k){ return caches.delete(k); }));
+    }catch(err){}
+    // 2) 注销自己
+    try{ await self.registration.unregister(); }catch(err){}
+    // 3) 让当前受控页面解脱（不带 SW 重新加载一次，之后本文件不会再被使用）
+    try{
+      var cs = await self.clients.matchAll({type:'window'});
+      cs.forEach(function(c){ try{ c.navigate(c.url); }catch(e){} });
+    }catch(err){}
+  })());
 });
 
-self.addEventListener('activate', function(e) {
-  e.waitUntil(
-    caches.keys().then(function(names) {
-      return Promise.all(
-        names.map(function(name) {
-          // 保留 Supabase 读缓存，其它旧缓存删除
-          if (name !== CACHE && name !== SUPABASE_CACHE) return caches.delete(name);
-        })
-      );
-    })
-  );
-  self.clients.claim();
-});
-
-// 用时间戳判断缓存是否过期
-function cacheIsFresh(cacheResp){
-  if(!cacheResp) return false;
-  const ts = cacheResp.headers.get('x-cache-time');
-  if(!ts) return false;
-  return (Date.now() - parseInt(ts)) < SUPABASE_TTL;
-}
-
-self.addEventListener('fetch', function(e) {
-  const url = new URL(e.request.url);
-
-  // Supabase REST 读请求（GET）：stale-while-revalidate
-  // 5分钟内的缓存直接用（快），同时后台刷新；无缓存或过期就走网络
-  if (e.request.method === 'GET' && url.href.startsWith(SUPABASE_REST)) {
-    e.respondWith(
-      caches.open(SUPABASE_CACHE).then(function(cache){
-        return cache.match(e.request).then(function(cached){
-          if(cacheIsFresh(cached)){
-            // 命中缓存：立即返回 + 后台刷新
-            fetch(e.request).then(function(fresh){
-              if(fresh && fresh.status === 200){
-                var clone = fresh.clone();
-                cache.put(e.request, new Response(clone.body, {
-                  status: clone.status, statusText: clone.statusText,
-                  headers: Object.assign({}, toObj(clone.headers), {'x-cache-time': String(Date.now())})
-                }));
-              }
-            }).catch(function(){});
-            return cached;
-          }
-          // 无缓存：走网络，成功后存缓存
-          return fetch(e.request).then(function(fresh){
-            if(fresh && fresh.status === 200){
-              var clone = fresh.clone();
-              cache.put(e.request, new Response(clone.body, {
-                status: clone.status, statusText: clone.statusText,
-                headers: Object.assign({}, toObj(clone.headers), {'x-cache-time': String(Date.now())})
-              }));
-            }
-            return fresh;
-          }).catch(function(){
-            return cached || Response.error();
-          });
-        });
-      })
-    );
-    return;
-  }
-
-  // 仅处理同源 GET
-  if (!url.href.startsWith(self.location.origin)) return;
-  if (e.request.method !== 'GET') return;
-
-  // 图片（/thumbs/, /images/）：**只走网络，不缓存**
-  // 之前错误地重定向到 Supabase Storage，但照片都在 GitHub 仓库里，导致 404
-  if (url.pathname.startsWith('/images/') || url.pathname.startsWith('/thumbs/')) {
-    e.respondWith(
-      fetch(e.request, { cache: 'no-store' }).then(function(resp) {
-        return resp;
-      }).catch(function() {
-        // 离线时回退缓存（如果之前缓存过）
-        return caches.match(e.request);
-      })
-    );
-    return;
-  }
-
-  // 其他资源：network-first（先网络后缓存）
-  e.respondWith(
-    fetch(e.request).then(function(resp) {
-      if (resp && resp.status === 200) {
-        var clone = resp.clone();
-        caches.open(CACHE).then(function(cache) { cache.put(e.request, clone); });
-      }
-      return resp;
-    }).catch(function() {
-      return caches.match(e.request).then(function(r) {
-        return r || (e.request.mode === 'navigate' ? caches.match('/index.html') : null);
-      });
-    })
-  );
-});
+// 不再拦截任何请求（全部直连网络）
+self.addEventListener('fetch', function(){});
