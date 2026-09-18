@@ -2139,7 +2139,29 @@ function renderTab(){
 }
 
 // ===== 齿轮绑定（在 EDITOR 定义后执行） =====
-const gearBtn = $('#navGear');
-if(gearBtn) gearBtn.onclick = () => open();
+/* 2026-09-19：齿轮按钮绑定（原来用 onclick，且被 script.js 的同名绑定覆盖）
+   → 统一走 pointerdown，并把两边都收口到 window.EDITOR.open */
+(function(){
+  var gearBtn = $('#navGear');
+  if(!gearBtn) return;
+  var _lock = 0;
+  function fire(e){
+    if(e){ e.preventDefault(); e.stopPropagation(); }
+    var now = Date.now();
+    if(now - _lock < 300) return;
+    _lock = now;
+    try{
+      if(window.EDITOR && typeof window.EDITOR.open === 'function') window.EDITOR.open();
+      else open();
+    }catch(err){ console.warn('[gear] 打开编辑器失败', err); }
+  }
+  gearBtn.onclick = null;
+  if(window.PointerEvent){
+    gearBtn.addEventListener('pointerdown', fire, {passive:false});
+  }else{
+    gearBtn.addEventListener('touchstart', fire, {passive:false});
+    gearBtn.addEventListener('click', fire, {passive:false});
+  }
+})();
 
 })();
