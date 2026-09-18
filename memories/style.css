@@ -1119,3 +1119,43 @@ img[src^="data:"]{ animation:none }
 }
 /* 已认证时密码门彻底移除命中 */
 .pwd-authed #pwdGate{ display: none !important }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   2026-09-19 深夜 ·【真·根因】灯箱按钮挡住全站点击 —— 彻底修复
+   ──────────────────────────────────────────────────────────────────
+   症状：右上角「⚙️ 管理菜单」点了没反应（主题按钮却正常）。
+   证据（真实浏览器 elementsFromPoint 实测）：
+       齿轮中心点 (1206, 29.5) 上最上层元素 = button.lightbox-close
+   根因链：
+     ① 2026-09-18 的".lightbox-close/-prev/-next 终极修复"给这三个按钮加了
+          visibility: visible !important;  pointer-events: auto !important;
+          z-index: 260 !important;
+     ② 但 visibility 是【可继承】属性 —— 子元素一旦显式声明，
+        就会覆盖父层 #lightbox:not(.active){ visibility:hidden }（CSS 继承规则）
+     ③ 于是灯箱【关着】的时候，这三个 position:fixed 的按钮依然参与命中测试，
+        而且 z-index 260 > 导航 z-index 100：
+          · .lightbox-close  right:24 top:20   44x44 → 正好压在「⚙️ 齿轮」上 ★
+          · .lightbox-prev   left:8  top:50%   40x40 → 挡住屏幕左中
+          · .lightbox-next   right:8 top:50%   40x40 → 挡住屏幕右中
+   修复：把"强制可见可点"限定在【灯箱打开时】；关闭态彻底剔除命中测试。
+   ══════════════════════════════════════════════════════════════════ */
+#lightbox:not(.active) .lightbox-close,
+#lightbox:not(.active) .lightbox-prev,
+#lightbox:not(.active) .lightbox-next{
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  z-index: -1 !important;
+}
+#lightbox:not(.active) .lightbox-filmstrip{
+  pointer-events: none !important;
+}
+#lightbox.active .lightbox-close,
+#lightbox.active .lightbox-prev,
+#lightbox.active .lightbox-next{
+  visibility: visible !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  z-index: 260 !important;
+}
