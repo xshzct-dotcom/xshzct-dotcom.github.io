@@ -1462,6 +1462,22 @@ var PLAY_MODE_NAME = { list:'列表循环', one:'单曲循环', shuffle:'随机�
     if(window.SFX) window.SFX.tick();
   };
   window.getPlayMode = function(){ return PLAY_MODE; };
+  // 2026-09-19：模式按钮绑定（同灯箱/齿轮，用 pointerdown 而非 onclick 属性）
+  (function(){
+    var b = document.getElementById('playMode');
+    if(!b) return;
+    var _lock = 0;
+    function fire(e){
+      if(e){ e.preventDefault(); e.stopPropagation(); }
+      var now = Date.now();
+      if(now - _lock < 300) return;
+      _lock = now;
+      window.cyclePlayMode();
+    }
+    b.onclick = null;
+    if(window.PointerEvent) b.addEventListener('pointerdown', fire, {passive:false});
+    else { b.addEventListener('touchstart', fire, {passive:false}); b.addEventListener('click', fire, {passive:false}); }
+  })();
   // 初次渲染 + DOM 就绪后补一次（按钮可能晚于脚本出现）
   paint();
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', paint);
