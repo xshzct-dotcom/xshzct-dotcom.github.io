@@ -944,6 +944,11 @@ img[src^="data:"]{ animation:none }
   height: auto;
   transition: transform .5s var(--ease-out-expo, cubic-bezier(.16,1,.3,1));
 }
+/* 2026-09-18：图片未加载完时先给个比例占位，避免"高度从 0 突变"造成瀑布流整体重排（视觉上像闪跳） */
+.masonry-item{
+  aspect-ratio: 4 / 3;
+}
+.masonry-item img{ height: 100%; object-fit: cover }
 .masonry-item:active{ transform: scale(.985) }
 
 @media (hover: hover) and (pointer: fine){
