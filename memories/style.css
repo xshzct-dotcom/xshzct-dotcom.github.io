@@ -1376,3 +1376,53 @@ html:not([data-theme="light"]) .hero-content::before{
 #lightbox{ will-change:opacity }
 /* 加载圈淡入淡出，避免一闪而过 */
 #lbLoader{ transition:opacity .2s ease }
+
+/* ══════════════════════════════════════════════════════════════════════
+   2026-09-19  手机相册级查看器 · 视觉与分层
+   ──────────────────────────────────────────────────────────────────────
+   三件事各占一层，互不干扰：
+     #lbFlip  → 转场（从缩略图长出来 / 缩回去）
+     .lb-img  → 缩放与平移（手指在照片上的一切操作）
+     #lbNb    → 相邻照片（跟手翻页时探进来的那一张）
+   图标同时去掉"网页控件"感：无底、纯白 glyph，只有桌面悬停时浮出极淡的底。
+   ══════════════════════════════════════════════════════════════════════ */
+#lbFlip, #lbBlur, #lbNb{
+  position:absolute; left:50%; top:50%; transform-origin:center center;
+  will-change:transform; pointer-events:none;
+}
+#lbFlip{ width:0; height:0 }
+#lbBlur{
+  background-size:cover; background-position:center; border-radius:6px;
+  opacity:0; filter:blur(18px) saturate(1.06); transition:opacity 260ms ease;
+}
+#lbNb{ width:0; height:0; display:none }
+#lbNbBlur{
+  position:absolute; left:0; top:0; transform-origin:center center;
+  background-size:cover; background-position:center; border-radius:6px;
+  filter:blur(18px) saturate(1.06); opacity:1;
+}
+#lbNeighbor{ position:absolute; left:0; top:0; transform-origin:center center; will-change:transform }
+.lb-img{
+  position:absolute; left:0; top:0; transform-origin:center center;
+  will-change:transform; backface-visibility:hidden;
+  max-width:none !important; max-height:none !important;
+}
+/* 图标：不再是一圈带边框的圆 —— 照片才是主角 */
+.lightbox-close, .lightbox-prev, .lightbox-next{
+  background:transparent !important; border-color:transparent !important;
+  box-shadow:none !important; color:rgba(255,255,255,.90) !important;
+  font-weight:400; backdrop-filter:none;
+}
+@media (hover: hover) and (pointer: fine){
+  .lightbox-close:hover, .lightbox-prev:hover, .lightbox-next:hover{
+    background:rgba(255,255,255,.10) !important;
+  }
+}
+.lightbox-counter{
+  background:rgba(0,0,0,.40) !important; color:rgba(255,255,255,.84) !important;
+  font-variant-numeric:tabular-nums; letter-spacing:.06em;
+  backdrop-filter:blur(8px);
+}
+@media (prefers-reduced-motion: reduce){
+  #lbFlip, #lbBlur, #lbNb, .lb-img, #lbNeighbor{ transition:none !important }
+}
