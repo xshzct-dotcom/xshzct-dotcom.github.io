@@ -80,7 +80,15 @@ function db(){
 
 // ===== 全局面板 =====
 let currentTab='essay';
+/* 2026-09-19：刚打开的 420ms 内忽略一切关闭请求。
+   真机现象：点齿轮「打不开、在跳闪」，要长按才行。
+   原因：面板在手机上宽 100vw，右上角的关闭按钮【正好落在手指位置】，
+        而 open 是在 pointerdown 时就执行的 —— 浏览器随后补发的 click
+        打中了刚出现的关闭按钮 → 立刻 close()。长按时浏览器不发补发 click，
+        所以只有长按能留住。加这个时间窗守卫即可根治（遮罩层与关闭按钮都覆盖）。 */
+let _openedAt = 0;
 async function open(){
+  _openedAt = Date.now();
   $('#editorPanel').classList.add('open');
   $('#editorBackdrop').classList.add('active');
   document.body.style.overflow='hidden';
@@ -109,7 +117,13 @@ async function open(){
   renderTab();
   prefetchAllTabs();   // 并行预取三个 tab 的数据（切 tab 秒开）
 }
-function close(){ $('#editorPanel').classList.remove('open');$('#editorBackdrop').classList.remove('active');document.body.style.overflow=''; }
+function close(){
+  // 刚打开的这一刻，忽略「补发 click」造成的误关闭（见上方 _openedAt 说明）
+  if(Date.now() - _openedAt < 420) return;
+  $('#editorPanel').classList.remove('open');
+  $('#editorBackdrop').classList.remove('active');
+  document.body.style.overflow='';
+}
 window.EDITOR={open,close};
 
 // 兜底同步：script.js 没跑时，editor 自己从 data.js 拉数据同步（bulk insert）
