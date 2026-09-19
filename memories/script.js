@@ -674,7 +674,10 @@ function renderRiver(opts){
     if(isNaN(idx)) return;
     lightboxPhotos = pool;
     lightboxIdx = idx;
-    openLightbox(idx);
+    // 2026-09-19：把被点缩略图的屏幕矩形交给灯箱 → 打开时从它的位置"长"出来（共享元素转场）
+    var r = null;
+    try{ r = fig.getBoundingClientRect(); }catch(err){}
+    openLightbox(idx, r);
   };
 
   // 滚动到底部自动加载更多（重绑，避免叠加）
@@ -2519,6 +2522,742 @@ lbZoom.closeDy = 0;
 lbZoom.closeScale = 1;
 lbZoom.tVX = 0;
 lbZoom.tVY = 0;
+
+/* ══════════════════════════════════════════════════════════════════════
+   2026-09-19  手机相册级查看器（Native-grade viewer）
+   ──────────────────────────────────────────────────────────────────────
+   目标：把手感从"网页灯箱"抬到"系统相册"。六项关键技术（逐条对应上面的问题）：
+     ① 结构分层：翻页(track) / 缩放(img) / 转场(flip) 三件事各自独立的一层，
+        互不干扰（原来全挤在一个 transform 上，一动就互相打架）
+     ② 渐进画质：缩略图(webp)先以模糊形式瞬间垫底 → 高清解码完成再淡入
+        → 永远不出现"转圈/空档"
+     ③ 跟手翻页：横拖时相邻照片按手指位移实时移动（不是跳变），松手按阈值/速度决定
+        翻过去还是弹回
+     ④ 共享元素转场：打开时从被点缩略图的位置"长"出来，关闭时"缩"回去
+     ⑤ 可打断动画：所有过渡用自研 tween（可 cancel），手指一碰就从【当前视觉值】接着走
+     ⑥ iOS 橡皮筋：越界量用阻尼公式（1 - 1/(d·c/dim + 1))，不是线性缩放
+   ══════════════════════════════════════════════════════════════════════ */
+
+var LB = {
+  cur: 0, n: 0,
+  stageW: 0, stageH: 0,
+  enterTween: null, pageTween: null,
+  dismissY: 0, dismissed: false,
+  ready: {},            // 缓存已解码的原图 URL，避免重复下载
+  reduced: false
+};
+try { LB.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch(e){}
+
+/* ── 可打断补间：手指按下的瞬间 cancel 掉，从当前视觉值接着走 ── */
+function lbEase(t){ return 1 - Math.pow(1 - t, 3); }                 // easeOutCubic
+function lbEaseSpringish(t){ return t < 1 ? 1 - Math.pow(1 - t, 3.2) : 1; }
+function lbTween(dur, onUpdate, onDone){
+  var h = { dead: false, cancel: function(){ h.dead = true; } };
+  if(LB.reduced) dur = 1;
+  var t0 = performance.now();
+  (function step(now){
+    if(h.dead) return;
+    var p = Math.min(1, (now - t0) / Math.max(1, dur));
+    onUpdate(p);
+    if(p < 1) requestAnimationFrame(step);
+    else if(onDone) onDone();
+  })(t0);
+  return h;
+}
+/* ── iOS 橡皮筋：越界越多、增量越小 ── */
+function lbRubber(over, dim, c){
+  c = c || 0.55;
+  if(dim <= 0) return over;
+  return (1 - 1 / (over * c / dim + 1)) * dim;
+}
+
+/* ── 分层结构（只建一次；把原有 #lightboxImg 移进「转场层 → 缩放层」里）── */
+function lbBuildLayers(){
+  var stage = document.getElementById('lightboxStage');
+  var img = document.getElementById('lightboxImg');
+  if(!stage || !img || stage.dataset.built === '1') return;
+  stage.dataset.built = '1';
+
+  // 模糊垫底（渐进画质的第一层）
+  var blur = document.createElement('div');
+  blur.id = 'lbBlur';
+  blur.setAttribute('aria-hidden', 'true');
+
+  // 转场层：负责"从缩略图长出来 / 缩回去"
+  var flip = document.createElement('div');
+  flip.id = 'lbFlip';
+
+  // 相邻照片层：跟手翻页时露出来的那一张
+  var nbWrap = document.createElement('div');
+  nbWrap.id = 'lbNb';
+  var nbBlur = document.createElement('div');
+  nbBlur.id = 'lbNbBlur';
+  var nbImg = document.createElement('img');
+  nbImg.id = 'lbNeighbor';
+  nbImg.alt = '';
+  nbWrap.appendChild(nbBlur);
+  nbWrap.appendChild(nbImg);
+
+  stage.appendChild(blur);
+  stage.appendChild(nbWrap);
+  stage.appendChild(flip);
+  flip.appendChild(img);          // 原图被移进转场层（id 不变，老代码仍能找到）
+  img.classList.add('lb-img');
+}
+
+/* ★ 2026-09-19：有模糊缩略图垫底时，绝不显示"转圈/准备…"
+   —— 原生的相册在加载时你看到的是"模糊的照片"，不是控件。
+   底层 loadImageWithProgress 会无条件弹 loader，这里加静默开关把它压住；
+   只有【没有缩略图可用】或【超过 4.5 秒仍未出图】时才允许转圈兜底。 */
+function showLbLoader(show, pct, text){
+  if(show && LB.quiet) return;
+  var loader = document.getElementById('lbLoader');
+  if(!loader){
+    loader = document.createElement('div');
+    loader.id = 'lbLoader';
+    loader.innerHTML = '<div class="lb-spinner"></div><div class="lb-progress"></div><div class="lb-text"></div>';
+    var st = document.getElementById('lightbox');
+    if(st) st.appendChild(loader);
+  }
+  if(!show){ loader.classList.add('hidden'); return; }
+  loader.classList.remove('hidden');
+  var prog = loader.querySelector('.lb-progress');
+  var tx = loader.querySelector('.lb-text');
+  if(prog) prog.style.setProperty('--p', Math.min(pct, 100) + '%');
+  if(tx) tx.textContent = text + (pct > 0 ? ' ' + pct + '%' : '');
+}
+
+/* 按"长宽比"算适应窗口的尺寸（有缩略图矩形时用它，避免横图被糊成竖条） */
+function lbFitSizeByAspect(ar){
+  if(!ar || !isFinite(ar) || ar <= 0) return { w:LB.stageW * 0.62, h:LB.stageH * 0.62 };
+  var maxW = LB.stageW * 0.92, maxH = LB.stageH * 0.88;
+  var w = maxW, h = w / ar;
+  if(h > maxH){ h = maxH; w = h * ar; }
+  return { w:w, h:h };
+}
+
+/* ── 当前视口下、某张图"适应窗口"后应有的显示尺寸 ── */
+function lbFitSize(nw, nh){
+  var maxW = LB.stageW * 0.92, maxH = LB.stageH * 0.88;
+  var k = Math.min(maxW / nw, maxH / nh, 1);
+  return { w: nw * k, h: nh * k, k: k };
+}
+
+/* 把一层的盒子设成"以舞台中心为中心"的显式像素尺寸（负边距居中，
+   这样 transform 只用来做位移/缩放，不会和居中互相打架） */
+function lbSetBox(el, w, h){
+  if(!el) return;
+  el.style.width = Math.round(w) + 'px';
+  el.style.height = Math.round(h) + 'px';
+  el.style.marginLeft = Math.round(-w / 2) + 'px';
+  el.style.marginTop = Math.round(-h / 2) + 'px';
+}
+
+/* ★ 2026-09-19：正确推导"缩略图 URL"
+   坑：数据库里的照片路径已经是完整 URL（https://…/images/… 或 Supabase Storage 的 …/photos/…），
+       而 thumb() 遇到 http 开头会【原样返回】→ 垫底用的是原图（慢且浪费）。
+   这里把两种情况都推导到真正的缩略图：
+     · GitHub 上的老照片： /images/xxx.jpg → /thumbs/xxx.webp
+     · Supabase 上传的：   …/public/photos/xxx → …/public/photos/thumbs/xxx
+*/
+function lbThumbOf(photo){
+  var p = (typeof getPath === 'function') ? getPath(photo) : String(photo || '');
+  if(!p) return '';
+  var GH = 'https://xshzct-dotcom.github.io/';
+  if(p.indexOf(GH + 'images/') === 0){
+    return GH + 'thumbs/' + p.slice((GH + 'images/').length).replace(/\.(jpe?g|png)$/i, '.webp');
+  }
+  if(p.indexOf(GH + 'thumbs/') === 0) return p;
+  var m = p.match(/\/object\/public\/photos\/(.+)$/);
+  if(m){
+    if(m[1].indexOf('thumbs/') === 0) return p;
+    return p.replace(/\/object\/public\/photos\/(.+)$/, '/object/public/photos/thumbs/$1');
+  }
+  return (typeof thumb === 'function') ? thumb(photo) : p;
+}
+
+/* ── 渐进画质：先立刻显示模糊缩略图，高清就绪后淡入并撤掉垫底 ── */
+function lbShowBlur(el, photo, fit){
+  if(!el) return;
+  var url = lbThumbOf(photo);
+  if(!url){ el.style.opacity = '0'; return; }
+  el.style.backgroundImage = 'url("' + url + '")';
+  lbSetBox(el, fit.w, fit.h);
+  el.style.opacity = '1';
+}
+function lbHideBlur(el){
+  if(!el) return;
+  el.style.opacity = '0';
+}
+
+/* ── 取图：命中缓存就直接用；否则先垫缩略图再加载原图 ── */
+function lbLoadInto(imgEl, blurEl, photo, want, aspect){
+  var fullUrl = full(photo);
+  // 垫底盒子按"被点缩略图的长宽比"来 —— 横图就是横的，不会被 cover 糊成竖条
+  lbShowBlur(blurEl, photo, lbFitSizeByAspect(aspect));
+  imgEl.style.opacity = '0';
+  // 有缩略图 → 静默加载（不显示转圈）；4.5 秒还没出图才放行转圈兜底
+  LB.quiet = true;
+  if(LB.quietTimer) clearTimeout(LB.quietTimer);
+  LB.quietTimer = setTimeout(function(){
+    LB.quiet = false;
+    showLbLoader(true, 0, '加载中…');
+  }, 4500);
+
+  function done(url){
+    var pre = new Image();
+    pre.onload = function(){
+      if(want && want() === false) return;
+      imgEl.src = url;
+      var apply = function(){
+        if(want && want() === false) return;
+        if(LB.quietTimer){ clearTimeout(LB.quietTimer); LB.quietTimer = null; }
+        var f2 = lbFitSize(imgEl.naturalWidth || 1200, imgEl.naturalHeight || 900);
+        lbSetBox(imgEl, f2.w, f2.h);
+        imgEl.style.transition = 'opacity ' + (LB.reduced ? 1 : 240) + 'ms ease';
+        imgEl.style.opacity = '1';
+        lbHideBlur(blurEl);
+        showLbLoader(false, 100, '');
+      };
+      if(imgEl.decode) imgEl.decode().then(apply).catch(apply); else apply();
+    };
+    pre.onerror = function(){ lbHideBlur(blurEl); };
+    pre.src = url;
+  }
+
+  if(LB.ready[fullUrl]){ done(fullUrl); return; }
+  loadImageWithProgress(fullUrl, fullAlt(photo)).then(function(url){
+    LB.ready[fullUrl] = true;
+    done(url);
+  }).catch(function(){
+    done(fullUrl);          // 兜底：直接交给 <img> 自己加载
+  });
+}
+
+/* ── 定位：把一层放在"某一页"的位置上（px，基于视口宽）── */
+function lbPlace(el, pageOffset, dragPx){
+  if(!el) return;
+  el.style.transform = 'translate3d(' + (pageOffset * LB.stageW + (dragPx || 0)) + 'px,0,0) scale(1)';
+}
+
+/* ══════════ 打开：共享元素转场（从缩略图位置长出来） ══════════ */
+function openLightbox(idx, srcRect){
+  if(idx < 0 || idx >= lightboxPhotos.length) return;
+  lbBuildLayers();
+  var lb = document.getElementById('lightbox');
+  var img = document.getElementById('lightboxImg');
+  var flip = document.getElementById('lbFlip');
+  var blur = document.getElementById('lbBlur');
+  var nb = document.getElementById('lbNb');
+  if(!lb || !img || !flip) return;
+
+  lightboxIdx = idx;
+  LB.cur = idx; LB.n = lightboxPhotos.length;
+  LB.stageW = window.innerWidth; LB.stageH = window.innerHeight;
+  LB.dismissY = 0; LB.dismissed = false;
+  if(LB.enterTween){ LB.enterTween.cancel(); LB.enterTween = null; }
+  if(LB.pageTween){ LB.pageTween.cancel(); LB.pageTween = null; }
+
+  var counter = document.getElementById('lightboxCounter');
+  if(counter) counter.textContent = (idx + 1) + ' / ' + LB.n;
+  if(nb){ nb.style.display = 'none'; lbPlace(nb, 0, 0); }
+  lbPlace(flip, 0, 0);
+
+  resetZoom();
+  applyTransform({ instant:true });
+
+  var photo = lightboxPhotos[idx];
+  var _ar = (srcRect && srcRect.height > 0) ? (srcRect.width / srcRect.height) : 0;
+  lbLoadInto(img, blur, photo, function(){ return lb.classList.contains('active'); }, _ar);
+
+  // 背景与层显隐
+  lb.style.transition = 'none';
+  lb.style.background = '#000';
+  lb.style.opacity = srcRect ? '0' : '1';        // 有源矩形 → 背景从透明渐入
+  lb.classList.add('active');
+  lb.style.pointerEvents = 'auto';
+  lb.style.touchAction = 'none';
+  document.body.style.overflow = 'hidden';
+  if(window.SFX) window.SFX.shutter();
+
+  if(srcRect && !LB.reduced && srcRect.width > 0){
+    // FLIP：从缩略图的矩形长到"适应窗口"的位置
+    var nw = img.naturalWidth || 1200, nh = img.naturalHeight || 900;
+    var fit = lbFitSize(nw, nh);
+    var imgCx = LB.stageW / 2, imgCy = LB.stageH / 2;                 // 目标：居中
+    var srcCx = srcRect.left + srcRect.width / 2;
+    var srcCy = srcRect.top + srcRect.height / 2;
+    var s0 = Math.max(0.06, Math.min(srcRect.width / fit.w, srcRect.height / fit.h));
+    var dx0 = srcCx - imgCx, dy0 = srcCy - imgCy;
+    var bg = document.getElementById('lbBlur');
+    if(bg){
+      bg.style.transform = 'translate3d(' + dx0 + 'px,' + dy0 + 'px,0) scale(' + s0 + ')';
+    }
+    flip.style.transform = 'translate3d(' + dx0 + 'px,' + dy0 + 'px,0) scale(' + s0 + ')';
+    lb.style.opacity = '0';
+    LB.enterTween = lbTween(460, function(p){
+      var e = lbEaseSpringish(p);
+      var x = dx0 * (1 - e), y = dy0 * (1 - e), s = s0 + (1 - s0) * e;
+      flip.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0) scale(' + s + ')';
+      if(bg) bg.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0) scale(' + (s * 1.06) + ')';
+      lb.style.opacity = String(Math.min(1, p * 1.5));
+    }, function(){
+      flip.style.transform = 'translate3d(0,0,0) scale(1)';
+      if(bg) bg.style.transform = 'translate3d(0,0,0) scale(1.06)';
+      lb.style.opacity = '1';
+      LB.enterTween = null;
+    });
+  } else {
+    flip.style.transform = 'translate3d(0,0,0) scale(1)';
+    lb.style.transition = 'opacity 200ms ease';
+    lb.style.opacity = '1';
+  }
+}
+window.openLightbox = openLightbox;
+
+/* ══════════ 关闭：缩回缩略图（反 FLIP） ══════════ */
+function lightboxRectOfCurrent(){
+  try{
+    var el = document.querySelector('.masonry-item[data-idx="' + lightboxIdx + '"]');
+    if(el) return el.getBoundingClientRect();
+    var figs = document.querySelectorAll('.masonry-item');
+    if(figs[lightboxIdx]) return figs[lightboxIdx].getBoundingClientRect();
+  }catch(e){}
+  return null;
+}
+function lightboxCleanup(){
+  LB.quiet = false;
+  if(LB.quietTimer){ clearTimeout(LB.quietTimer); LB.quietTimer = null; }
+  var lb = document.getElementById('lightbox');
+  var img = document.getElementById('lightboxImg');
+  var flip = document.getElementById('lbFlip');
+  var blur = document.getElementById('lbBlur');
+  var nb = document.getElementById('lbNb');
+  if(!lb) return;
+  lb.classList.remove('active');
+  lb.style.opacity = '0';
+  lb.style.pointerEvents = 'none';
+  lb.style.background = '#000';
+  if(flip) flip.style.transform = 'translate3d(0,0,0) scale(1)';
+  if(blur){ blur.style.opacity = '0'; blur.style.transform = 'translate3d(0,0,0) scale(1.06)'; }
+  if(nb){ nb.style.display = 'none'; lbPlace(nb, 0, 0); }
+  resetZoom();
+  if(img){
+    img.style.transition = 'none';
+    img.style.transform = 'translate3d(0,0,0) scale(1)';
+    img.style.opacity = '0';
+  }
+}
+
+function closeLightbox(opts){
+  if(opts && opts.skipAnim){ lightboxCleanup(); return; }     // 手势里已经动画过了
+  var lb = document.getElementById('lightbox');
+  var img = document.getElementById('lightboxImg');
+  var flip = document.getElementById('lbFlip');
+  var blur = document.getElementById('lbBlur');
+  if(!lb || !lb.classList.contains('active')){ lightboxCleanup(); return; }
+  if(LB.enterTween){ LB.enterTween.cancel(); LB.enterTween = null; }
+  if(LB.pageTween){ LB.pageTween.cancel(); LB.pageTween = null; }
+  if(window.SFX) window.SFX.click();
+
+  var rect = lightboxRectOfCurrent();
+  var nw = img ? (img.naturalWidth || 1200) : 1200;
+  var nh = img ? (img.naturalHeight || 900) : 900;
+  var fit = lbFitSize(nw, nh);
+
+  if(rect && !LB.reduced && rect.width > 0){
+    var dx1 = rect.left + rect.width / 2 - LB.stageW / 2;
+    var dy1 = rect.top + rect.height / 2 - LB.stageH / 2;
+    var s1 = Math.max(0.06, Math.min(rect.width / fit.w, rect.height / fit.h));
+    LB.enterTween = lbTween(320, function(p){
+      var e = lbEase(p);
+      var x = dx1 * e, y = dy1 * e, s = 1 + (s1 - 1) * e;
+      if(flip) flip.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0) scale(' + s + ')';
+      if(blur) blur.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0) scale(' + (s * 1.06) + ')';
+      lb.style.opacity = String(Math.max(0, 1 - p * 1.35));
+    }, function(){ LB.enterTween = null; lightboxCleanup(); });
+  } else {
+    lb.style.transition = 'opacity 200ms ease';
+    lb.style.opacity = '0';
+    setTimeout(lightboxCleanup, 200);
+  }
+}
+window.closeLightbox = closeLightbox;
+
+/* ══════════ 翻页：跟手拖动 + 邻居探入 + 松手吸附 ══════════ */
+var pg = { active:false, axis:'', x0:0, y0:0, dx:0, dir:1, nbIdx:-1, trace:[], committed:false };
+
+function lbPrepareNeighbor(dir){
+  var nb = document.getElementById('lbNb');
+  var nbImg = document.getElementById('lbNeighbor');
+  var nbBlur = document.getElementById('lbNbBlur');
+  if(!nb || !nbImg) return -1;
+  var n = lightboxPhotos.length;
+  if(n <= 1) return -1;
+  var i = ((LB.cur + dir) % n + n) % n;
+  pg.nbIdx = i;
+  var photo = lightboxPhotos[i];
+  lbShowBlur(nbBlur, photo, { w:LB.stageW * 0.62, h:LB.stageH * 0.62 });
+  nbImg.style.opacity = '0';
+  var fullUrl = full(photo);
+  var put = function(url){
+    nbImg.src = url;
+    var go = function(){
+      var f2 = lbFitSize(nbImg.naturalWidth || 1200, nbImg.naturalHeight || 900);
+      lbSetBox(nbImg, f2.w, f2.h);
+      nbImg.style.transition = 'opacity 200ms ease';
+      nbImg.style.opacity = '1';
+    };
+    if(nbImg.decode) nbImg.decode().then(go).catch(go); else go();
+  };
+  if(LB.ready[fullUrl]) put(fullUrl);
+  else loadImageWithProgress(fullUrl, fullAlt(photo)).then(function(u){ LB.ready[fullUrl] = true; put(u); }).catch(function(){ put(fullUrl); });
+  nb.style.display = '';
+  lbPlace(nb, dir, 0);
+  return i;
+}
+
+function lbCommitPage(dir){
+  var nb = document.getElementById('lbNb');
+  var flip = document.getElementById('lbFlip');
+  var nbImg = document.getElementById('lbNeighbor');
+  var img = document.getElementById('lightboxImg');
+  var blur = document.getElementById('lbBlur');
+  if(!nb || pg.nbIdx < 0) return;
+  var w = LB.stageW;
+  LB.pageTween = lbTween(300, function(p){
+    var e = lbEase(p);
+    flip.style.transform = 'translate3d(' + (-dir * w * e) + 'px,0,0) scale(1)';
+    nb.style.transform = 'translate3d(' + (dir - dir * e) * w + 'px,0,0)';
+    var lb = document.getElementById('lightbox');
+    if(lb) lb.style.opacity = '1';
+  }, function(){
+    // 角色互换：把邻居的内容接到当前层，位置瞬间归零（同一帧无闪）
+    var src = nbImg.src;
+    img.style.transition = 'none';
+    img.style.opacity = '1';
+    img.src = src;
+    if(blur) blur.style.opacity = '0';
+    lightboxIdx = pg.nbIdx; LB.cur = pg.nbIdx;
+    var counter = document.getElementById('lightboxCounter');
+    if(counter) counter.textContent = (LB.cur + 1) + ' / ' + LB.n;
+    lbPlace(flip, 0, 0);
+    nb.style.display = 'none'; lbPlace(nb, 0, 0);
+    resetZoom(); applyTransform({ instant:true });
+    LB.pageTween = null;
+  });
+}
+
+function lbCancelPage(){
+  var nb = document.getElementById('lbNb');
+  var flip = document.getElementById('lbFlip');
+  if(!nb || !flip) return;
+  var dir = pg.dir, w = LB.stageW;
+  LB.pageTween = lbTween(260, function(p){
+    var e = lbEase(p);
+    flip.style.transform = 'translate3d(' + (-dir * w * (1 - e)) + 'px,0,0)';
+    nb.style.transform = 'translate3d(' + (dir * w * (1 - e)) + 'px,0,0)';
+  }, function(){
+    nb.style.display = 'none'; lbPlace(nb, 0, 0);
+    flip.style.transform = 'translate3d(0,0,0) scale(1)';
+    LB.pageTween = null;
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   手机相册级查看器 · 第二层：手势与收尾（覆盖旧的手势绑定）
+   手势分工（同一根手指，按首次位移方向分流）：
+     横向 → 跟手翻页（邻居实时探入，松手按"位移 28% 或速度"决定翻/回弹）
+     纵向向下 → 下拉关闭（跟着手指变小 + 背景渐暗，松手按 110px/速度决定）
+     已放大 → 单指平移（带 iOS 橡皮筋与惯性）
+     两指   → 连续缩放（松手回弹到 1~5 之间）
+     未放大双击 → 在"适应窗口 ↔ 2.5 倍"之间切换，以落点为锚
+   ══════════════════════════════════════════════════════════════════════ */
+
+function lbNowIsZoomed(){ return lbZoom.scale > 1.01; }
+
+function bindLightboxInteractions(){
+  var lb = document.getElementById('lightbox');
+  var stage = document.getElementById('lightboxStage');
+  if(!lb || !stage) return;
+  lbBuildLayers();
+
+  /* ── 桌面：双击切换（以落点为锚）── */
+  lb.addEventListener('dblclick', function(e){
+    if(e.target.closest('.lightbox-close,.lightbox-prev,.lightbox-next,.lightbox-counter')) return;
+    e.preventDefault();
+    if(window._touchZoomTime && Date.now() - window._touchZoomTime < 500) return;
+    if(lbAnimating) return;
+    lbToggleZoomAt(e.clientX, e.clientY);
+  });
+
+  /* ── 桌面：滚轮/触控板缩放（指数映射，按帧合并）── */
+  lb.addEventListener('wheel', function(e){
+    if(!lb.classList.contains('active')) return;
+    e.preventDefault();
+    var d = e.deltaY;
+    if(e.deltaMode === 1) d *= 16; else if(e.deltaMode === 2) d *= 100;
+    d = Math.max(-140, Math.min(140, d));
+    lbWheelAt = { x:e.clientX, y:e.clientY };
+    lbWheelAcc += -d * 0.0026;
+    if(!lbWheelRaf){
+      lbWheelRaf = requestAnimationFrame(function(){
+        lbWheelRaf = 0;
+        var f = Math.exp(lbWheelAcc); lbWheelAcc = 0;
+        if(lbWheelAt) zoomTo(lbZoom.scale * f, lbWheelAt.x, lbWheelAt.y, false);
+      });
+    }
+  }, {passive:false});
+
+  /* ── 桌面鼠标：未放大时横拖翻页 / 已放大时拖拽平移 ── */
+  var mDrag = null;
+  lb.addEventListener('pointerdown', function(e){
+    if(e.pointerType === 'touch') return;
+    if(e.target.closest('.lightbox-close,.lightbox-prev,.lightbox-next,.lightbox-counter')) return;
+    if(LB.enterTween){ LB.enterTween.cancel(); LB.enterTween = null; }
+    if(LB.pageTween){ LB.pageTween.cancel(); LB.pageTween = null; }
+    mDrag = { x:e.clientX, y:e.clientY, mode: lbNowIsZoomed() ? 'pan' : 'idle', trace:[] };
+    if(mDrag.mode === 'pan'){ lbZoom.dragging = true; applyTransform({ instant:true }); }
+    lbTrackPush(mDrag.trace, e.clientX, e.clientY);
+    try{ lb.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+  });
+  lb.addEventListener('pointermove', function(e){
+    if(!mDrag) return;
+    var dx = e.clientX - mDrag.x, dy = e.clientY - mDrag.y;
+    if(mDrag.mode === 'idle' && (Math.abs(dx) > 6 || Math.abs(dy) > 6)){
+      mDrag.mode = (Math.abs(dx) > Math.abs(dy)) ? 'page' : (lbNowIsZoomed() ? 'pan' : 'none');
+      if(mDrag.mode === 'page'){
+        var dir = dx < 0 ? 1 : -1;
+        pg.dir = dir; pg.committed = false;
+        if(lightboxPhotos.length > 1) lbPrepareNeighbor(dir);
+      }
+    }
+    lbTrackPush(mDrag.trace, e.clientX, e.clientY);
+    if(mDrag.mode === 'pan'){
+      lbZoom.x += e.clientX - mDrag.x; lbZoom.y += e.clientY - mDrag.y;
+      mDrag.x = e.clientX; mDrag.y = e.clientY;
+      applyTransform({ dragging:true, rubber:true });
+    } else if(mDrag.mode === 'page'){
+      var nb = document.getElementById('lbNb'), flip = document.getElementById('lbFlip');
+      var w = LB.stageW, d = Math.max(-w, Math.min(w, dx));
+      if(flip) flip.style.transform = 'translate3d(' + d + 'px,0,0)';
+      if(nb) nb.style.transform = 'translate3d(' + (pg.dir * w + d) + 'px,0,0)';
+    }
+    e.preventDefault();
+  });
+  function mEnd(){
+    if(!mDrag) return;
+    var v = lbTrackVel(mDrag.trace), mode = mDrag.mode;
+    var dx = v.vx * 120;
+    var wasPan = lbZoom.dragging;
+    mDrag = null;
+    if(mode === 'pan'){ lbZoom.dragging = false; lbMomentum(v.vx, v.vy); return; }
+    if(mode === 'page'){
+      var far = Math.abs(dx) > LB.stageW * 0.28;
+      var fast = Math.abs(v.vx) > 0.45;
+      if((far || fast) && pg.nbIdx >= 0) lbCommitPage(pg.dir); else lbCancelPage();
+    }
+  }
+  window.addEventListener('pointerup', mEnd);
+  window.addEventListener('pointercancel', mEnd);
+
+  /* ── 触屏手势 ── */
+  var tStart = { x:0, y:0 }, pinch0 = 0, scale0 = 1, panX0 = 0, panY0 = 0;
+  var panTrace = [], lastTap = 0, lastT = { x:0, y:0 };
+
+  stage.addEventListener('touchstart', function(e){
+    if(LB.enterTween){ LB.enterTween.cancel(); LB.enterTween = null; }
+    if(LB.pageTween){ LB.pageTween.cancel(); LB.pageTween = null; }
+    if(e.touches.length === 2){
+      e.preventDefault();
+      var a = e.touches[0], b = e.touches[1];
+      pinch0 = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1;
+      scale0 = lbZoom.scale;
+      pg.active = true; pg.axis = 'pinch'; pg.committed = false;
+      lbZoom.dragging = true;
+      applyTransform({ instant:true });
+      return;
+    }
+    if(e.touches.length !== 1) return;
+    var now = Date.now(), tt = e.touches[0];
+    if(now - lastTap < 300 && Math.abs(tt.clientX - lastT.x) < 32 && Math.abs(tt.clientY - lastT.y) < 32){
+      e.preventDefault();
+      window._touchZoomTime = Date.now();
+      lastTap = 0;
+      if(!lbAnimating) lbToggleZoomAt(tt.clientX, tt.clientY);
+      return;
+    }
+    lastTap = now; lastT = { x:tt.clientX, y:tt.clientY };
+    tStart.x = tt.clientX; tStart.y = tt.clientY;
+    panX0 = lbZoom.x; panY0 = lbZoom.y;
+    panTrace = []; mDragTouchStart();
+    pg.active = true; pg.axis = ''; pg.committed = false;
+    pg.dismissY = 0;
+  }, {passive:false});
+
+  stage.addEventListener('touchmove', function(e){
+    if(!pg.active) return;
+    if(pg.axis === 'pinch' && e.touches.length === 2){
+      e.preventDefault();
+      var a = e.touches[0], b = e.touches[1];
+      var d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      var nn = Math.max(0.65, Math.min(LB_MAX * 1.12, scale0 * (d / pinch0)));
+      var mx = (a.clientX + b.clientX) / 2, my = (a.clientY + b.clientY) / 2;
+      var r = stage.getBoundingClientRect();
+      var old = lbZoom.scale, ratio = nn / old;
+      lbZoom.x = (lbZoom.x - (mx - r.left - r.width / 2)) * ratio + (mx - r.left - r.width / 2);
+      lbZoom.y = (lbZoom.y - (my - r.top - r.height / 2)) * ratio + (my - r.top - r.height / 2);
+      lbZoom.scale = nn;
+      applyTransform({ dragging:true, rubber:true });
+      return;
+    }
+    if(e.touches.length !== 1) return;
+    var tt = e.touches[0];
+    var dx = tt.clientX - tStart.x, dy = tt.clientY - tStart.y;
+    if(!pg.axis){
+      if(Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if(lbNowIsZoomed()) pg.axis = 'pan';
+      else if(Math.abs(dx) > Math.abs(dy) * 1.1){
+        pg.axis = 'page';
+        pg.dir = dx < 0 ? 1 : -1;
+        if(lightboxPhotos.length > 1) lbPrepareNeighbor(pg.dir);
+      } else if(dy > 0){ pg.axis = 'dismiss'; }
+      else pg.axis = 'none';
+    }
+    var flip = document.getElementById('lbFlip'), nb = document.getElementById('lbNb');
+    if(pg.axis === 'pan'){
+      e.preventDefault();
+      lbZoom.x = panX0 + dx; lbZoom.y = panY0 + dy;
+      lbTrackPush(panTrace, tt.clientX, tt.clientY);
+      applyTransform({ dragging:true, rubber:true });
+    } else if(pg.axis === 'page'){
+      e.preventDefault();
+      lbTrackPush(panTrace, tt.clientX, tt.clientY);
+      var w = LB.stageW, d = dx;
+      if(pg.nbIdx < 0){ d = dx * 0.25; }                       // 只有一张：轻微跟随以示"到头了"
+      if(flip) flip.style.transform = 'translate3d(' + d + 'px,0,0)';
+      if(nb) nb.style.transform = 'translate3d(' + (pg.dir * w + d) + 'px,0,0)';
+    } else if(pg.axis === 'dismiss'){
+      e.preventDefault();
+      lbTrackPush(panTrace, tt.clientX, tt.clientY);
+      var H = LB.stageH;
+      var yy = Math.max(-20, dy);
+      pg.dismissY = yy;
+      var sc = Math.max(0.62, 1 - yy / (H * 1.1));
+      if(flip) flip.style.transform = 'translate3d(0,' + yy + 'px,0) scale(' + sc + ')';
+      lb.style.opacity = String(Math.max(0.15, 1 - yy / (H * 0.62)));
+    }
+  }, {passive:false});
+
+  stage.addEventListener('touchend', function(e){
+    if(!pg.active) return;
+    if(pg.axis === 'pinch'){
+      lbZoom.dragging = false;
+      if(e.touches.length === 0){
+        if(lbZoom.scale < 1){ resetZoom(); applyTransform({ dur:340 }); }
+        else if(lbZoom.scale > LB_MAX){ zoomTo(LB_MAX, null, null, true, 340); }
+        else applyTransform({ dur:300 });
+        pg.active = false; pg.axis = '';
+      }
+      return;
+    }
+    if(e.touches.length > 0) return;
+    var ct = e.changedTouches[0] || { clientX:tStart.x, clientY:tStart.y };
+    var dx = ct.clientX - tStart.x, dy = ct.clientY - tStart.y;
+    var v = lbTrackVel(panTrace);
+    var axis = pg.axis;
+    pg.active = false; pg.axis = '';
+    panTrace = [];
+
+    if(axis === 'pan'){
+      var fl = document.getElementById('lbFlip');
+      lbMomentum(v.vx, v.vy);
+      return;
+    }
+    if(axis === 'page'){
+      var far = Math.abs(dx) > LB.stageW * 0.28;
+      var fast = Math.abs(v.vx) > 0.45;
+      if((far || fast) && pg.nbIdx >= 0) lbCommitPage(pg.dir); else lbCancelPage();
+      return;
+    }
+    if(axis === 'dismiss'){
+      var commit = (pg.dismissY > 110) || (v.vy > 0.6);
+      if(commit){
+        var flip = document.getElementById('lbFlip');
+        var curY = pg.dismissY, curS = Math.max(0.62, 1 - curY / (LB.stageH * 1.1));
+        var rect = lightboxRectOfCurrent();
+        var img = document.getElementById('lightboxImg');
+        var nw = img ? (img.naturalWidth || 1200) : 1200;
+        var nh = img ? (img.naturalHeight || 900) : 900;
+        var fit = lbFitSize(nw, nh);
+        /* 从"手指当前拖到的位置"继续，一路缩回缩略图（起点就是当前位置，所以接得上手） */
+        if(rect && !LB.reduced){
+          var dx1 = rect.left + rect.width / 2 - LB.stageW / 2;
+          var dy1 = rect.top + rect.height / 2 - LB.stageH / 2;
+          var s1 = Math.max(0.06, Math.min(rect.width / fit.w, rect.height / fit.h));
+          LB.pageTween = lbTween(280, function(p){
+            var e = lbEase(p);
+            var x = dx1 * e;
+            var y = curY + (dy1 - curY) * e;
+            var sc = curS + (s1 - curS) * e;
+            if(flip) flip.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0) scale(' + sc + ')';
+            lb.style.opacity = String(Math.max(0, 1 - p * 1.2));
+          }, function(){ LB.pageTween = null; lightboxCleanup(); });
+        } else {
+          lightboxCleanup();
+        }
+        return;
+      }
+      // 没到阈值 → 弹回原位
+      var flip2 = document.getElementById('lbFlip');
+      var y0 = pg.dismissY, s0 = Math.max(0.62, 1 - y0 / (LB.stageH * 1.1));
+      LB.pageTween = lbTween(300, function(p){
+        var e = lbEase(p);
+        var y = y0 * (1 - e), sc = s0 + (1 - s0) * e;
+        if(flip2) flip2.style.transform = 'translate3d(0,' + y + 'px,0) scale(' + sc + ')';
+        lb.style.opacity = String(Math.min(1, 0.15 + (1 - 0.15) * e + (1 - p) * 0.85));
+      }, function(){ LB.pageTween = null; lb.style.opacity = '1'; });
+      return;
+    }
+  }, {passive:false});
+
+  stage.addEventListener('touchcancel', function(){
+    var flip = document.getElementById('lbFlip'), nb = document.getElementById('lbNb');
+    if(flip) flip.style.transform = 'translate3d(0,0,0) scale(1)';
+    if(nb){ nb.style.display = 'none'; lbPlace(nb, 0, 0); }
+    lb.style.opacity = '1';
+    lbZoom.dragging = false;
+    pg.active = false; pg.axis = '';
+    if(lbNowIsZoomed()) applyTransform({ dur:300 });
+  });
+}
+
+function mDragTouchStart(){}
+
+/* ── 闭合收尾（与旧 closeLightbox 分离，便于"已经动画过"的路径直接收尾）── */
+function lbFinishClose(){
+  lightboxCleanup();
+}
+
+/* ── 翻页 API：箭头/键盘/旧横滑都走这里，带过渡动画 ── */
+function navLightbox(dir){
+  if(!lightboxPhotos || lightboxPhotos.length <= 1){ if(window.SFX) window.SFX.flip(); return; }
+  if(LB.pageTween){ LB.pageTween.cancel(); LB.pageTween = null; }
+  if(LB.enterTween){ LB.enterTween.cancel(); LB.enterTween = null; }
+  pg.dir = dir; pg.nbIdx = lbPrepareNeighbor(dir);
+  pg.committed = true;
+  if(window.SFX) window.SFX.flip();
+  // 邻居还没就绪时也能立刻动（它的槽位已有模糊垫底），但要等 src 才能互换
+  var nbImg = document.getElementById('lbNeighbor');
+  var t0 = Date.now();
+  (function wait(){
+    if(nbImg && nbImg.src){ lbCommitPage(dir); return; }
+    if(Date.now() - t0 > 1200){ lbCancelPage(); return; }
+    setTimeout(wait, 40);
+  })();
+}
+window.navLightbox = navLightbox;
 
 // ===== 2026-09-15：供博客页(iframe)调用，实现音乐互斥 =====
 // 博客里的歌播放 → 主页背景乐暂停（进度自动保留）；博客的歌停下 → 主页从原进度继续
