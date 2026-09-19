@@ -2676,6 +2676,106 @@ function lbThumbOf(photo){
   return (typeof thumb === 'function') ? thumb(photo) : p;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   2026-09-19  加载 / 失败状态重做（用户反馈：网络差时只剩一个破图图标，
+               比原来的转圈更难看；而且我这次重写把旧的"换源重试/失败提示"弄丢了）
+   ──────────────────────────────────────────────────────────────────────
+   分级反馈（从优到劣，优先用前面的，后面的兜底）：
+     ① 缩略图模糊垫底 —— 只要缩略图能下来，屏幕上就一直是"照片"而不是控件
+     ② 700ms 后仍无图 → 一条 3px 的细进度条 + 一行小字（比大盘转圈克制得多）
+     ③ 主源失败 → 自动换 CDN 备源 → 再失败退到缩略图（至少让用户看到画面）
+     ④ 全部失败 → 居中"没能加载出来 + 点击重试"（可点，44px 触达面积）
+   ★ 并且：<img> 加载失败时立刻把它隐藏 —— 绝不让浏览器画出"破图图标"。
+   ══════════════════════════════════════════════════════════════════════ */
+var _lbLoadToken = 0;
+var _lbRetry = null;      // 当前加载的重试入口（由 lbLoadPhoto 设置）
+
+function lbStateEl(){
+  var el = document.getElementById('lbState');
+  if(el) return el;
+  el = document.createElement('div');
+  el.id = 'lbState';
+  el.innerHTML = '<div class="lb-bar"><i></i></div><div class="lb-state-txt"></div>' +
+                 '<button type="button" class="lb-retry">点击重试</button>';
+  var lb = document.getElementById('lightbox');
+  if(lb) lb.appendChild(el);
+  return el;
+}
+function lbStateLoading(text){
+  var el = lbStateEl();
+  el.classList.remove('err');
+  el.classList.add('show');
+  var t = el.querySelector('.lb-state-txt');
+  if(t) t.textContent = text || '加载中…';
+}
+function lbStateError(text){
+  var el = lbStateEl();
+  el.classList.add('show', 'err');
+  var t = el.querySelector('.lb-state-txt');
+  if(t) t.textContent = text || '这张没能加载出来（网络不太好）';
+}
+function lbStateHide(){
+  var el = document.getElementById('lbState');
+  if(el){ el.classList.remove('show', 'err'); }
+}
+
+/* 统一加载：主源 → CDN 备源 → 缩略图（保底画面）→ 失败态 */
+function lbLoadPhoto(photo, opts){
+  opts = opts || {};
+  var img = document.getElementById('lightboxImg');
+  var blur = document.getElementById('lbBlur');
+  var token = ++_lbLoadToken;
+  var done = false;
+  var timer = setTimeout(function(){ if(!done) lbStateLoading('加载中…'); }, 700);  // 700ms 内不打扰
+  function end(){ done = true; clearTimeout(timer); }
+
+  function ok(url, note){
+    if(token !== _lbLoadToken) return;
+    end(); lbStateHide();
+    if(opts.onReady) opts.onReady(url, note);
+  }
+  function fail(){
+    if(token !== _lbLoadToken) return;
+    end();
+    img.style.opacity = '0';                 // 绝不留下破图图标
+    if(blur && blur.style.backgroundImage && blur.style.backgroundImage !== 'none'){
+      blur.style.opacity = '1';              // 还有缩略图就留着画面，只提示"没加载出原图"
+      lbStateError('原图没能加载出来（正显示缩略图）· 点击重试');
+    } else {
+      lbStateError('这张没能加载出来（网络不太好）· 点击重试');
+    }
+  }
+
+  /* ★ 2026-09-19：改为【以 <img> 元素为准】的尝试链
+     原来依赖 loadImageWithProgress，但它在彻底失败时【不报错、只把 URL 原样返回】
+     → 失败态永远不触发（断网时只剩黑屏 + 细进度条）。现在逐个真实探测：
+     主源 → CDN 备源 → 缩略图（保底画面）→ 都失败才进失败态。 */
+  var urls = [full(photo), fullAlt(photo), lbThumbOf(photo)];
+  var i = 0;
+  function next(){
+    if(token !== _lbLoadToken) return;
+    if(i >= urls.length){ fail(); return; }
+    var url = urls[i++];
+    if(!url){ next(); return; }
+    var pre = new Image();
+    pre.onload = function(){
+      if(i === 1) LB.ready[full(photo)] = true;
+      ok(url, i > 1 ? 'fallback' : '');
+    };
+    pre.onerror = function(){ next(); };
+    try{ pre.src = url; }catch(e){ next(); }
+  }
+  _lbRetry = function(){ lbStateLoading('重试中…'); i = 0; next(); };
+  next();
+
+  // 重试按钮
+  var el = lbStateEl();
+  el.querySelector('.lb-retry').onclick = function(e){
+    e.preventDefault(); e.stopPropagation();
+    if(_lbRetry) _lbRetry(); else { i = 0; next(); }
+  };
+}
+
 /* ── 渐进画质：先立刻显示模糊缩略图，高清就绪后淡入并撤掉垫底 ── */
 function lbShowBlur(el, photo, fit){
   if(!el) return;
@@ -2779,7 +2879,24 @@ function openLightbox(idx, srcRect){
   try{ img.removeAttribute('src'); }catch(e){}
   img.style.opacity = '0';
   if(blur){ blur.style.backgroundImage = 'none'; blur.style.opacity = '0'; }
-  lbLoadInto(img, blur, photo, function(){ return lb.classList.contains('active'); }, _ar);
+  // <img> 自身加载失败时立刻隐藏 —— 否则浏览器会画出"破图图标"（用户实测反馈）
+  img.onerror = function(){ img.style.opacity = '0'; };
+  lbShowBlur(blur, photo, lbFitSizeByAspect(_ar));      // ① 缩略图垫底
+  lbLoadPhoto(photo, {
+    onReady: function(url){
+      if(!lb.classList.contains('active')) return;
+      var f2 = lbFitSize(img.naturalWidth || 1200, img.naturalHeight || 900);
+      lbSetBox(img, f2.w, f2.h);
+      img.src = url;
+      var go = function(){
+        img.style.transition = 'opacity 240ms ease';
+        img.style.opacity = '1';
+        lbHideBlur(blur);
+        showLbLoader(false, 100, '');
+      };
+      if(img.decode) img.decode().then(go).catch(go); else go();
+    }
+  });
 
   // 背景与层显隐
   lb.style.transition = 'none';
@@ -2860,6 +2977,8 @@ function lightboxCleanup(){
   if(blur){ blur.style.opacity = '0'; blur.style.transform = 'translate3d(0,0,0) scale(1.06)'; }
   if(nb){ nb.style.display = 'none'; lbPlace(nb, 0, 0); }
   resetZoom();
+  lbStateHide();
+  img.onerror = null;
   if(img){
     img.style.transition = 'none';
     img.style.transform = 'translate3d(0,0,0) scale(1)';
@@ -3031,7 +3150,10 @@ function bindLightboxInteractions(){
   var mDrag = null;
   lb.addEventListener('pointerdown', function(e){
     if(e.pointerType === 'touch') return;
-    if(e.target.closest('.lightbox-close,.lightbox-prev,.lightbox-next,.lightbox-counter')) return;
+    // ★ 2026-09-19：把「加载失败时的重试按钮」也排除掉 ——
+    //   否则下面 setPointerCapture 会把指针捕获到 #lightbox，click 目标变成 #lightbox
+    //   而不是按钮 → 按钮点了没反应（实测踩到）
+    if(e.target.closest('.lightbox-close,.lightbox-prev,.lightbox-next,.lightbox-counter,.lb-retry,#lbState')) return;
     if(LB.enterTween){ LB.enterTween.cancel(); LB.enterTween = null; }
     if(LB.pageTween){ LB.pageTween.cancel(); LB.pageTween = null; }
     mDrag = { x:e.clientX, y:e.clientY, mode: lbNowIsZoomed() ? 'pan' : 'idle', trace:[] };
@@ -3327,29 +3449,25 @@ function lbStepTo(dir){
   if(LB.quietTimer) clearTimeout(LB.quietTimer);
   LB.quietTimer = setTimeout(function(){ LB.quiet = false; showLbLoader(true, 0, '加载中…'); }, 4500);
 
-  function settle(url){
-    var done = function(){
+  img.onerror = function(){ img.style.opacity = '0'; };
+  lbLoadPhoto(photo, {
+    onReady: function(url){
       if(!lb.classList.contains('active')) return;
-      if(LB.quietTimer){ clearTimeout(LB.quietTimer); LB.quietTimer = null; }
-      var f2 = lbFitSize(img.naturalWidth || 1200, img.naturalHeight || 900);
-      lbSetBox(img, f2.w, f2.h);
-      applyTransform({ instant:true });
-      flip.style.transition = 'transform 280ms ' + LB_STEP_EASE + ', opacity 200ms ease';
-      flip.style.transform = 'translate3d(0,0,0) scale(1)';
-      flip.style.opacity = '1';
-      img.style.transition = 'opacity 200ms ease';
-      img.style.opacity = '1';
-      lbHideBlur(blur);
-      showLbLoader(false, 100, '');
-    };
-    img.src = url;
-    if(img.decode) img.decode().then(done).catch(done); else setTimeout(done, 40);
-  }
-  var fullUrl = full(photo);
-  if(LB.ready[fullUrl]) settle(fullUrl);
-  else loadImageWithProgress(fullUrl, fullAlt(photo))
-        .then(function(u){ LB.ready[fullUrl] = true; settle(u); })
-        .catch(function(){ settle(fullUrl); });
+      img.src = url;
+      var go = function(){
+        var f2 = lbFitSize(img.naturalWidth || 1200, img.naturalHeight || 900);
+        lbSetBox(img, f2.w, f2.h);
+        applyTransform({ instant:true });
+        flip.style.transition = 'transform 280ms ' + LB_STEP_EASE + ', opacity 200ms ease';
+        flip.style.transform = 'translate3d(0,0,0) scale(1)';
+        flip.style.opacity = '1';
+        img.style.transition = 'opacity 200ms ease';
+        img.style.opacity = '1';
+        lbHideBlur(blur);
+      };
+      if(img.decode) img.decode().then(go).catch(go); else go();
+    }
+  });
 }
 
 // 箭头按钮 / 键盘 ←→ / 任何"上一张 下一张"入口都走这条路
