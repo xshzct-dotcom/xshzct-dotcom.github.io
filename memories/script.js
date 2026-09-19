@@ -3258,23 +3258,102 @@ function lbFinishClose(){
   lightboxCleanup();
 }
 
-/* ── 翻页 API：箭头/键盘/旧横滑都走这里，带过渡动画 ── */
-function navLightbox(dir){
-  if(!lightboxPhotos || lightboxPhotos.length <= 1){ if(window.SFX) window.SFX.flip(); return; }
-  if(LB.pageTween){ LB.pageTween.cancel(); LB.pageTween = null; }
-  if(LB.enterTween){ LB.enterTween.cancel(); LB.enterTween = null; }
-  pg.dir = dir; pg.nbIdx = lbPrepareNeighbor(dir);
-  pg.committed = true;
-  if(window.SFX) window.SFX.flip();
-  // 邻居还没就绪时也能立刻动（它的槽位已有模糊垫底），但要等 src 才能互换
-  var nbImg = document.getElementById('lbNeighbor');
-  var t0 = Date.now();
-  (function wait(){
-    if(nbImg && nbImg.src){ lbCommitPage(dir); return; }
-    if(Date.now() - t0 > 1200){ lbCancelPage(); return; }
-    setTimeout(wait, 40);
-  })();
+/* ══════════════════════════════════════════════════════════════════════
+   2026-09-19  箭头/键盘翻页 → 改为「稳重版（原地换心 + 落定）」
+   ──────────────────────────────────────────────────────────────────────
+   用户反馈："左右箭头（上下一张）好飘好跳，手机电脑都是，我要换一种稳的、有重力的"。
+   原因有两条：
+     ① 旧实现是【整屏横滑 430px】—— 内容大幅平移 = 视觉上"飘"
+     ② 更糟的是它要【等邻居图加载完】才动（40ms 轮询、最多等 1.2 秒）
+        → 点了箭头有一瞬间没反应，然后突然动 = "跳"
+   现在的做法（三步，体感"重"）：
+     ① 同一帧：新图的缩略图模糊垫底立刻上场 → 零延迟就有正确画面
+     ② 旧图朝行进方向【只退 12px】并轻微缩小（不是整屏位移）→ 有方向感但不飘
+     ③ 新图就绪后从 ±12px / 0.985 【落定】到 0 / 1，曲线偏"快起稳停"
+   ★ 关键取舍：方向感用"12px 微偏移 + 透明度"表达，不用"整屏位移"。
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* 从网格缩略图反查这张照片的长宽比（网格里的图已经加载过，拿得到 naturalWidth） */
+function lbAspectOfGrid(i){
+  try{
+    var el = document.querySelector('.masonry-item[data-idx="' + i + '"] img');
+    if(el && el.naturalWidth && el.naturalHeight) return el.naturalWidth / el.naturalHeight;
+  }catch(e){}
+  try{
+    var figs = document.querySelectorAll('.masonry-item');
+    var e2 = figs[i] && figs[i].querySelector('img');
+    if(e2 && e2.naturalWidth) return e2.naturalWidth / e2.naturalHeight;
+  }catch(e){}
+  return 0;
 }
+
+var LB_STEP_EASE = 'cubic-bezier(.2,.8,.2,1)';   // 快起、稳停（这就是"重量感"的来源）
+var LB_NUDGE = 12;                                // 方向微偏移（px）—— 不飘的关键数字
+
+function lbStepTo(dir){
+  var n = (lightboxPhotos && lightboxPhotos.length) || 0;
+  if(n <= 1){ if(window.SFX) window.SFX.flip(); return; }
+  var lb = document.getElementById('lightbox');
+  var img = document.getElementById('lightboxImg');
+  var flip = document.getElementById('lbFlip');
+  var blur = document.getElementById('lbBlur');
+  if(!lb || !img || !flip) return;
+  if(LB.enterTween){ LB.enterTween.cancel(); LB.enterTween = null; }
+  if(LB.pageTween){ LB.pageTween.cancel(); LB.pageTween = null; }
+
+  var target = ((LB.cur + dir) % n + n) % n;
+  var photo = lightboxPhotos[target];
+  var ar = lbAspectOfGrid(target);
+
+  // ① 同一帧就有正确画面（新图的缩略图垫底）—— 消除"点了没反应"
+  resetZoom();
+  lbShowBlur(blur, photo, lbFitSizeByAspect(ar));
+
+  // ② 旧图朝行进方向只退 12px + 轻微缩小（方向感有了，但不"飘"）
+  flip.style.transition = 'transform 200ms ' + LB_STEP_EASE + ', opacity 150ms ease';
+  // 方向：dir=+1（下一张）时，旧图应该【往左退】、新图从右侧落定 → 所以偏移取 -dir
+  flip.style.transform = 'translate3d(' + (-LB_NUDGE * dir) + 'px,0,0) scale(.985)';
+  flip.style.opacity = '0';
+  img.removeAttribute('src');        // 立刻丢掉旧内容（旧图已在退场，不会闪）
+  img.style.opacity = '0';
+
+  LB.cur = target; lightboxIdx = target;
+  var counter = document.getElementById('lightboxCounter');
+  if(counter) counter.textContent = (target + 1) + ' / ' + n;
+  if(window.SFX) window.SFX.flip();
+
+  // ③ 新图就绪 → 从 ±12px / 0.985 落定到 0 / 1
+  LB.quiet = true;
+  if(LB.quietTimer) clearTimeout(LB.quietTimer);
+  LB.quietTimer = setTimeout(function(){ LB.quiet = false; showLbLoader(true, 0, '加载中…'); }, 4500);
+
+  function settle(url){
+    var done = function(){
+      if(!lb.classList.contains('active')) return;
+      if(LB.quietTimer){ clearTimeout(LB.quietTimer); LB.quietTimer = null; }
+      var f2 = lbFitSize(img.naturalWidth || 1200, img.naturalHeight || 900);
+      lbSetBox(img, f2.w, f2.h);
+      applyTransform({ instant:true });
+      flip.style.transition = 'transform 280ms ' + LB_STEP_EASE + ', opacity 200ms ease';
+      flip.style.transform = 'translate3d(0,0,0) scale(1)';
+      flip.style.opacity = '1';
+      img.style.transition = 'opacity 200ms ease';
+      img.style.opacity = '1';
+      lbHideBlur(blur);
+      showLbLoader(false, 100, '');
+    };
+    img.src = url;
+    if(img.decode) img.decode().then(done).catch(done); else setTimeout(done, 40);
+  }
+  var fullUrl = full(photo);
+  if(LB.ready[fullUrl]) settle(fullUrl);
+  else loadImageWithProgress(fullUrl, fullAlt(photo))
+        .then(function(u){ LB.ready[fullUrl] = true; settle(u); })
+        .catch(function(){ settle(fullUrl); });
+}
+
+// 箭头按钮 / 键盘 ←→ / 任何"上一张 下一张"入口都走这条路
+function navLightbox(dir){ lbStepTo(dir); }
 window.navLightbox = navLightbox;
 
 // ===== 2026-09-15：供博客页(iframe)调用，实现音乐互斥 =====

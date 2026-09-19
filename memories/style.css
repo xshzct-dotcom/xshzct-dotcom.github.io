@@ -1426,3 +1426,12 @@ html:not([data-theme="light"]) .hero-content::before{
 @media (prefers-reduced-motion: reduce){
   #lbFlip, #lbBlur, #lbNb, .lb-img, #lbNeighbor{ transition:none !important }
 }
+
+/* ══ 2026-09-19 箭头按钮：稳重的按下反馈 ══
+   原来是 scale(.88~.945) 的"弹一下"，配合整屏滑动显得更飘；
+   改成只做轻微的透明度/底色变化 —— 按下"沉"一点，而不是"弹"起来。 */
+.lightbox-close:active, .lightbox-prev:active, .lightbox-next:active{
+  transform:none !important;
+  background:rgba(255,255,255,.16) !important;
+  transition:background 120ms ease !important;
+}
