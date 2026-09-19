@@ -2757,6 +2757,9 @@ function openLightbox(idx, srcRect){
   LB.dismissY = 0; LB.dismissed = false;
   if(LB.enterTween){ LB.enterTween.cancel(); LB.enterTween = null; }
   if(LB.pageTween){ LB.pageTween.cancel(); LB.pageTween = null; }
+  // 手势状态复位：万一上次是"拖到一半被关掉"，别把旧的轴/方向带到这一次
+  pg.active = false; pg.axis = ''; pg.dir = 1; pg.nbIdx = -1;
+  pg.committed = false; pg.dismissY = 0; pg.trace = [];
 
   var counter = document.getElementById('lightboxCounter');
   if(counter) counter.textContent = (idx + 1) + ' / ' + LB.n;
@@ -2828,6 +2831,13 @@ function lightboxRectOfCurrent(){
 function lightboxCleanup(){
   LB.quiet = false;
   if(LB.quietTimer){ clearTimeout(LB.quietTimer); LB.quietTimer = null; }
+  /* ★ 2026-09-19 真机/真机反馈修复：这一层原来漏了"解开滚动锁"
+     → 看完照片关掉之后，body 的 overflow:hidden 一直留着，整个页面滚不动
+       （用户反馈："相册卡住了滑轮不了"）。所有关闭路径最终都会走到这里，所以在这里统一复位。 */
+  try{
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+  }catch(e){}
   var lb = document.getElementById('lightbox');
   var img = document.getElementById('lightboxImg');
   var flip = document.getElementById('lbFlip');
