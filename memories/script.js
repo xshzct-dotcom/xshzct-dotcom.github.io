@@ -2070,13 +2070,35 @@ function init(){
 var LB_MAX = 5;                                  // 统一缩放上限
 var LB_DBL = 2.5;                                // 双击放大倍数
 var LB_EASE = 'cubic-bezier(.22,.61,.36,1)';     // 接近原生的手感曲线
+/* ★ 2026-09-19 惯性参数（真机反馈「放大后滑动太灵敏、没有重力感」）
+   原因：触摸路径把【累计位移】当成速度（dx/16），200px 的拖动被算成 12.5px/ms 的高速甩动，
+        一松手就飞到边界。现在改为：取最近 80ms 的位置差分 + 采用比例 + 上限 + 更强衰减。 */
+var LB_FLING = 0.5;     // 松手速度的采用比例（越小越"稳重"）
+var LB_VMAX  = 1.9;     // 起飞速度上限 px/ms
+var LB_DECAY = 0.945;   // 每帧衰减（越大越黏）
+var LB_VSTOP = 0.38;    // 低于此速度不滑行，直接停
 
 // 图片在 scale=1 时的显示尺寸（从带 transform 的实测框反推，最稳）
 function lbBaseSize(){
+  /* ★ 2026-09-19 修正（真机 bug：「点哪放大哪」变成了「只放大到中间」）
+     原来是用【当前】transform 反推基准尺寸：r.width / lbZoom.scale。
+     但调用时机是 zoomTo 已经改完 scale、img.style.transform 还没写入的这一瞬，
+     rect 仍是旧尺寸 → 基准被低估（实测 396 被算成 158）→ 可平移范围算成 0
+     → 锚点位移被 lbClamp 钳掉 → 看起来永远放大到正中间。
+     现在改成从图片原始像素 + CSS 的 max-width/max-height 推算，与当前 transform 无关。 */
   var img = $('#lightboxImg');
   if(!img) return {w:0, h:0};
-  var r = img.getBoundingClientRect();
-  var s = lbZoom.scale || 1;
+  var nw = img.naturalWidth, nh = img.naturalHeight;
+  if(nw && nh){
+    var cs = getComputedStyle(img);
+    var mw = parseFloat(cs.maxWidth);
+    var mh = parseFloat(cs.maxHeight);
+    if(!mw || !isFinite(mw)) mw = window.innerWidth * 0.92;
+    if(!mh || !isFinite(mh)) mh = window.innerHeight * 0.88;
+    var k = Math.min(mw / nw, mh / nh, 1);      // 等比缩放以适应，且不放大
+    return { w: nw * k, h: nh * k };
+  }
+  var r = img.getBoundingClientRect(), s = lbZoom.scale || 1;
   return { w: r.width / s, h: r.height / s };
 }
 // 边界钳制：rubber=true 时允许"拉过头一点"（橡皮筋），松手再弹回
@@ -2169,21 +2191,35 @@ function lbToggleZoomAt(cx, cy){
   }
 }
 
-// 松手后的惯性滑行（到边界用橡皮筋 + 最后弹回）
+/* 速度估计：用最近 ~80ms 的位置差分（比"上一帧位移"稳，比"累计位移"准） */
+function lbTrackPush(arr, x, y){
+  var t = performance.now();
+  arr.push({ x:x, y:y, t:t });
+  while(arr.length > 1 && t - arr[0].t > 80) arr.shift();
+  return arr;
+}
+function lbTrackVel(arr){
+  if(!arr || arr.length < 2) return { vx:0, vy:0 };
+  var a = arr[0], b = arr[arr.length - 1];
+  var dt = Math.max(1, b.t - a.t);
+  return { vx:(b.x - a.x) / dt, vy:(b.y - a.y) / dt };
+}
+// 松手后的惯性滑行：采用比例 + 上限 + 按真实帧时长衰减 + 到边界橡皮筋
 function lbMomentum(vx, vy){
-  if(Math.hypot(vx, vy) < 0.12) { applyTransform({ dur: 320 }); return; }
-  var x = lbZoom.x, y = lbZoom.y;
-  var decay = 0.93;
-  (function step(){
-    vx *= decay; vy *= decay;
-    x += vx * 16; y += vy * 16;
-    var c = lbClamp(x, y, lbZoom.scale, true);
-    x = c.x; y = c.y;
-    lbZoom.x = x; lbZoom.y = y;
+  var sp = Math.hypot(vx, vy);
+  if(sp < LB_VSTOP){ applyTransform({ dur: 320 }); return; }   // 没甩起来 → 直接停/弹回
+  var k = Math.min(1, LB_VMAX / sp);
+  vx *= LB_FLING * k; vy *= LB_FLING * k;
+  var prev = performance.now();
+  (function step(now){
+    var dt = Math.min(34, Math.max(8, now - prev)); prev = now;
+    var d = Math.pow(LB_DECAY, dt / 16);
+    vx *= d; vy *= d;
+    lbZoom.x += vx * dt; lbZoom.y += vy * dt;
     applyTransform({ dragging: true, rubber: true });
-    if(Math.hypot(vx, vy) > 0.06) requestAnimationFrame(step);
+    if(Math.hypot(vx, vy) > 0.05) requestAnimationFrame(step);
     else applyTransform({ dur: 340 });          // 弹回边界内
-  })();
+  })(prev);
 }
 
 /* ── 手势引擎（重写）──────────────────────────────
@@ -2230,7 +2266,8 @@ function bindLightboxInteractions(){
     if(e.pointerType === 'touch') return;               // 触屏走下面的 touch 分支
     if(lbZoom.scale <= 1.01) return;
     if(e.target.closest('.lightbox-close,.lightbox-prev,.lightbox-next,.lightbox-filmstrip,.lightbox-counter,.lightbox-zoom-indicator')) return;
-    lbDrag = { x:e.clientX, y:e.clientY, t:performance.now(), vx:0, vy:0 };
+    lbDrag = { x:e.clientX, y:e.clientY, t:performance.now(), trace:[] };
+    lbTrackPush(lbDrag.trace, e.clientX, e.clientY);
     lbZoom.dragging = true;
     applyTransform({ instant:true });
     try{ lb.setPointerCapture(e.pointerId); }catch(err){}
@@ -2238,19 +2275,18 @@ function bindLightboxInteractions(){
   });
   lb.addEventListener('pointermove', function(e){
     if(!lbDrag) return;
-    var now = performance.now(), dt = Math.max(8, now - lbDrag.t);
     var dx = e.clientX - lbDrag.x, dy = e.clientY - lbDrag.y;
-    lbDrag.vx = dx / dt; lbDrag.vy = dy / dt;
-    lbDrag.x = e.clientX; lbDrag.y = e.clientY; lbDrag.t = now;
+    lbDrag.x = e.clientX; lbDrag.y = e.clientY;
+    lbTrackPush(lbDrag.trace, e.clientX, e.clientY);
     lbZoom.x += dx; lbZoom.y += dy;
     applyTransform({ dragging:true, rubber:true });
     e.preventDefault();
   });
   function endDrag(){
     if(!lbDrag) return;
-    var vx = lbDrag.vx, vy = lbDrag.vy;
+    var v = lbTrackVel(lbDrag.trace);      // 与触摸路径同一套速度估计
     lbDrag = null; lbZoom.dragging = false;
-    lbMomentum(vx, vy);
+    lbMomentum(v.vx, v.vy);
   }
   window.addEventListener('pointerup', endDrag);
   window.addEventListener('pointercancel', endDrag);
@@ -2258,6 +2294,7 @@ function bindLightboxInteractions(){
 
   /* ④ 触屏手势 */
   var t1 = { x:0, y:0 }, t0 = { x:0, y:0 }, pinch0 = 0, scale0 = 1, panX0 = 0, panY0 = 0;
+  var panTrace = [];        // 平移时的位置采样（用于算松手速度）
   var lastTap = 0, lastT = 0, moved = false;
 
   stage.addEventListener('touchstart', function(e){
@@ -2284,6 +2321,7 @@ function bindLightboxInteractions(){
     }
     lastTap = now; lastT = { x:tt.clientX, y:tt.clientY };
     t0.x = tt.clientX; t0.y = tt.clientY;
+    panTrace = [];
     panX0 = lbZoom.x; panY0 = lbZoom.y;
     moved = false;
     lbZoom.closeDy = 0; lbZoom.closeScale = 1;
@@ -2314,7 +2352,7 @@ function bindLightboxInteractions(){
       e.preventDefault();
       lbZoom.x = panX0 + dx;
       lbZoom.y = panY0 + dy;
-      lbZoom.tVX = dx; lbZoom.tVY = dy;
+      lbTrackPush(panTrace, tt.clientX, tt.clientY);      // 只记最近 80ms
       applyTransform({ dragging:true, rubber:true });
     } else if(lbTouch.mode === 'swipe'){
       // 只有明显的【向下】拖才做"下滑关闭"的跟随效果（上滑不跟，避免误触）
@@ -2345,9 +2383,9 @@ function bindLightboxInteractions(){
       var mode = lbTouch.mode;
       lbTouch.mode = 'none';
       if(mode === 'pan'){
-        var vx = (lbZoom.tVX || 0) / 16, vy = (lbZoom.tVY || 0) / 16;
-        lbZoom.tVX = 0; lbZoom.tVY = 0;
-        lbMomentum(vx, vy);
+        var v = lbTrackVel(panTrace);                       // 最近 80ms 的真实速度
+        panTrace = [];
+        lbMomentum(v.vx, v.vy);
         return;
       }
       if(mode === 'swipe'){
