@@ -2771,6 +2771,14 @@ function openLightbox(idx, srcRect){
 
   var photo = lightboxPhotos[idx];
   var _ar = (srcRect && srcRect.height > 0) ? (srcRect.width / srcRect.height) : 0;
+  /* ★ 2026-09-19 修复（用户反馈："放大照片会先显示上次的照片卡一下"）
+     原因：上一张的 src 还挂在 #lightboxImg 上，而"旧图等到新图就绪再淡入"这条规则
+          本来只该用于【翻页】；全新打开时会先把上一张露出来一下 ✗
+     做法：全新打开时立刻丢掉旧 src（尺寸由 lbSetBox 撑着，不会塌），
+          屏幕上只留"这张照片的缩略图模糊垫底" → 高清就绪再淡入。 */
+  try{ img.removeAttribute('src'); }catch(e){}
+  img.style.opacity = '0';
+  if(blur){ blur.style.backgroundImage = 'none'; blur.style.opacity = '0'; }
   lbLoadInto(img, blur, photo, function(){ return lb.classList.contains('active'); }, _ar);
 
   // 背景与层显隐
