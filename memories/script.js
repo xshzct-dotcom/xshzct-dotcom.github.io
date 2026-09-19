@@ -2605,28 +2605,6 @@ function lbBuildLayers(){
   img.classList.add('lb-img');
 }
 
-/* ★ 2026-09-19：有模糊缩略图垫底时，绝不显示"转圈/准备…"
-   —— 原生的相册在加载时你看到的是"模糊的照片"，不是控件。
-   底层 loadImageWithProgress 会无条件弹 loader，这里加静默开关把它压住；
-   只有【没有缩略图可用】或【超过 4.5 秒仍未出图】时才允许转圈兜底。 */
-function showLbLoader(show, pct, text){
-  if(show && LB.quiet) return;
-  var loader = document.getElementById('lbLoader');
-  if(!loader){
-    loader = document.createElement('div');
-    loader.id = 'lbLoader';
-    loader.innerHTML = '<div class="lb-spinner"></div><div class="lb-progress"></div><div class="lb-text"></div>';
-    var st = document.getElementById('lightbox');
-    if(st) st.appendChild(loader);
-  }
-  if(!show){ loader.classList.add('hidden'); return; }
-  loader.classList.remove('hidden');
-  var prog = loader.querySelector('.lb-progress');
-  var tx = loader.querySelector('.lb-text');
-  if(prog) prog.style.setProperty('--p', Math.min(pct, 100) + '%');
-  if(tx) tx.textContent = text + (pct > 0 ? ' ' + pct + '%' : '');
-}
-
 /* 按"长宽比"算适应窗口的尺寸（有缩略图矩形时用它，避免横图被糊成竖条） */
 function lbFitSizeByAspect(ar){
   if(!ar || !isFinite(ar) || ar <= 0) return { w:LB.stageW * 0.62, h:LB.stageH * 0.62 };
@@ -2796,13 +2774,7 @@ function lbLoadInto(imgEl, blurEl, photo, want, aspect){
   // 垫底盒子按"被点缩略图的长宽比"来 —— 横图就是横的，不会被 cover 糊成竖条
   lbShowBlur(blurEl, photo, lbFitSizeByAspect(aspect));
   imgEl.style.opacity = '0';
-  // 有缩略图 → 静默加载（不显示转圈）；4.5 秒还没出图才放行转圈兜底
-  LB.quiet = true;
-  if(LB.quietTimer) clearTimeout(LB.quietTimer);
-  LB.quietTimer = setTimeout(function(){
-    LB.quiet = false;
-    showLbLoader(true, 0, '加载中…');
-  }, 4500);
+
 
   function done(url){
     var pre = new Image();
@@ -2811,7 +2783,7 @@ function lbLoadInto(imgEl, blurEl, photo, want, aspect){
       imgEl.src = url;
       var apply = function(){
         if(want && want() === false) return;
-        if(LB.quietTimer){ clearTimeout(LB.quietTimer); LB.quietTimer = null; }
+        if(Timer){ clearTimeout(Timer); Timer = null; }
         var f2 = lbFitSize(imgEl.naturalWidth || 1200, imgEl.naturalHeight || 900);
         lbSetBox(imgEl, f2.w, f2.h);
         imgEl.style.transition = 'opacity ' + (LB.reduced ? 1 : 240) + 'ms ease';
@@ -2907,6 +2879,15 @@ function openLightbox(idx, srcRect){
   lb.style.touchAction = 'none';
   document.body.style.overflow = 'hidden';
   if(window.SFX) window.SFX.shutter();
+  /* ★ 2026-09-19 预加载左右两张邻居 ——
+     这是"下一张从左边出来"的根因修复：滑动开始时邻居还没加载，
+     用户看到的就是"当前照片往左滑走、右边是黑的、然后新图突然出现"。
+     预加载后，滑动时右边已经有画面了 → 视觉上下一张自然地从右边来。 */
+  setTimeout(function(){
+    if(!lb.classList.contains('active')) return;
+    try{ lbPrepareNeighbor(1); }catch(e){}
+    try{ lbPrepareNeighbor(-1); }catch(e){}
+  }, 100);
 
   if(srcRect && !LB.reduced && srcRect.width > 0){
     // FLIP：从缩略图的矩形长到"适应窗口"的位置
@@ -2954,8 +2935,7 @@ function lightboxRectOfCurrent(){
   return null;
 }
 function lightboxCleanup(){
-  LB.quiet = false;
-  if(LB.quietTimer){ clearTimeout(LB.quietTimer); LB.quietTimer = null; }
+  if(Timer){ clearTimeout(Timer); Timer = null; }
   /* ★ 2026-09-19 真机/真机反馈修复：这一层原来漏了"解开滚动锁"
      → 看完照片关掉之后，body 的 overflow:hidden 一直留着，整个页面滚不动
        （用户反馈："相册卡住了滑轮不了"）。所有关闭路径最终都会走到这里，所以在这里统一复位。 */
@@ -3082,6 +3062,11 @@ function lbCommitPage(dir){
     nb.style.display = 'none'; lbPlace(nb, 0, 0);
     resetZoom(); applyTransform({ instant:true });
     LB.pageTween = null;
+    // 翻到新页后，预加载它左右两张邻居（下次滑动时右/左边已经有画面）
+    setTimeout(function(){
+      try{ lbPrepareNeighbor(1); }catch(e){}
+      try{ lbPrepareNeighbor(-1); }catch(e){}
+    }, 50);
   });
 }
 
@@ -3445,9 +3430,9 @@ function lbStepTo(dir){
   if(window.SFX) window.SFX.flip();
 
   // ③ 新图就绪 → 从 ±12px / 0.985 落定到 0 / 1
-  LB.quiet = true;
-  if(LB.quietTimer) clearTimeout(LB.quietTimer);
-  LB.quietTimer = setTimeout(function(){ LB.quiet = false; showLbLoader(true, 0, '加载中…'); }, 4500);
+  
+  if(Timer) clearTimeout(Timer);
+  Timer = setTimeout(function(){  showLbLoader(true, 0, '加载中…'); }, 4500);
 
   img.onerror = function(){ img.style.opacity = '0'; };
   lbLoadPhoto(photo, {
