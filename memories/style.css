@@ -1299,30 +1299,26 @@ html:not([data-theme="light"]) .hero::after{
    把焦点上移到 32%，竖构图人像能保住头部（横构图几乎无感）。 */
 .masonry-item img, .river-stream img{ object-position:center 32% }
 
-/* ══ 2026-09-19 文字背后的"局部光晕" ══
-   不再整张照片蒙色，而是只在标题区域加一团柔光：
-   照片在别处保持通透，文字在任何亮度的照片上都读得清（对比度 ≥4.5:1）。 */
-/* ★ 2026-09-19 修正：径向渐变的半径必须【小于】元素的一半，否则到元素边界时还没淡完，
-   会在照片上露出一个可见的白色矩形（第一版就是这个毛病，已实测看到边界）。
-   现在的几何：水平半径 42%×1400=588px < 半宽 700px ✓；垂直 40%×620=248px < 半高 310px ✓
-   —— 光晕在元素边界之前就完全透明，看不到任何边。 */
-.hero-content::before{
-  content:''; position:absolute; z-index:-1;
-  left:50%; top:50%; transform:translate(-50%,-50%);
-  width:min(1400px,140vw); height:min(620px,80vh);
-  pointer-events:none;
-}
-html:not([data-theme="light"]) .hero-content::before{
-  background:radial-gradient(42% 40% at 50% 50%,
-    rgba(10,12,16,.72) 0%, rgba(10,12,16,.50) 42%, rgba(10,12,16,.18) 72%, rgba(10,12,16,0) 100%);
-}
-[data-theme="light"] .hero-content::before{
-  background:radial-gradient(42% 40% at 50% 50%,
-    rgba(255,255,255,.94) 0%, rgba(255,255,255,.72) 42%, rgba(255,255,255,.28) 72%, rgba(255,255,255,0) 100%);
-}
+/* ══ 2026-09-23 删除"文字背后的局部光晕"（用户反馈：一团白雾把照片洗了）══
+   历史：2026-09-19 我给 .hero-content 加了一个 ::before 径向渐变（1400×512，
+         浅色中心 94% 白 / 深色中心 72% 黑），本意是"只给标题垫底、不整张蒙色"。
+   实际效果：它是一块 1400px 宽的大雾，把照片中段整片洗掉 —— 换个说法而已，本质仍是蒙色。
+   实测对比：深色主题里它毫无必要（浅色字+黑色投影本来就够读），纯在压暗照片；
+             浅色主题里它唯一的用途是给"深色标题字"垫底。
+   → 正解：让【浅色主题的标题也改用浅色字 + 深投影】（见下方 [data-theme="light"] .hero-title），
+     两个主题就都不需要这团雾了。照片恢复通透。 */
+/* ★ 2026-09-23：浅色主题下 hero 标题改用【浅色字 + 深投影】——
+   hero 是"压在照片上"的区域，深色字在暗照片上没法读（这才是那团白雾存在的唯一理由）。
+   改成浅色字后，白雾可以彻底删掉，照片不用再被洗。
+   <em> 用亮一点的鼠尾草绿，深底/亮底上都压得住。 */
 [data-theme="light"] .hero-title,
 [data-theme="light"] .hero-title-solo{
-  text-shadow:0 1px 2px rgba(255,255,255,.6);
+  color:#FFFFFF;
+  text-shadow:0 2px 30px rgba(0,0,0,.55), 0 1px 4px rgba(0,0,0,.45);
+}
+[data-theme="light"] .hero-title em,
+[data-theme="light"] .hero-title-solo em{
+  color:#9FC1A1;
 }
 [data-theme="light"] .nav:not(.scrolled) .nav-links a,
 [data-theme="light"] .nav:not(.scrolled) .nav-brand{
