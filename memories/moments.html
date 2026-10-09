@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20261010-4">
+<link rel="stylesheet" href="style.css?v=20261010-5">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -437,9 +437,11 @@ img[src^="data:"]{ animation:none }
   padding: 7px 14px 7px 12px;
   border-radius: var(--r-full, 999px);
   border: 1px solid rgba(var(--fg-rgb), .10);
-  background: rgba(14,17,22,.72);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  backdrop-filter: blur(14px) saturate(150%);
+  /* .72 太薄：背后是亮照片时磨砂会把亮度混进来，浅色字对比度不稳。
+     按本项目"照片上的文字必须有 scrim"的规矩，底加实到 .88。 */
+  background: rgba(14,17,22,.88);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+  backdrop-filter: blur(10px) saturate(130%);
   color: var(--text);
   font-size: .86rem;
   line-height: 1.2;
@@ -458,8 +460,8 @@ img[src^="data:"]{ animation:none }
 }
 .mp-back:active, .ml-back:active{ transform: scale(.96) }
 [data-theme="light"] .mp-back, [data-theme="light"] .ml-back{
-  background: rgba(255,255,255,.86);
-  border-color: rgba(32,35,40,.12);
+  background: rgba(255,255,255,.94);
+  border-color: rgba(32,35,40,.14);
   color: #1F2226;
   box-shadow: 0 2px 10px rgba(32,35,40,.10);
 }
@@ -553,7 +555,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20261010-4"></script>
+<script src="vendor/supabase.js?v=20261010-5"></script>
 <script>
 (function(){
   'use strict';
