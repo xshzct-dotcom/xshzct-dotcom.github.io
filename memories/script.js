@@ -681,7 +681,7 @@ function renderRiver(opts){
     }
     _masonryShown = end;
     var pe = document.getElementById('galleryLoadProgress');
-    if(pe) pe.textContent = _masonryShown + ' / ' + pool.length + ' 张';
+    if(pe) pe.textContent = '已显示 ' + _masonryShown + ' / ' + pool.length + ' 张';
     return end;
   }
 
