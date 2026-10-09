@@ -998,6 +998,7 @@ function navLightbox(dir){
   }
   lightboxIdx = next;
   if(window.SFX) window.SFX.flip();
+  lbPaging = true;                       // ★ 2026-10-10：告诉 openLightbox「这是翻页，旧图继续显示」
   openLightbox(lightboxIdx);
 }
 window.navLightbox = navLightbox;
@@ -1116,6 +1117,14 @@ function closeLightbox(){
   lb.style.pointerEvents = 'none';
   document.body.style.overflow = '';
   if(window.SFX) window.SFX.click();
+  /* ★ 2026-10-10：关掉就把旧图丢掉。
+     否则 <img> 里一直留着上一张的位图，下次打开时（哪怕判定出错）也有机会闪出来。 */
+  var _lbIm = $('#lightboxImg');
+  if(_lbIm){
+    _lbIm.style.transition = 'none';
+    _lbIm.style.opacity = '0';
+    _lbIm.removeAttribute('src');
+  }
   resetZoom();
 }
 window.closeLightbox = closeLightbox;
@@ -2110,6 +2119,10 @@ var LB_FLING = 0.5;     // 松手速度的采用比例（越小越"稳重"）
 var LB_VMAX  = 1.9;     // 起飞速度上限 px/ms
 var LB_DECAY = 0.945;   // 每帧衰减（越大越黏）
 var LB_VSTOP = 0.38;    // 低于此速度不滑行，直接停
+/* ★ 2026-10-10：区分「全新打开」和「翻页」
+   只有 navLightbox()（翻页）会把它置 true；其余一律按全新打开处理。
+   这样即便将来有人新增调用点忘了传参，也只会"多一次淡入"，绝不会闪出过期照片。 */
+var lbPaging = false;
 
 // 图片在 scale=1 时的显示尺寸（从带 transform 的实测框反推，最稳）
 function lbBaseSize(){
@@ -2191,6 +2204,7 @@ function applyTransform(opts){
 function resetZoom(){
   lbZoom.scale = 1; lbZoom.x = 0; lbZoom.y = 0;
   lbZoom.closeDy = 0; lbZoom.closeScale = 1;
+  if(typeof lbWheelCancel === 'function') lbWheelCancel();   // ★ 复位时打断平滑循环
 }
 
 // 缩放到指定值：① 统一上限 ② 锚点处保持不动 ③ 结束后再钳制一次
@@ -2216,6 +2230,7 @@ function zoomTo(newScale, anchorX, anchorY, withAnim, dur){
 
 // 双指/双击的统一动作：在「适应窗口 ↔ 2.5 倍」之间切换，以落点为锚
 function lbToggleZoomAt(cx, cy){
+  if(typeof lbWheelCancel === 'function') lbWheelCancel();   // ★ 先停掉滚轮平滑，避免互相拉扯
   if(lbZoom.scale > 1.01){
     resetZoom();
     applyTransform({ dur: 340 });
@@ -2259,6 +2274,40 @@ function lbMomentum(vx, vy){
    桌面：pointer 拖拽（缩放时）+ 滚轮指数缩放 + 双击切换
    触屏：单指平移(缩放时) / 单指横滑换图 / 单指下滑关闭 / 双指连续缩放 */
 var lbDrag = null, lbWheelAcc = 0, lbWheelRaf = 0, lbWheelAt = null;
+
+/* ══ ★ 2026-10-10 滚轮平滑缩放引擎 ══════════════════════════════════
+   原来：每个 wheel 事件直接算出倍数，再用 applyTransform({instant:true}) 硬跳一帧。
+        鼠标滚一格 deltaY≈100 → 一次跳 e^0.26 = 1.30 倍；而且事件本身是离散的
+        （一格一事件）→ 视觉上就是「一顿一顿地蹦」，也就是你说的"生硬、卡卡的"。
+   现在：把「离散的输入」和「连续的视觉变化」解耦 ——
+        wheel 只更新【目标缩放值 lbWheelTarget】，
+        再由一个 rAF 循环每帧把当前值按比例逼近目标（指数平滑）。
+        无论鼠标滚轮还是触控板，看到的都是连续顺滑的推拉。 */
+var lbWheelTarget = 1, lbWheelLast = 0;
+var LB_WHEEL_K = 0.0012;        // 强度：鼠标滚一格(≈100) ≈ 放大 12%（原来 30%，太猛）
+var LB_WHEEL_SMOOTH = 0.22;     // 每帧逼近比例：越大越跟手，越小越飘
+
+function lbWheelStep(){
+  lbWheelRaf = 0;
+  var lbEl = $('#lightbox');
+  if(!lbEl || !lbEl.classList.contains('active')){ lbWheelTarget = lbZoom.scale; return; }
+  var diff = lbWheelTarget - lbZoom.scale;
+  var ax = lbWheelAt ? lbWheelAt.x : null, ay = lbWheelAt ? lbWheelAt.y : null;
+  // 收敛阈值必须 > zoomTo 内部的 0.001 最小步进，否则会出现"永远差一点点"的死循环
+  if(Math.abs(diff) <= 0.004){ zoomTo(lbWheelTarget, ax, ay, false); return; }
+  zoomTo(lbZoom.scale + diff * LB_WHEEL_SMOOTH, ax, ay, false);
+  lbWheelRaf = requestAnimationFrame(lbWheelStep);
+}
+function lbWheelTo(target){
+  lbWheelTarget = Math.max(1, Math.min(LB_MAX, target));
+  if(!lbWheelRaf) lbWheelRaf = requestAnimationFrame(lbWheelStep);
+}
+/* 非滚轮的缩放动作（双击/双指/复位）要打断平滑循环，否则两边会互相拉扯 */
+function lbWheelCancel(){
+  if(lbWheelRaf){ cancelAnimationFrame(lbWheelRaf); lbWheelRaf = 0; }
+  lbWheelTarget = lbZoom.scale;
+}
+window.lbWheelCancel = lbWheelCancel;
 var lbTouch = { mode:'none' };
 
 function bindLightboxInteractions(){
@@ -2281,17 +2330,13 @@ function bindLightboxInteractions(){
     e.preventDefault();
     var d = e.deltaY;
     if(e.deltaMode === 1) d *= 16;              // 以"行"为单位的设备
-    else if(e.deltaMode === 2) d *= 100;
-    d = Math.max(-140, Math.min(140, d));
+    else if(e.deltaMode === 2) d *= 100;        // 以"页"为单位的设备
+    d = Math.max(-120, Math.min(120, d));
+    var nowT = performance.now();
+    if(nowT - lbWheelLast > 220) lbWheelTarget = lbZoom.scale;   // 新手势：从当前实际值起算
+    lbWheelLast = nowT;
     lbWheelAt = { x: e.clientX, y: e.clientY };
-    lbWheelAcc += -d * 0.0026;
-    if(!lbWheelRaf){
-      lbWheelRaf = requestAnimationFrame(function(){
-        lbWheelRaf = 0;
-        var f = Math.exp(lbWheelAcc); lbWheelAcc = 0;
-        if(lbWheelAt) zoomTo(lbZoom.scale * f, lbWheelAt.x, lbWheelAt.y, false);
-      });
-    }
+    lbWheelTo(lbWheelTarget * Math.exp(-d * LB_WHEEL_K));
   }, {passive:false});
 
   /* ③ 桌面拖拽（仅缩放后）+ 惯性 */
@@ -2480,7 +2525,14 @@ function openLightbox(idx, kenBurns){
 
   // 载入耗时超过 400ms 才显示转圈 —— 缓存命中时完全不闪（这是"成熟感"的关键细节）
   var loaderTimer = setTimeout(function(){ showLbLoader(true, 0, '加载中…'); }, 400);
-  var firstPaint = !img.src || img.src === '' || img.src === window.location.href;
+  /* ★ 2026-10-10 修「打开照片时先闪一下上一张」★
+     旧判定靠 img.src 是否为空来判断"首次打开"，但关闭灯箱时从不清空 src →
+     从第二次打开起 firstPaint 恒为 false → 走进「换图时旧图继续显示」的分支 →
+     屏幕上先出现【上一张】，等新图 preload 完才被替换 —— 就是你看到的那一闪。
+     正解：由调用方明确告知。只有翻页(navLightbox)才允许旧图继续显示（避免中间空档）；
+     其余情况一律按"全新打开"：新图没就绪前保持透明，绝不显示过期照片。 */
+  var firstPaint = !lbPaging;
+  lbPaging = false;
 
   loadImageWithProgress(src, fullAlt(photo)).then(function(url){
     var pre = new Image();
