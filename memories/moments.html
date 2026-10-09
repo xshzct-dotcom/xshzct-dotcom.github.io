@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20261010-3">
+<link rel="stylesheet" href="style.css?v=20261010-4">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -411,6 +411,63 @@ img[src^="data:"]{ animation:none }
 .empty-art .ea-bars i:nth-child(4){ height:20px; animation-delay:.48s }
 @keyframes eaBar{ 0%,100%{ transform:scaleY(.55); opacity:.5 } 50%{ transform:scaleY(1); opacity:.9 } }
 
+
+/* ══════════════════════════════════════════════════════════════════
+   ★ 2026-10-10 返回按钮常驻（用户反馈：看到下面时要滚回顶部才能退出）
+   ──────────────────────────────────────────────────────────────────
+   原来两处都够不着：
+     · 详情页「← 返回列表」写的是 position:absolute，而 .mp-detail-wrap 没有定位
+       → absolute 会相对【文档】而非【视口】解析，往下滚它就跑走了
+     · 列表页「← 返回主页」虽然 sticky，却带一段"下滑隐藏"逻辑
+       （模仿浏览器地址栏）→ 一往下滑就藏起来，同样按不到
+   现在：两者统一改成 position:fixed 的悬浮胶囊，永远可点。
+   博客页跑在 iframe 里，iframe 是 height:calc(100% - var(--nav-h)) 的视口尺寸，
+   因此 iframe 内部 fixed = 贴在可见区左上角，正好落在主站导航下方。
+   z-index 取 30：高于 .mp-head(20)、低于 .mp-viewer(200) —— 看大图时被盖住，不碍事。
+   ══════════════════════════════════════════════════════════════════ */
+.mp-back, .ml-back{
+  position: fixed !important;
+  left: 14px !important;
+  top: 12px !important;
+  margin: 0 !important;
+  z-index: 30 !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px 7px 12px;
+  border-radius: var(--r-full, 999px);
+  border: 1px solid rgba(var(--fg-rgb), .10);
+  background: rgba(14,17,22,.72);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+  color: var(--text);
+  font-size: .86rem;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(0,0,0,.18);
+  transition: background .22s var(--ease), border-color .22s var(--ease),
+              color .22s var(--ease), transform .22s var(--ease);
+}
+@media (hover: hover) and (pointer: fine){
+  .mp-back:hover, .ml-back:hover{
+    background: rgba(14,17,22,.92);
+    border-color: var(--border-hover);
+    transform: translateY(-1px);
+  }
+}
+.mp-back:active, .ml-back:active{ transform: scale(.96) }
+[data-theme="light"] .mp-back, [data-theme="light"] .ml-back{
+  background: rgba(255,255,255,.86);
+  border-color: rgba(32,35,40,.12);
+  color: #1F2226;
+  box-shadow: 0 2px 10px rgba(32,35,40,.10);
+}
+@media (hover: hover) and (pointer: fine){
+  [data-theme="light"] .mp-back:hover, [data-theme="light"] .ml-back:hover{
+    background: #FFFFFF; border-color: rgba(32,35,40,.24);
+  }
+}
 </style>
 </head>
 <body>
@@ -496,7 +553,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20261010-3"></script>
+<script src="vendor/supabase.js?v=20261010-4"></script>
 <script>
 (function(){
   'use strict';
@@ -1084,22 +1141,15 @@ async function load(){
     }
   }
 
-  // 2026-09-15：移动端顶部返回键"下滑隐藏/上滑显示"（避免一直占着左上角）
+  /* ★ 2026-10-10 已移除「下滑隐藏返回键」逻辑 ★
+     原实现：下滑 >80px 就给 .mp-head 加 .head-hidden（opacity:0 + translateY(-100%)），
+             上滑或回顶才恢复 —— 模仿浏览器地址栏。
+     问题：用户滚到文章下面想退出时，返回键正好是隐藏状态，必须滚回顶部才能按到。
+     现在返回键本身已是 position:fixed 的常驻胶囊，这层隐藏逻辑连同必要性一起删掉。
+     （.head-hidden 的 CSS 规则保留但不再有人添加该类，无副作用） */
   (function(){
     var hd = document.querySelector('.mp-head');
-    if(!hd) return;
-    var lastY = window.scrollY, ticking = false;
-    window.addEventListener('scroll', function(){
-      if(ticking) return;
-      ticking = true;
-      requestAnimationFrame(function(){
-        var y = window.scrollY;
-        if(y > lastY + 6 && y > 80){ hd.classList.add('head-hidden'); }
-        else if(y < lastY - 6 || y <= 80){ hd.classList.remove('head-hidden'); }
-        lastY = y;
-        ticking = false;
-      });
-    }, {passive:true});
+    if(hd) hd.classList.remove('head-hidden');   // 兜底：万一状态里残留
   })();
   // 2026-09-15：卡片上长按不要弹系统菜单（否则会打断"按住显现"的手感）
   (function(){
