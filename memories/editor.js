@@ -1490,6 +1490,36 @@ function pbInsertAtCursor(ta, str){
   ta.focus();
 }
 
+/* ★ 2026-10-10 ★ 修「移除照片/视频后，它后面的正文被吞掉」
+   ──────────────────────────────────────────────────────────────
+   旧实现（本文件原 1516-1535 / 1555-1571 行）：
+     正文按 /\[照片\d+\]/ split 成 parts，再这样拼回去 ——
+       out = parts[0];
+       newOrder.forEach((_, k) => out += '[照片'+(k+1)+']' + (parts[k+1] || ''));
+     当 newOrder 为空（删掉唯一一张 / 最后一张）时，forEach 一次都不执行，
+     parts[1]、parts[2]… 全部没被拼回 → 照片后面的文字无声消失。
+     实测：post#66《状态》233 字 → 0 字；post#9《今天，你开始笑了》152 字 → 67 字。
+   ──────────────────────────────────────────────────────────────
+   新实现：只扫一遍正文，删掉「被移除那张」的标记，其余文字一字不动，
+          剩下的标记按出现顺序重新编号。（不依赖位置，从根本上杜绝错位） */
+function pbRemoveMediaTag(text, i, kind){
+  if(!text) return text || '';
+  var re = new RegExp('\\[' + kind + '(\\d+)\\]', 'g');
+  var out = '', last = 0, m;
+  while((m = re.exec(text)) !== null){
+    out += text.slice(last, m.index);            // 标记【前】的文字：原样保留
+    if(parseInt(m[1], 10) !== i + 1){
+      out += '\u0000' + m[1] + '\u0000';        // 保留的标记先占位
+    }
+    last = m.index + m[0].length;
+  }
+  out += text.slice(last);                       // 标记【后】的文字：一定要保留
+  var n = 0;                                     // 按出现顺序重编号 1..n
+  return out.replace(/\u0000(\d+)\u0000/g, function(_, d){
+    return '[' + kind + (++n) + ']';
+  });
+}
+
 function pbRenderImgList(){
   var box = document.getElementById('postImgList');
   if(!box) return;
@@ -1517,19 +1547,11 @@ function pbRenderImgList(){
     btn.onclick = function(){
       var i = +btn.getAttribute('data-rm');
       var ta = document.getElementById('postText');
-      var cur = ta ? ta.value : '';
-      var parts = cur.split(/\[照片\d+\]/);
-      var order = (cur.match(/\[照片(\d+)\]/g) || []).map(function(s){ return parseInt(s.match(/\d+/)[0], 10); });
+      // 2026-10-10 修复：先按标记安全重写正文（保留全部文字），再移除图片
+      if(ta) ta.value = pbRemoveMediaTag(ta.value, i, '照片');
       _postDraft.images.splice(i, 1);
-      var newOrder = order.filter(function(n){ return n !== (i + 1); });
-      if(newOrder.length !== order.length - 1){
-        // 该照片没有在文中插过，只需重排剩余
-        newOrder = order.filter(function(_, k){ return k !== i; });
-      }
-      var out = parts[0] || '';
-      newOrder.forEach(function(oldN, k){ out += '[照片' + (k + 1) + ']' + (parts[k + 1] || ''); });
-      if(ta) ta.value = out;
       pbRenderImgList();
+      pbSaveDraftSoon();
       _postStatus('已移除照片');
     };
   });
@@ -1556,14 +1578,9 @@ function pbRenderVideoList(){
     btn.onclick = function(){
       var i = +btn.getAttribute('data-rmv');
       var ta = document.getElementById('postText');
-      var cur = ta ? ta.value : '';
-      var parts = cur.split(/\[视频\d+\]/);
-      var order = (cur.match(/\[视频(\d+)\]/g) || []).map(function(s){ return parseInt(s.match(/\d+/)[0], 10); });
+      // 2026-10-10 修复：与照片同一处 bug，一起改成安全写法
+      if(ta) ta.value = pbRemoveMediaTag(ta.value, i, '视频');
       (_postDraft.videos || []).splice(i, 1);
-      var newOrder = order.filter(function(_, k){ return k !== i; });
-      var out = parts[0] || '';
-      newOrder.forEach(function(oldN, k){ out += '[视频' + (k + 1) + ']' + (parts[k + 1] || ''); });
-      if(ta) ta.value = out;
       pbRenderVideoList();
       pbSaveDraftSoon();
       _postStatus('已移除视频');
