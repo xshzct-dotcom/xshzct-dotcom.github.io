@@ -294,6 +294,28 @@ function buildTimeline(){
   // 去掉没有文章的组
   Object.keys(groups).forEach(k => { if(groups[k].items.length===0) delete groups[k]; });
   const catIds = Object.keys(groups);
+  /* ★ 2026-10-01：把分类组按【组内最新一篇文章的日期】降序排 ★
+     为什么需要：组的顺序原来完全取决于数据来源 ——
+       data.js 走数组顺序（童年篇 → 初恋篇），Supabase 走分组时的插入顺序（初恋篇 → 童年篇）。
+     两边不一致时，首屏兜底画一次、DB 数据回来再画一次 → 你会看到两组"上下跳一下"。
+     统一成一个确定性排序后，两次渲染结果完全相同，就不会再跳。
+     规则：有日期的按最新日期降序在前；全组都没日期的排最后（稳定排序保持原相对顺序）。
+     例：初恋篇最新 2026.4.20 → 在前；童年篇 7 篇全无日期 → 在后。（与现状一致，不改动观感） */
+  catIds.sort(function(a,b){
+    function newest(g){
+      var mx='';
+      (g.items||[]).forEach(function(it){
+        var d=it.date||'';
+        if(/^\d{4}\./.test(d) && d>mx) mx=d;
+      });
+      return mx;
+    }
+    var na=newest(groups[a]), nb=newest(groups[b]);
+    if(na && nb) return na<nb ? 1 : (na>nb ? -1 : 0);
+    if(na && !nb) return -1;
+    if(!na && nb) return 1;
+    return 0;
+  });
   if(catIds.length===0){
     timeline.innerHTML = '<div class="timeline-empty"># 暂无文章 #</div>';
     return;
@@ -1917,6 +1939,7 @@ async function loadFromSupabase(){
         essayCategories.splice(0, essayCategories.length, ...cats);
       }
       // 重建时间线索引 + 显示
+      window._essaysFromDB = true;   // ★ 告诉上面的兜底定时器：别再用 data.js 画了
       fillTimelineIndex();
       buildTimeline();
     }
@@ -2023,7 +2046,17 @@ function init(){
   initMusic();
   // 歌单同步在下面 init() 末尾统一处理（带 data.js 兜底）
   fillTimelineIndex();
-  buildTimeline();
+  /* ★ 2026-10-01：首屏【不再】直接用 data.js 画随笔时间线 ★
+     根因：data.js 是"首次灌入的兜底数据"，它和 Supabase 里实际的文章/分类
+           迟早会不一致 —— 你在编辑器里删掉一个分类，data.js 不会跟着变。
+     原来：先画 data.js（3 个分类，含已删的「日记」）→ Supabase 回来整组重画（2 个分类）
+           → 中间那一下就是你看到的"闪一下之前的日记"。
+     现在：优先等 Supabase 的数据（通常 200~400ms）来画；只有它失败/超过 700ms 没回应，
+           才用 data.js 兜底（保证离线、慢网也能看到内容，不会空白）。 */
+  window._essaysFromDB = false;
+  setTimeout(function(){
+    if(!window._essaysFromDB) buildTimeline();   // 离线 / 超时兜底
+  }, 700);
   buildRiver();
   bindLightboxInteractions();
   initDailyQuote();
