@@ -1243,6 +1243,27 @@ function renderPostAttachments(){
   });
 }
 
+/* ★ 2026-10-12：编辑器里的 emoji 图标统一换单色 SVG（emoji 在 Windows 会渲染成豆腐块） */
+(function(){
+  if(document.getElementById('eIcoStyle')) return;
+  var st=document.createElement('style'); st.id='eIcoStyle';
+  st.textContent='.e-ico{width:14px;height:14px;vertical-align:-2px;margin-right:5px;opacity:.85;flex:0 0 auto}';
+  document.head.appendChild(st);
+})();
+
+/* ★ 2026-10-12：编辑列表里的动态缩略图 + 音乐标记（替代 🖼 / 🎵 emoji） */
+(function(){
+  if(document.getElementById('pvThumbStyle')) return;
+  var st=document.createElement('style'); st.id='pvThumbStyle';
+  st.textContent =
+    '.pv-thumb{position:relative;flex:0 0 46px;width:46px;height:46px;border-radius:9px;overflow:hidden;background:rgba(var(--fg-rgb),.06)}'
+  + '.pv-thumb img{width:100%;height:100%;object-fit:cover;object-position:center 32%;display:block;opacity:.55;transition:opacity var(--dur-ui) ease,transform var(--dur-ui) ease}'
+  + '.pv-thumb:hover img{opacity:1;transform:scale(1.04)}'
+  + '.pv-thumb-n{position:absolute;right:3px;bottom:3px;min-width:15px;height:15px;padding:0 4px;border-radius:8px;background:rgba(0,0,0,.62);color:#fff;font-size:.62rem;line-height:15px;text-align:center;font-variant-numeric:tabular-nums}'
+  + '.pv-note{width:12px;height:12px;vertical-align:-1px;margin-left:5px;opacity:.72;flex:0 0 auto}';
+  document.head.appendChild(st);
+})();
+
 function renderPostOldList(posts){
   var el = document.getElementById('postOldList');
   if(!el) return;
@@ -1258,15 +1279,37 @@ function renderPostOldList(posts){
        ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2));
     var title = (p.title || '').trim();
     var txt = (p.content || '').replace(/\s+/g, ' ').slice(0, 40);
-    var cnt = (p.images && p.images.length) ? ' 🖼' + p.images.length : '';
-    if(p.music_path) cnt += ' 🎵';
+    /* ★ 2026-10-12：不再用「🖼N」这个图标 ★
+       原来写的是 ' 🖼' + 数量 —— 🖼 在 Windows 上渲染成豆腐块（本项目站规本来就禁止 emoji 当图标），
+       看起来就是一个莫名的方块加数字。用户要求：直接把照片半透明显示出来，更直观。
+       现在：左侧放一张该动态首图的小缩略图（半透明 .55，悬停变实），
+             多图时右下角叠一个数字；音乐改用单色 SVG（不再用 🎵 emoji）。
+       缩略图取 Storage 的 thumbs/ 前缀（和博客列表 moments.html 用同一套），
+       加载失败就回退到原图。 */
+    var imgCnt = (p.images && p.images.length) || 0;
+    var thumbHtml = '';
+    if(imgCnt){
+      var first = p.images[0];
+      var tSrc = _storageUrl('thumbs/' + first);
+      var fSrc = _storageUrl(first);
+      thumbHtml = '<div class="pv-thumb">' +
+        '<img src="' + esc(tSrc) + '" alt="" loading="lazy" decoding="async"' +
+        ' onerror="this.onerror=null;this.src=\'' + esc(fSrc) + '\'">' +
+        (imgCnt > 1 ? '<span class="pv-thumb-n">' + imgCnt + '</span>' : '') +
+        '</div>';
+    }
+    var musicHtml = p.music_path
+      ? '<svg class="pv-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-label="有音乐"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16.5" cy="16" r="3"/></svg>'
+      : '';
+    var cnt = '';
     var extra = [p.mood, p.weather, p.location].filter(Boolean).join(' · ');
     // 有标题 → 主行显示标题（醒目），下面小字跟正文摘要；无标题 → 只显示摘要
     var mainLine = title
-      ? ('<div style="font-size:.93rem;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(title) + cnt + '</div>' +
+      ? ('<div style="font-size:.93rem;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(title) + musicHtml + '</div>' +
          (txt ? '<div style="font-size:.74rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px">' + esc(txt) + '…</div>' : ''))
-      : ('<div style="font-size:.86rem;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (esc(txt) || '（无文字）') + cnt + '</div>');
+      : ('<div style="font-size:.86rem;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (esc(txt) || '（无文字）') + musicHtml + '</div>');
     return '<div style="display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)">' +
+      thumbHtml +
       '<div style="flex:1;min-width:0">' +
         '<div style="font-size:.72rem;color:var(--text-muted);margin-bottom:3px">' + ts + '</div>' +
         mainLine +
@@ -1912,14 +1955,14 @@ async function renderPostTab(){
       </div>
       <input id="postTitle" class="post-title-input" placeholder="标题">
       <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 10px;font-size:.8rem;color:var(--text-dim)">
-        <span style="flex-shrink:0">📅 日期</span>
+        <span style="flex-shrink:0;display:inline-flex;align-items:center"><svg class="e-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>日期</span>
         <input id="postDate" type="date" style="background:rgba(var(--fg-rgb),.06);border:1px solid var(--border);border-radius:8px;padding:5px 9px;color:var(--text);font-size:.82rem;font-family:inherit">
       </div>
       <textarea id="postText" rows="12"></textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
-        <button type="button" class="editor-btn editor-btn-secondary" id="postInsertImg">🖼 插入照片</button>
-        <button type="button" class="editor-btn editor-btn-secondary" id="postInsertVideo">🎬 插入视频</button>
-        <label class="editor-btn editor-btn-secondary" style="cursor:pointer">🎵 加音乐
+        <button type="button" class="editor-btn editor-btn-secondary" id="postInsertImg"><svg class="e-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="M4 17l5-5 3.5 3.5L16 12l4 4.5"/></svg>插入照片</button>
+        <button type="button" class="editor-btn editor-btn-secondary" id="postInsertVideo"><svg class="e-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="13" height="14" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3z"/></svg>插入视频</button>
+        <label class="editor-btn editor-btn-secondary" style="cursor:pointer"><svg class="e-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16.5" cy="16" r="3"/></svg>加音乐
           <input type="file" accept="audio/*" style="display:none" id="postMusicInput"></label>
         <input type="file" accept="image/*" style="display:none" id="postImgInput">
       </div>

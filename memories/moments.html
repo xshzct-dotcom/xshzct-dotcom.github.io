@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20261010-5">
+<link rel="stylesheet" href="style.css?v=20261012-1">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -470,6 +470,31 @@ img[src^="data:"]{ animation:none }
     background: #FFFFFF; border-color: rgba(32,35,40,.24);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   ★ 2026-10-12 修「进博客/更新博客时从右边闪一下」★
+   ──────────────────────────────────────────────────────────────────
+   逐帧实测（iframe 内，打开博客期间）：
+     t≈15ms   骨架屏已渲染 → documentElement.scrollWidth = 1200 > clientWidth = 1192（横向溢出 8px）
+     t≈211ms  仍然 8px
+     t≈178ms  之后恢复正常
+   8px = 一条滚动条的宽度。而且逐元素排查后：
+     · 没有任何元素右边界越界（who 为空）
+     · 没有任何元素自身横向溢出（selfOver 为空）
+     · 没有任何元素宽度等于 innerWidth（vwUsers 为空）
+   结论：这 8px 不是某个元素撑出来的，而是【内容高度变化时竖向滚动条重新布局】的瞬时抖动 ——
+        滚动条一出现/消失，可用宽度瞬间变化 8px，横向位置就跳一下，看起来就是"从右边闪一下"。
+        更新博客时会重新拉数据、骨架屏再走一遍，所以同一个现象复现。
+   修法（两条，都只作用在博客页，不影响主页）：
+     ① overflow-x: clip —— 杜绝任何瞬时横向溢出，不会再冒出横向滚动条。
+        用 clip 而不是 hidden：clip 不创建滚动容器，不会破坏 .mp-head / .ml-back 的 sticky。
+     ② scrollbar-gutter: stable —— 竖向滚动条的空间常驻预留，
+        内容宽度不再随滚动条出现/消失而变化 → 横向零位移。
+   ══════════════════════════════════════════════════════════════════ */
+html{
+  overflow-x: clip;
+  scrollbar-gutter: stable;
+}
 </style>
 </head>
 <body>
@@ -555,7 +580,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20261010-5"></script>
+<script src="vendor/supabase.js?v=20261012-1"></script>
 <script>
 (function(){
   'use strict';
