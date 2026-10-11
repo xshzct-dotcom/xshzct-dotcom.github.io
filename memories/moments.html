@@ -18,11 +18,12 @@
 <title>博客 · 向天游</title>
 <meta name="theme-color" content="#0E1116">
 <meta name="description" content="读与行 — 文字、照片与音乐">
-<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/index.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/600.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5/700.css">
-<link rel="stylesheet" href="style.css?v=20261012-1">
+<!-- ★ 2026-10-12 字体瘦身：本页原来只有 jsDelivr 一个字体来源，
+     换成和主页同一套（Google Fonts），这样两页字体来源统一、也少一个 CDN 依赖。 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20261012-2">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -580,7 +581,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20261012-1"></script>
+<script src="vendor/supabase.js?v=20261012-2"></script>
 <script>
 (function(){
   'use strict';
