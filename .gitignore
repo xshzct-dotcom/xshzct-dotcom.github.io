@@ -7,3 +7,8 @@ Thumbs.db
 __pycache__/
 *.pyc
 _pycache/
+
+# 2026-10-12：调试/临时文件不进仓库（仓库是公开的）
+_diag*.html
+网站链接.txt
+julian678/
