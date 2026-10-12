@@ -1628,7 +1628,8 @@ function playSong(idx, seekFromStorage){
   currentSongIdx=idx;
   const t=s[idx];
   const sp=(t.storage_path||t.url||'').trim();
-  const SUPABASE_STORAGE = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/';
+  /* 2026-10-12：改走私有桶（原来指向公开桶，照片私有化后那里只剩 404） */
+  const SUPABASE_STORAGE = MEDIA_BASE;
   let url = sp.startsWith('http') ? sp
           : sp.startsWith('music/') ? MUSIC_BASE+sp.slice(6)
           : sp ? SUPABASE_STORAGE+sp
@@ -2192,8 +2193,12 @@ async function loadFromSupabase(){
     if(albumPhotos && albumPhotos.length > 0){
       albumPhotos.forEach(function(ap){
         var sp = ap.storage_path || ap.filename || '';
-        var imgUrl = sp.startsWith('images/') ? ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//,''))
-          : ('https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos/' + sp);
+        /* ★ 2026-10-12：非 images/ 开头的那几条（相册里早期直接上传的照片）
+           原来拼的是【公开桶】地址，现已迁到私有桶。改成拼私有桶路径 —— 未登录时
+           会被 Service Worker 挡住（返回 404），登录后由 SW 补凭证正常加载。 */
+        var imgUrl = sp.startsWith('images/')
+          ? ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//,''))
+          : (MEDIA_BASE + safeKey(sp));
         allGalleryPhotos.push({path:imgUrl||sp, src:imgUrl||sp, _albumTitle:sbAlbumMap[ap.album_id]?sbAlbumMap[ap.album_id].title:'未知', _albumId:String(ap.album_id)});
       });
     } else {
