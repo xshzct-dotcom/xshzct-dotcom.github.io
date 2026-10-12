@@ -2272,12 +2272,20 @@ function init(){
   // 同步 data.js → Supabase（让编辑器有真实数据）— 暴露 promise 给 editor 共享
   window.MemoriesReady = ensureSync();
 
-  // 拉 DB 歌单 + 播放第一首（用户手势授权后才播放）
-  ensureSync().then(() => loadFromSupabase()).then(() => {
-    if(window._currentSongs && window._currentSongs.length > 0){
-      switchPlaylist(window._currentSongs);
-    }
-  }).catch(e => console.warn('[memories] init playlist failed:', e));
+  /* ══ 拉 DB 数据 + 歌单（2026-10-12 改造）══
+     数据库的读权限已收紧为「仅已登录用户可读」，所以必须先确认有登录会话再请求，
+     否则未登录时会刷一堆 401。
+     未登录时页面被密码门整屏遮住、看不到任何内容，也根本不需要加载数据；
+     登录成功后代码会 location.reload()，那时 hasLocalSession() 为真，自然就会加载。 */
+  if (typeof hasLocalSession === 'function' && hasLocalSession()) {
+    ensureSync().then(() => loadFromSupabase()).then(() => {
+      if(window._currentSongs && window._currentSongs.length > 0){
+        switchPlaylist(window._currentSongs);
+      }
+    }).catch(e => console.warn('[memories] init playlist failed:', e));
+  } else {
+    console.log('[memories] 未登录 → 不请求云端数据（登录后会自动重载）');
+  }
 
   // 全局媒体观察
   const mo = new MutationObserver(()=>{ observeFadeUps(); });
