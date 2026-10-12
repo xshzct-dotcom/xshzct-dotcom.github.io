@@ -13,46 +13,20 @@ function rand(min,max){return min+Math.random()*(max-min)}
 function randi(min,max){return Math.floor(rand(min,max+1))}
 
 // ===== 路径处理（兼容字符串与对象） =====
-// 双源策略（2026-09-10）：
-//   主源 = GitHub Pages 直连（源站，永远最新，不会拿到 CDN 缓存的旧坏图）
-//   备源 = jsDelivr CDN（加速 + 免疫 GitHub Pages 的 429 限流）
-//   图片 onerror 时自动切到备源重试，两源都失败才显示"图丢失"
-const REPO = 'xshzct-dotcom/xshzct-dotcom.github.io@main';
-const IMG_BASE = 'https://xshzct-dotcom.github.io/images/';
-const THUMB_BASE = 'https://xshzct-dotcom.github.io/thumbs/';
-// 备用 CDN 源
-const IMG_BASE_ALT = 'https://cdn.jsdelivr.net/gh/'+REPO+'/images/';
-const THUMB_BASE_ALT = 'https://cdn.jsdelivr.net/gh/'+REPO+'/thumbs/';
-const MUSIC_BASE = 'https://xshzct-dotcom.github.io/music/';
+/* ★ 2026-10-12 清理：这里原本有 6 个常量 ——
+     REPO / IMG_BASE / THUMB_BASE / IMG_BASE_ALT / THUMB_BASE_ALT / MUSIC_BASE
+   它们全部指向 GitHub 仓库或 jsDelivr CDN（属于"双源策略"时代的产物）。
+   照片迁入 Supabase 私有桶 + 仓库媒体清空 + git 历史重写之后，这些地址
+   统统 404；而且全文件搜下来只剩定义行、没有任何代码引用 → 整块删除。
+   现在所有媒体只有一条路：Media 私有桶，取图统一走 thumb() / full()。 */
 function getPath(p){
   if(!p) return '';
   if(typeof p==='string') return p;
   return p.path||p.src||p.storage_path||p.url||p.filename||'';
 }
-// 内部：按指定 base 生成缩略图 URL
-function _thumbWith(p, base){
-  const s=getPath(p); if(!s) return '';
-  if(s.startsWith('http')) return s;
-  let t = s;
-  if(t.startsWith('images/')) t = t.slice(7);
-  if(t.startsWith('thumbs/')) return base+t.slice(7);
-  t = t.replace(/\.jpg$/i, '.webp')
-       .replace(/\.jpeg$/i, '.webp')
-       .replace(/\.png$/i, '.webp');
-  return base+t;
-}
-// 内部：按指定 base 生成原图 URL
-function _fullWith(p, base){
-  const s=getPath(p); if(!s) return '';
-  if(s.startsWith('http')) return s;
-  if(s.startsWith('images/')) return base+s.slice(7);
-  if(s.startsWith('thumbs/')){
-    let t = s.replace(/^\.\.\/thumbs\//, 'images/').replace(/^thumbs\//, 'images/');
-    t = t.replace(/\.webp$/i, '.jpg');
-    return base+t.slice(7);
-  }
-  return base+s;
-}
+/* ★ 2026-10-12 清理：这里原本有 _thumbWith() / _fullWith() 两个
+   "按指定 base 生成 URL" 的函数，是给旧的 GitHub直连 / jsDelivr 双源切换用的。
+   双源已经不存在了，而且这两个函数全文件只剩定义、没有任何调用 → 删除。 */
 /* ══════════════════════════════════════════════════════════════════
    ★ 2026-10-12 私有媒体：照片改从 Supabase 私有桶取（不再是公开的 GitHub Pages）★
    ──────────────────────────────────────────────────────────────────
@@ -128,8 +102,10 @@ function _normMediaPath(s){
   t = t.replace(/^\.\.\//, '');      // 去掉 ../
   return t;
 }
-// 只有 images/ 或 thumbs/ 开头的才是"从仓库迁过来的那批" → 走私有桶
-function _isOwnMedia(s){ return /^(images|thumbs)\//.test(s); }
+// 桶里有「仓库迁过来的那批」（images/ thumbs/）以及编辑器/博客上传的两类：
+//   posts/  = 动态正文里插入的图（moments.html 上传）
+// 这些都必须走私有桶；只有真正的外链（别的网站）才原样放行。
+function _isOwnMedia(s){ return /^(images|thumbs|posts)\//.test(s); }
 
 // 缩略图
 function thumb(p){
@@ -145,6 +121,11 @@ function full(p){
   var s = _normMediaPath(raw);
   if (!_isOwnMedia(s)) return raw;
   if (!_mediaAuthed()) return MEDIA_BLANK;
+  /* ★ 2026-10-12：博客图（posts/）在桶里就放在 posts/ 下，不带 images/ 前缀。
+     而 _fullRel() 是给"仓库迁过来那批"设计的 —— 它把 thumbs/x.webp 还原成
+     x.jpg 再交给调用方拼 'images/'。若把 posts/ 也交给它，会拼成
+     images/posts/x.jpg（桶里没这个 key → 404），所以这里单独走一条直通。 */
+  if (s.indexOf('posts/') === 0) return MEDIA_BASE + safeKey(s);
   return MEDIA_BASE + 'images/' + safeKey(_fullRel(s));
 }
 // 备源：私有桶只有一个源，缩略图缺失时直接回退原图（沿用原有的 onerror 链）
@@ -1628,12 +1609,19 @@ function playSong(idx, seekFromStorage){
   currentSongIdx=idx;
   const t=s[idx];
   const sp=(t.storage_path||t.url||'').trim();
-  /* 2026-10-12：改走私有桶（原来指向公开桶，照片私有化后那里只剩 404） */
+  /* 2026-10-12：改走私有桶 */
   const SUPABASE_STORAGE = MEDIA_BASE;
+  /* ★ 2026-10-12 修复：原来有两条分支指向仓库的 /music/ 目录（MUSIC_BASE）——
+       sp.startsWith('music/') ? MUSIC_BASE+sp.slice(6)
+       : MUSIC_BASE+(t.name||t.title||'')+'.mp3'
+     仓库媒体已清空 + git 历史重写，那个目录返回 404（实测 /music/ 路径 404），
+     一旦命中就会"歌点了没反应"。现在两条都改走私有桶（MEDIA_BASE）。
+     注意 sp 可能是带中文的原形（如 'music/陈绮贞 - 旅行的意义.mp3'），
+     而桶里的 key 是 safeKey 编码后的形态（'music/_E9_99_88...mp3'），
+     所以必须包一层 safeKey；纯 ASCII 的名字 safeKey 是无操作，不会破坏原路径。 */
   let url = sp.startsWith('http') ? sp
-          : sp.startsWith('music/') ? MUSIC_BASE+sp.slice(6)
-          : sp ? SUPABASE_STORAGE+sp
-          : MUSIC_BASE+(t.name||t.title||'')+'.mp3';
+          : sp ? SUPABASE_STORAGE + safeKey(sp)
+          : SUPABASE_STORAGE + safeKey('music/' + (t.name||t.title||'') + '.mp3');
   // 2026-09-16 修复：先把"恢复进度"的监听器绑好，再设置 src 并 load
   //   —— 原来是 src+load() 之后才绑 loadedmetadata；元数据若已就绪就永不触发，
   //      这正是"歌记住了但进度不延续"的原因
@@ -2193,12 +2181,13 @@ async function loadFromSupabase(){
     if(albumPhotos && albumPhotos.length > 0){
       albumPhotos.forEach(function(ap){
         var sp = ap.storage_path || ap.filename || '';
-        /* ★ 2026-10-12：非 images/ 开头的那几条（相册里早期直接上传的照片）
-           原来拼的是【公开桶】地址，现已迁到私有桶。改成拼私有桶路径 —— 未登录时
-           会被 Service Worker 挡住（返回 404），登录后由 SW 补凭证正常加载。 */
-        var imgUrl = sp.startsWith('images/')
-          ? ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//,''))
-          : (MEDIA_BASE + safeKey(sp));
+        /* ★ 2026-10-12：这里原来是两套写法 ——「images/ 开头 → 拼 GitHub 仓库地址；
+           其余 → 拼公开桶」。仓库媒体已清空 + git 历史重写，GitHub 那条路必定 404；
+           而公开桶也已清空并转为私有。现在桶里 images/** 与散落对象并存，
+           两条统一成一条：私有桶 + safeKey（safeKey 对纯 ASCII 名字是无操作）。
+           （旧写法之所以没暴露问题，是因为下游 thumb()/full() 会先剥域名归一化 ——
+             靠下游兜底太脆，直接拼对更安全。） */
+        var imgUrl = sp ? (MEDIA_BASE + safeKey(sp)) : '';
         allGalleryPhotos.push({path:imgUrl||sp, src:imgUrl||sp, _albumTitle:sbAlbumMap[ap.album_id]?sbAlbumMap[ap.album_id].title:'未知', _albumId:String(ap.album_id)});
       });
     } else {
