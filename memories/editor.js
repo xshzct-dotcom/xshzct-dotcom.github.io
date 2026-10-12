@@ -7,7 +7,32 @@
 
 const SB_URL='https://mvzbkuhwapdqcdkekczh.supabase.co';
 const SB_KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
-const STORAGE_URL=SB_URL+'/storage/v1/object/public/photos';
+/* ★ 2026-10-12：编辑器改走【私有桶】★
+   原来上传/读取都用公开桶 photos —— 等于你新传的每张照片都是公开的，
+   别人拿到链接就能看。现在统一走私有桶 private：
+     · 上传对象名经 safeKey() 编码（Supabase 不接受非 ASCII 的 key）
+     · 读取用 authenticated/private 路径，由 Service Worker 补登录凭证
+   说明：库里已有的对象名本来就是纯 ASCII，safeKey() 对它们是无操作，所以不用改数据。 */
+const STORAGE_URL=SB_URL+'/storage/v1/object/authenticated/private';
+const MEDIA_BUCKET='private';
+// 与 script.js 里同名函数保持一致（逐段处理，非 ASCII 编成 _XX）
+function safeKey(path){
+  return String(path || '').split('/').map(function(seg){
+    var out = '';
+    for (var i = 0; i < seg.length; ) {
+      var cp = seg.codePointAt(i), ch = String.fromCodePoint(cp);
+      i += ch.length;
+      if (cp < 128 && /[A-Za-z0-9._-]/.test(ch)) { out += ch; }
+      else {
+        var bytes = unescape(encodeURIComponent(ch));
+        for (var k = 0; k < bytes.length; k++) {
+          out += '_' + ('0' + bytes.charCodeAt(k).toString(16).toUpperCase()).slice(-2);
+        }
+      }
+    }
+    return out;
+  }).join('/');
+}
 // 2026-09-19：复用 script.js 已创建的客户端，避免同一页面出现两个 GoTrueClient
 //   （控制台会告警 "Multiple GoTrueClient instances ... may produce undefined behavior"）
 let sb;
@@ -866,7 +891,7 @@ function renderList(){
             if(sb) await sb.from('album_photos').delete().in('id', ids);
             // 2026-09-16：连缩略图一起删，避免"删了照片但 thumbs/ 还占着空间"
             var spsAll = sps.concat(sps.map(function(x){ return 'thumbs/' + x; }));
-            if(spsAll.length && sb) sb.storage.from('photos').remove(spsAll).catch(function(){});
+            if(spsAll.length && sb) sb.storage.from(MEDIA_BUCKET).remove(spsAll.map(safeKey)).catch(function(){});
           }catch(err){ console.warn(err); }
           _selSet.clear(); _selectMode = false;
           invalidateCache('album');   // 删除照片后清相册列表缓存（返回时张数正确）
@@ -919,10 +944,10 @@ function renderList(){
             var fname = Date.now() + '_' + Math.random().toString(36).slice(2, 6) + '.' +
                         (isCompressed ? 'jpg' : (f.name.split('.').pop() || 'jpg'));
             console.log('[upload] starting', fname, 'orig:', f.size, 'upload:', upFile.size);
-            var uploadPromise = sb.storage.from('photos').upload(fname, upFile, {upsert:true});
+            var uploadPromise = sb.storage.from(MEDIA_BUCKET).upload(safeKey(fname), upFile, {upsert:true});
             // 2026-09-15：同步生成并上传缩略图（thumbs/ 前缀，~400px）。异步执行，失败不影响主上传
             makeThumbBlob(upFile, 400, 0.8).then(function(tb){
-              if(tb) return sb.storage.from('photos').upload('thumbs/' + fname, tb, {upsert:true, contentType:'image/jpeg'});
+              if(tb) return sb.storage.from(MEDIA_BUCKET).upload(safeKey('thumbs/' + fname), tb, {upsert:true, contentType:'image/jpeg'});
             }).catch(function(e){ console.warn('[thumb] upload failed', e); });
             // 超时按体积动态计算（每 MB 3 秒，最少 30 秒；原来固定 12 秒，大图容易误判失败）
             var toMs = Math.max(30000, Math.ceil(upFile.size / 1048576) * 3000);
@@ -1028,7 +1053,7 @@ async function renderMusicTab(){
           const sp = (t.storage_path || '').trim();
           // 如果 storage_path 是完整 URL（https://xxx/photos/yyy.mp3），提取文件名
           const objName = sp.includes('photos/') ? sp.split('photos/')[1] : sp;
-          sb.storage.from('photos').remove([objName]).catch(()=>{});
+          sb.storage.from(MEDIA_BUCKET).remove([safeKey(objName)]).catch(()=>{});
         }
         // 3. 歌曲文件在 Supabase storage 里已在上一步删了
         //   （GitHub 仓库里的旧文件不再删——安全起见不携带仓库写权限）
@@ -1086,7 +1111,7 @@ async function renderMusicTab(){
         console.log('[music] uploading', fname, 'size:', f.size);
         try{
           // 15秒超时
-          const upPromise = sb.storage.from('photos').upload(fname, f, {
+          const upPromise = sb.storage.from(MEDIA_BUCKET).upload(safeKey(fname), f, {
             upsert: true,
             contentType: f.type || 'audio/mpeg',
             cacheControl: '3600'
@@ -1194,7 +1219,7 @@ function _postStatus(msg, color){
 }
 
 async function uploadToStorage(path, blobOrFile){
-  var up = sb.storage.from('photos').upload(path, blobOrFile, {upsert: true, contentType: blobOrFile.type || undefined});
+  var up = sb.storage.from(MEDIA_BUCKET).upload(safeKey(path), blobOrFile, {upsert: true, contentType: blobOrFile.type || undefined});
   var to = new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('上传超时')); }, 45000); });
   var r = await Promise.race([up, to]);
   if(!r || r.error) throw new Error((r && r.error && r.error.message) || '上传失败');
@@ -1203,7 +1228,7 @@ async function uploadToStorage(path, blobOrFile){
 
 function _storageUrl(p){
   if(!p) return '';
-  return /^https?:/i.test(p) ? p : (STORAGE_URL + '/' + p);
+  return /^https?:/i.test(p) ? p : (STORAGE_URL + '/' + safeKey(p));
 }
 
 function renderPostAttachments(){
@@ -1347,7 +1372,7 @@ function renderPostOldList(posts){
         if(p.music_path) rm.push(p.music_path);
         // 2026-09-16：附件 + 缩略图一并删除（否则 thumbs/ 会长期残留占空间）
         var rmAll = rm.concat(rm.map(function(x){ return 'thumbs/' + x; }));
-        if(rmAll.length && sb) sb.storage.from('photos').remove(rmAll).catch(function(){});
+        if(rmAll.length && sb) sb.storage.from(MEDIA_BUCKET).remove(rmAll.map(safeKey)).catch(function(){});
         invalidateCache('post');
         renderTab();
       }catch(e){ b.textContent = '删除'; alert('删除失败：' + e.message); }
@@ -2073,7 +2098,7 @@ async function renderPostTab(){
       // 2026-09-15：同步生成缩略图（thumbs/posts/...）
       // 博客列表卡片用缩略图作淡化背景，缺失会导致卡片背景空白
       makeThumbBlob(blob, 420, 0.78).then(function(tb){
-        if(tb) return sb.storage.from('photos').upload('thumbs/' + path, tb, {upsert:true, contentType:'image/jpeg'});
+        if(tb) return sb.storage.from(MEDIA_BUCKET).upload(safeKey('thumbs/' + path), tb, {upsert:true, contentType:'image/jpeg'});
       }).catch(function(e){ console.warn('[thumb] post thumb upload failed', e); });
       _postDraft.images.push({ path: path, cap: '', name: f.name, preview: URL.createObjectURL(blob) });
       var n = _postDraft.images.length;
