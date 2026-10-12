@@ -3,7 +3,7 @@
 // 策略：network-first（每次都拿最新），离线时回退缓存
 // 2026-08-11：从根目录 sw.js 复制到 memories/ 并修正路径；移除旧版编辑器死文件的预缓存
 // ============================================
-const CACHE = 'memories-v192';
+const CACHE = 'memories-v194';
 const STATIC_ASSETS = [
   '/memories/', '/memories/index.html',
   '/memories/style.css', '/data.js', '/memories/script.js',
@@ -13,6 +13,67 @@ const STATIC_ASSETS = [
 
 const SUPABASE_STORAGE = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos';
 const SUPABASE_REST = 'https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1';
+/* ★ 2026-10-12 私有媒体：图片不再放公开仓库，改放 Supabase 私有桶 ★
+   URL 是固定的（/storage/v1/object/authenticated/private/<key>），
+   但直接请求会被 Storage 拒（实测未登录一律 404）。
+   所以由 SW 在转发时补上登录态：Authorization: Bearer <access_token>。
+   —— 为什么不用官方"签名 URL"？实测签名 URL 每次都不一样（token 里带时间戳），
+      URL 一变浏览器缓存就全失效，每张图都要重新下载，流量会炸。
+      固定 URL + SW 补头 → URL 稳定 → 缓存命中率最高。 */
+const SUPABASE_MEDIA = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/authenticated/private/';
+const SB_ANON_KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
+const MEDIA_TOKEN_TTL = 25 * 60 * 1000;   // access_token 有效期 1 小时，这里提前 35 分钟刷新
+
+let MEDIA_TOKEN = null, MEDIA_TOKEN_AT = 0;
+
+// 页面把登录后的 access_token 推给 SW
+self.addEventListener('message', function(e){
+  var d = e.data;
+  if(d && d.type === 'media-token' && d.token){
+    MEDIA_TOKEN = d.token; MEDIA_TOKEN_AT = Date.now();
+  }
+});
+
+// SW 被浏览器休眠重启后内存会清空 → 向页面要一次
+function askClientsForToken(){
+  return self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then(function(cs){
+    if(!cs.length) return null;
+    return new Promise(function(resolve){
+      var settled = false;
+      var ch = new MessageChannel();
+      var t = setTimeout(function(){ if(!settled){ settled = true; resolve(null); } }, 2000);
+      ch.port1.onmessage = function(ev){
+        if(settled) return; settled = true; clearTimeout(t);
+        resolve((ev.data && ev.data.token) || null);
+      };
+      try{ cs[0].postMessage({ type: 'get-media-token' }, [ch.port2]); }
+      catch(err){ if(!settled){ settled = true; clearTimeout(t); resolve(null); } }
+    });
+  });
+}
+
+function mediaFetch(req){
+  var tok = (MEDIA_TOKEN && (Date.now() - MEDIA_TOKEN_AT) < MEDIA_TOKEN_TTL) ? MEDIA_TOKEN : null;
+  var getTok = tok ? Promise.resolve(tok) : askClientsForToken().then(function(t){
+    if(t){ MEDIA_TOKEN = t; MEDIA_TOKEN_AT = Date.now(); }
+    return t;
+  });
+  return getTok.then(function(t){
+    if(!t) return new Response('', { status: 404, statusText: 'Not Found' });
+    return fetch(req.url, { headers: { 'Authorization': 'Bearer ' + t, 'apikey': SB_ANON_KEY } })
+      .then(function(r){
+        // token 可能刚好过期 → 重新要一次再试
+        if(r.status === 400 || r.status === 401 || r.status === 403){
+          return askClientsForToken().then(function(t2){
+            if(!t2) return r;
+            MEDIA_TOKEN = t2; MEDIA_TOKEN_AT = Date.now();
+            return fetch(req.url, { headers: { 'Authorization': 'Bearer ' + t2, 'apikey': SB_ANON_KEY } });
+          });
+        }
+        return r;
+      });
+  });
+}
 // Supabase 读请求缓存名 + 有效期（5分钟内直接用缓存，后台再刷新）
 const SUPABASE_CACHE = 'supabase-reads-v1';
 const SUPABASE_TTL = 5 * 60 * 1000;
@@ -59,6 +120,12 @@ function cacheIsFresh(cacheResp){
 
 self.addEventListener('fetch', function(e) {
   const url = new URL(e.request.url);
+
+  /* ★ 私有媒体：必须在下面"仅处理同源"那句【之前】，因为它是跨域请求 ★ */
+  if (e.request.method === 'GET' && url.href.startsWith(SUPABASE_MEDIA)) {
+    e.respondWith(mediaFetch(e.request));
+    return;
+  }
 
   /* ═══ 2026-09-19 ★修复★：Supabase 读请求改为【network-first】 ═══
      原来是 stale-while-revalidate —— 5 分钟内的旧结果直接返回、后台才刷新。

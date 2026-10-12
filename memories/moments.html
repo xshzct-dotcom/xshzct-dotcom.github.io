@@ -20,10 +20,44 @@
 <meta name="description" content="读与行 — 文字、照片与音乐">
 <!-- ★ 2026-10-12 字体瘦身：本页原来只有 jsDelivr 一个字体来源，
      换成和主页同一套（Google Fonts），这样两页字体来源统一、也少一个 CDN 依赖。 -->
+<script>
+/* ★ 2026-10-12 私有媒体的凭证桥（必须放在 head，越早越好）★
+   Service Worker 转发私有图片时会来问"登录凭证是多少"。
+   如果这个监听器注册得太晚（比如放到页面底部的 script.js 里），
+   图片请求早就发出去了 → SW 问不到 → 404 → 而 <img> 失败后不会自动重试。
+   所以这里紧贴 head 注册，并且直接同步读 localStorage 里的 Supabase session，
+   不依赖 SDK 是否加载完成。 */
+(function(){
+  window.__mediaToken = function(){
+    try{
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!/^sb-.*-auth-token$/.test(k)) continue;
+        var raw = localStorage.getItem(k);
+        if (!raw) continue;
+        var v = null;
+        try { v = JSON.parse(raw); } catch(e) { continue; }
+        if (v && v.access_token) return v.access_token;
+        if (v && v.currentSession && v.currentSession.access_token) return v.currentSession.access_token;
+        if (v && v.session && v.session.access_token) return v.session.access_token;
+      }
+    }catch(e){}
+    return null;
+  };
+  if (navigator.serviceWorker) {
+    navigator.serviceWorker.addEventListener('message', function(e){
+      var d = e.data, p = e.ports && e.ports[0];
+      if (d && d.type === 'get-media-token' && p) {
+        try{ p.postMessage({ token: window.__mediaToken() }); }catch(err){ p.postMessage({ token: null }); }
+      }
+    });
+  }
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261012-2">
+<link rel="stylesheet" href="style.css?v=20261012-4">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -512,53 +546,92 @@ html{
   </div>
 </div>
 <script>
-// 密码门（2026-09-15 补）：博客页原先可被直接访问（绕过主页密码），此处用同一标记 _v2pw2 校验
-// 2026-09-15 改哈希：源码不再出现明文密码
-var _PW_SALT = 'memories-2026';
-var _PW_HASH = '15adc3de66e134142320e2af38ad20d0ff12e67b55406682a2307e2a2cbbaf53';
-function _pwOk(v, cb){
-  var ok = false;
+/* ══════════════════════════════════════════════════════════════════
+   ★ 2026-10-12 博客页的密码门改成【服务端校验】★
+   ──────────────────────────────────────────────────────────────────
+   原来它只检查 localStorage 里的 _v2pw2 这个字符串 —— 等于门没装：
+   任何人直接打开 moments.html，在控制台敲一句 localStorage.setItem('_v2pw2','1')
+   就能看全部博客；哈希比对也全在浏览器里做，源码里就有。
+   现在改成真的 Supabase Auth 登录：密码交给服务端验，成功才拿得到 access_token。
+   ══════════════════════════════════════════════════════════════════ */
+var AUTH_EMAIL = 'owner@julian678.site';
+/* ⚠️ SB_URL / SB_KEY 是在本页更下面（第 ~588 行）才定义的，这里【不能】立刻 createClient，
+   否则拿到 undefined 会建出一个坏客户端。改成第一次要用时才创建（那时已定义）。 */
+var _gateSbInst = null;
+function gateSb(){
+  if(_gateSbInst) return _gateSbInst;
   try{
-    var data = new TextEncoder().encode(String(v) + _PW_SALT);
-    crypto.subtle.digest('SHA-256', data).then(function(buf){
-      var hex = '';
-      new Uint8Array(buf).forEach(function(b){ hex += ('0' + b.toString(16)).slice(-2); });
-      cb(hex === _PW_HASH);
-    }).catch(function(){
-      var s = String(v);
-      cb(s.length === 2 && s.charCodeAt(0) === 31185 && s.charCodeAt(1) === 20219);
-    });
-  }catch(e){
-    var s2 = String(v);
-    cb(s2.length === 2 && s2.charCodeAt(0) === 31185 && s2.charCodeAt(1) === 20219);
-  }
+    if(typeof supabase === 'undefined' || typeof SB_URL === 'undefined' || typeof SB_KEY === 'undefined') return null;
+    _gateSbInst = supabase.createClient(SB_URL, SB_KEY);
+  }catch(e){ _gateSbInst = null; }
+  return _gateSbInst;
 }
+
 (function(){
   var gate = document.getElementById('pwdGate');
   if(!gate) return;
-  var ok = false;
-  try{ ok = localStorage.getItem('_v2pw2') === '1'; }catch(e){}
-  if(ok){ if(gate.parentNode) gate.parentNode.removeChild(gate); return; }
-  document.documentElement.style.overflow = 'hidden';
-  var inp = document.getElementById('pwdInput2');
-  var btn = document.getElementById('pwdSubmit2');
-  var err = document.getElementById('pwdError2');
-  function pass(){
-    try{ localStorage.setItem('_v2pw2','1'); }catch(e){}
+
+  function localHasSession(){
+    try{
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (/^sb-.*-auth-token$/.test(k) && localStorage.getItem(k)) return true;
+      }
+    }catch(e){}
+    return false;
+  }
+  function openGate(){
     document.documentElement.style.overflow = '';
-    if(gate.parentNode) gate.parentNode.removeChild(gate);
+    if(gate && gate.parentNode) gate.parentNode.removeChild(gate);
   }
-  function check(){
-    _pwOk(inp ? inp.value : '', function(good){
-      if(good) pass();
-      else if(err) err.style.display = 'block';
-    });
+  function showGate(){
+    document.documentElement.style.overflow = 'hidden';
+    var inp = document.getElementById('pwdInput2');
+    var btn = document.getElementById('pwdSubmit2');
+    var err = document.getElementById('pwdError2');
+    function check(){
+      var v = inp ? inp.value : '';
+      var sbx = gateSb();
+      if(!sbx){ if(err) err.textContent = '云端未连接，请刷新重试'; return; }
+      if(btn) btn.disabled = true;
+      sbx.auth.signInWithPassword({ email: AUTH_EMAIL, password: String(v) }).then(function(r){
+        if(btn) btn.disabled = false;
+        var s = r && r.data && r.data.session;
+        if(!r || r.error || !s || !s.access_token){
+          if(err) err.textContent = '密码不对喔';
+          return;
+        }
+        try{ localStorage.setItem('_v2pw2','1'); }catch(e){}   // 兼容历史统计标记
+        if(typeof pushMediaToken === 'function') pushMediaToken();
+        openGate();
+      }).catch(function(){
+        if(btn) btn.disabled = false;
+        if(err) err.textContent = '网络异常，请重试';
+      });
+    }
+    if(btn) btn.onclick = check;
+    if(inp){
+      inp.onkeydown = function(e){ if(e.key === 'Enter') check(); };
+      setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 150);
+    }
   }
-  if(btn) btn.onclick = check;
-  if(inp){
-    inp.onkeydown = function(e){ if(e.key === 'Enter') check(); };
-    setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 150);
+
+  // 有本地会话 → 先放行（真正的凭证由 Supabase SDK 校验），并顺手校验一次有效性
+  if(localHasSession()){
+    openGate();
+    var sb2 = gateSb();
+    if(sb2){
+      sb2.auth.getSession().then(function(r){
+        var s = r && r.data && r.data.session;
+        if(!s || !s.access_token){
+          try{ localStorage.removeItem('_v2pw2'); }catch(e){}
+          if(gate && !gate.parentNode){ /* 已被移除，忽略 */ }
+        }
+      }).catch(function(){});
+    }
+    return;
   }
+  showGate();
 })();
 </script>
 
@@ -581,7 +654,7 @@ function _pwOk(v, cb){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20261012-2"></script>
+<script src="vendor/supabase.js?v=20261012-4"></script>
 <script>
 (function(){
   'use strict';

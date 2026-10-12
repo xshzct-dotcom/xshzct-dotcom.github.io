@@ -53,12 +53,83 @@ function _fullWith(p, base){
   }
   return base+s;
 }
-// 缩略图（主源 / 备源）
-function thumb(p){ return _thumbWith(p, THUMB_BASE); }
-function thumbAlt(p){ return _thumbWith(p, THUMB_BASE_ALT); }
-// 原图（主源 / 备源）
-function full(p){ return _fullWith(p, IMG_BASE); }
-function fullAlt(p){ return _fullWith(p, IMG_BASE_ALT); }
+/* ══════════════════════════════════════════════════════════════════
+   ★ 2026-10-12 私有媒体：照片改从 Supabase 私有桶取（不再是公开的 GitHub Pages）★
+   ──────────────────────────────────────────────────────────────────
+   为什么这么做：原来 images/ thumbs/ 全在公开的 GitHub 仓库里，
+   任何人打开网址或直接翻仓库都能看到全部照片 —— "密码门"只是前端比对哈希，形同虚设。
+   现在：照片放进私有桶 private，URL 固定但没登录一律 404；
+        Service Worker 负责在转发时补上登录态（见 sw.js 的 mediaFetch）。
+   为什么用「固定 URL + SW 补头」而不是官方签名 URL：
+        实测签名 URL 每次都不同（token 带时间戳）→ 缓存全失效 → 每张图都要重新下载。
+        固定 URL 能吃到浏览器缓存，对流量和速度都友好得多。
+   ══════════════════════════════════════════════════════════════════ */
+const MEDIA_BASE = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/authenticated/private/';
+
+/* 把路径编码成纯 ASCII 的桶 key —— 必须与上传脚本 _upload_private.py 的 safe_key() 完全一致：
+   逐段处理，ASCII 的 [A-Za-z0-9._-] 原样保留，其余按 UTF-8 逐字节编成 _XX。
+   例：'images/chuanxi/DSC_4231_看图王.jpg' → 'images/chuanxi/DSC_4231__E7_9C_8B_E5_9B_BE_E7_8E_8B.jpg'
+   （Supabase Storage 不接受非 ASCII 的 key，而本站 99% 的文件名都带中文） */
+function safeKey(path){
+  return String(path || '').split('/').map(function(seg){
+    var out = '';
+    for (var i = 0; i < seg.length; ) {
+      var cp = seg.codePointAt(i), ch = String.fromCodePoint(cp);
+      i += ch.length;
+      if (cp < 128 && /[A-Za-z0-9._-]/.test(ch)) { out += ch; }
+      else {
+        var bytes = unescape(encodeURIComponent(ch));
+        for (var k = 0; k < bytes.length; k++) {
+          out += '_' + ('0' + bytes.charCodeAt(k).toString(16).toUpperCase()).slice(-2);
+        }
+      }
+    }
+    return out;
+  }).join('/');
+}
+// 缩略图在桶里的相对路径
+function _thumbRel(s){
+  var t = s;
+  if (t.startsWith('images/')) t = t.slice(7);
+  else if (t.startsWith('thumbs/')) t = t.slice(7);
+  return t.replace(/\.jpe?g$/i, '.webp').replace(/\.png$/i, '.webp');
+}
+// 原图在桶里的相对路径
+function _fullRel(s){
+  if (s.startsWith('images/')) return s.slice(7);
+  if (s.startsWith('thumbs/')) return s.replace(/^thumbs\//, '').replace(/\.webp$/i, '.jpg');
+  return s;
+}
+// 未登录时不发真请求，返回一块透明占位（否则页面会刷一堆 404，纯浪费）
+var MEDIA_BLANK = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="3"><rect width="4" height="3" fill="rgba(128,128,128,.08)"/></svg>');
+function _mediaAuthed(){
+  try{
+    if (typeof hasLocalSession === 'function') return hasLocalSession();
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (/^sb-.*-auth-token$/.test(k) && localStorage.getItem(k)) return true;
+    }
+  }catch(e){}
+  return false;
+}
+// 缩略图
+function thumb(p){
+  var s = getPath(p); if (!s) return '';
+  if (/^https?:/i.test(s)) return s;          // 外链原样返回
+  if (!_mediaAuthed()) return MEDIA_BLANK;
+  return MEDIA_BASE + 'thumbs/' + safeKey(_thumbRel(s));
+}
+// 原图
+function full(p){
+  var s = getPath(p); if (!s) return '';
+  if (/^https?:/i.test(s)) return s;
+  if (!_mediaAuthed()) return MEDIA_BLANK;
+  return MEDIA_BASE + 'images/' + safeKey(_fullRel(s));
+}
+// 备源：私有桶只有一个源，缩略图缺失时直接回退原图（沿用原有的 onerror 链）
+function thumbAlt(p){ return full(p); }
+function fullAlt(p){ return full(p); }
 
 // ===== 2026-09-19：全站 UI 图标（单色 SVG + currentColor，随主题变色）=====
 //   背景：emoji 的渲染颜色由系统字体决定（☀️ 是黄的、🔁 是蓝的），改不了 → 一律用 SVG。
@@ -1270,19 +1341,64 @@ document.addEventListener('keydown', e => {
 // ===== 旧世界密码（2026-09-15 改为哈希校验：源码不再出现明文密码）=====
 var _PW_SALT = 'memories-2026';
 var _PW_HASH = '15adc3de66e134142320e2af38ad20d0ff12e67b55406682a2307e2a2cbbaf53';
+/* ★ 2026-10-12 密码门改成【服务端校验】★
+   原来是在浏览器里把输入做 SHA-256 再和源码里的哈希比对 —— 这是"锁在门上的钥匙摆在门口"：
+   哈希就写在公开的 data.js 里，而且任何人都能绕过前端直接读文件。
+   现在：把密码交给 Supabase Auth 校验，成功才拿到 access_token，
+        而私有桶的图片没有这个 token 一律 404 —— 门才真的锁上了。 */
+const AUTH_EMAIL = 'owner@julian678.site';
 async function _pwOk(v){
   try{
-    var data = new TextEncoder().encode(String(v) + _PW_SALT);
-    var buf = await crypto.subtle.digest('SHA-256', data);
-    var hex = '';
-    new Uint8Array(buf).forEach(function(b){ hex += ('0' + b.toString(16)).slice(-2); });
-    return hex === _PW_HASH;
-  }catch(e){
-    // 兜底：极老浏览器不支持 crypto.subtle 时，用长度+首字校验（不暴露完整密码）
-    var s = String(v);
-    return s.length === 2 && s.charCodeAt(0) === 31185 && s.charCodeAt(1) === 20219;
-  }
+    if(!SB) return false;
+    var r = await SB.auth.signInWithPassword({ email: AUTH_EMAIL, password: String(v) });
+    if(!r || r.error) return false;
+    var sess = r.data && r.data.session;
+    if(!sess || !sess.access_token) return false;
+    pushMediaToken();
+    return true;
+  }catch(e){ return false; }
 }
+
+/* 把登录态推给 Service Worker（私有媒体的 fetch 靠它补 Authorization 头）。
+   SW 被浏览器休眠重启后内存会清空，所以它也支持反过来主动来问（见下面的 message 监听）。 */
+function pushMediaToken(){
+  try{
+    if(!SB || !navigator.serviceWorker) return;
+    if(!navigator.serviceWorker.controller) return;
+    SB.auth.getSession().then(function(r){
+      var tok = r && r.data && r.data.session && r.data.session.access_token;
+      if(tok) navigator.serviceWorker.controller.postMessage({ type:'media-token', token: tok });
+    }).catch(function(){});
+  }catch(e){}
+}
+window.pushMediaToken = pushMediaToken;
+
+if (navigator.serviceWorker) {
+  navigator.serviceWorker.addEventListener('message', function(e){
+    var d = e.data, port = e.ports && e.ports[0];
+    if(!d || d.type !== 'get-media-token' || !port) return;
+    try{
+      if(!SB){ port.postMessage({ token: null }); return; }
+      SB.auth.getSession().then(function(r){
+        var tok = r && r.data && r.data.session && r.data.session.access_token;
+        port.postMessage({ token: tok || null });
+      }).catch(function(){ port.postMessage({ token: null }); });
+    }catch(err){ port.postMessage({ token: null }); }
+  });
+}
+
+/* 同步判断"本地是否已有登录会话" —— 供首屏防闪用（不等 SDK 异步）。
+   Supabase SDK 把 session 存在 localStorage 的 sb-<ref>-auth-token 这个键里。 */
+function hasLocalSession(){
+  try{
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (/^sb-.*-auth-token$/.test(k) && localStorage.getItem(k)) return true;
+    }
+  }catch(e){}
+  return false;
+}
+window.hasLocalSession = hasLocalSession;
 let pwdCallback=null;
 function showPwdModal(cb){ 
   pwdCallback=cb; 
@@ -1298,7 +1414,7 @@ async function checkPwd(){
   var inp = overlay.classList.contains('active') ? document.getElementById('pwdInput2') : document.getElementById('pwdInput');
   var ok = inp ? await _pwOk(inp.value) : false;
   if(ok){
-    try{localStorage.setItem('_v2pw2','1')}catch(e){}
+    try{localStorage.setItem('_v2pw2','1')}catch(e){}   // 旧标记，保留只为兼容历史统计
     document.body.classList.add('pwd-authed');
     // 2026-09-15：把本次访问标记为「自己人」（供访客统计区分）
     try{ if(typeof window._markAuthed === 'function') window._markAuthed(); }catch(e){}
@@ -1308,6 +1424,12 @@ async function checkPwd(){
     closePwdModal();
     if(pwdCallback) pwdCallback();
     if(typeof window.openOldWorld==='function') window.openOldWorld();
+    /* ★ 2026-10-12：登录成功后必须重新加载页面 ★
+       原因：门锁着的时候，thumb()/full() 返回的是占位图（为了不发无意义的 404），
+       而这些图片元素已经渲染出来了、失败后也不会自己重试。
+       重载一次，页面就会以"已登录"状态重新渲染，图片用真 URL 走 SW。
+       重载后 head 里的凭证桥会立刻把 token 给 SW，所以不会有竞态。 */
+    setTimeout(function(){ try{ location.reload(); }catch(e){} }, 350);
   } else {
     var err = overlay.classList.contains('active') ? overlay.querySelector('.pwd-error') : document.getElementById('pwdError');
     if(err) err.textContent='密码不对喔';
@@ -1320,7 +1442,8 @@ window.checkPwd=checkPwd;
   var gate = document.getElementById('pwdGate');
   if(gate){
     // 已通过过密码
-    if(localStorage && localStorage.getItem('_v2pw2') === '1'){
+    // ★ 2026-10-12：改成看「本地是否真的有登录会话」，而不是旧的 _v2pw2 字符串标记
+    if (typeof hasLocalSession === 'function' ? hasLocalSession() : false) {
       gate.style.display = 'none';
       return;
     }
@@ -1801,6 +1924,46 @@ const SB_KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
 //   （控制台会告警 "Multiple GoTrueClient instances ... may produce undefined behavior"）
 let SB = null;
 try { SB = window._supabaseClient || supabase.createClient(SB_URL, SB_KEY); window._supabaseClient = SB; } catch(e) { SB = null; }
+
+/* ★ 2026-10-12：页面加载时若已有登录会话，主动把 token 推给 Service Worker ★
+   否则用户重开页面（session 还在）会看到"门开着但图片全是 404"。
+   SW 没就绪时先挂到 load 上，另外 SW 自己也会反过来问（见 get-media-token）。 */
+(function(){
+  function boot(){
+    try{
+      if(!SB) return;
+      SB.auth.getSession().then(function(r){
+        var s = r && r.data && r.data.session;
+        if(s && s.access_token){
+          document.body.classList.add('pwd-authed');
+          var g = document.getElementById('pwdGate');
+          if(g) g.style.display = 'none';
+          if(typeof pushMediaToken === 'function') pushMediaToken();
+        }
+      }).catch(function(){});
+    }catch(e){}
+  }
+  /* ★ hero 背景图也从私有桶来 ★
+     原来样式表里写死 background:url('../images/hero_bg.jpg') —— 那是公开仓库的地址，
+     私有化之后会 404。改由 JS 在登录态就绪时设置。 */
+  function setHeroBg(){
+    try{
+      var hb = document.getElementById('heroBg');
+      if(!hb || !_mediaAuthed()) return;
+      hb.style.backgroundImage = 'url("' + full('images/hero_bg.jpg') + '")';
+    }catch(e){}
+  }
+  window.setHeroBg = setHeroBg;
+  if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+    navigator.serviceWorker.ready.then(function(){
+      boot(); setHeroBg();
+      // controller 可能还没切过来，等一拍再推一次
+      setTimeout(function(){ boot(); setHeroBg(); }, 800);
+    }).catch(function(){ boot(); setHeroBg(); });
+  } else { boot(); setHeroBg(); }
+  window.addEventListener('DOMContentLoaded', setHeroBg);
+  window.addEventListener('load', function(){ setTimeout(boot, 400); });
+})();
 
 // 把 data.js 现有内容灌到 Supabase（完整版：表空时 bulk insert，否则 per-item merge）
 async function ensureSync(){

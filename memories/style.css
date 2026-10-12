@@ -200,7 +200,9 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 
 /* --- Hero --- */
 .hero{position:relative;height:100vh;min-height:600px;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.hero-bg{position:absolute;inset:0;background:url('../images/hero_bg.jpg') center/cover no-repeat;transform:translateZ(0);will-change:transform}
+/* ★ 2026-10-12：背景图不再写死在 CSS（那是公开仓库地址，私有化后会 404），
+   改由 script.js 在登录态就绪后设置 background-image（见 setHeroBg）★ */
+.hero-bg{position:absolute;inset:0;background-color:var(--bg-elevated);background-position:center;background-size:cover;background-repeat:no-repeat;transform:translateZ(0);will-change:transform}
 #heroStars{display:none}
 .hero-content{position:relative;z-index:2;text-align:center;padding:0 24px}
 .hero-title{font-family:var(--font-display);font-size:clamp(2.5rem,6vw,5rem);font-weight:700;line-height:1.1;letter-spacing:-1px;margin-bottom:16px;opacity:0;transform:translateY(30px);animation:heroIn .8s var(--ease-out) var(--dur-ui) forwards}
