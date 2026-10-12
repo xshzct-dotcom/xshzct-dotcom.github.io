@@ -3,7 +3,7 @@
 // 策略：network-first（每次都拿最新），离线时回退缓存
 // 2026-08-11：从根目录 sw.js 复制到 memories/ 并修正路径；移除旧版编辑器死文件的预缓存
 // ============================================
-const CACHE = 'memories-v195';
+const CACHE = 'memories-v196';
 const STATIC_ASSETS = [
   '/memories/', '/memories/index.html',
   '/memories/style.css', '/data.js', '/memories/script.js',
@@ -25,6 +25,25 @@ const SB_ANON_KEY = 'sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
 const MEDIA_TOKEN_TTL = 25 * 60 * 1000;   // access_token 有效期 1 小时，这里提前 35 分钟刷新
 
 let MEDIA_TOKEN = null, MEDIA_TOKEN_AT = 0;
+
+/* ★ 2026-10-12：私有媒体【本地缓存】★
+   为什么必须加：实测从 Supabase 拉一张 5KB 缩略图要 0.33~1.2s（项目在悉尼，
+   国内到 Cloudflare 边缘节点的往返就是这个数），而浏览器同域只能并发 6 个
+   → 120 张缩略图要排 20 轮 ≈ 6 秒。加了本地缓存后第二次访问基本秒开。
+   响应头实测有 `CF-Cache-Status: HIT` + `Cache-Control: max-age=3600`，
+   说明 CDN 层已经缓存了，瓶颈纯粹在"每张图都要付一次往返"。
+   安全说明：缓存只存在【这台设备的浏览器里】，且只有登录后才会产生；
+   缓存键是固定 URL、存的是图片内容本身，不含任何凭证。 */
+const MEDIA_CACHE = 'private-media-v1';
+const MEDIA_MAX_ENTRIES = 900;      // 约 60~80MB，防止无限增长把磁盘吃满
+
+function trimMediaCache(cache){
+  return cache.keys().then(function(keys){
+    if (keys.length <= MEDIA_MAX_ENTRIES) return;
+    var drop = keys.slice(0, keys.length - MEDIA_MAX_ENTRIES);
+    return Promise.all(drop.map(function(k){ return cache.delete(k); }));
+  }).catch(function(){});
+}
 
 // 页面把登录后的 access_token 推给 SW
 self.addEventListener('message', function(e){
@@ -52,26 +71,45 @@ function askClientsForToken(){
   });
 }
 
-function mediaFetch(req){
+function getMediaToken(){
   var tok = (MEDIA_TOKEN && (Date.now() - MEDIA_TOKEN_AT) < MEDIA_TOKEN_TTL) ? MEDIA_TOKEN : null;
-  var getTok = tok ? Promise.resolve(tok) : askClientsForToken().then(function(t){
-    if(t){ MEDIA_TOKEN = t; MEDIA_TOKEN_AT = Date.now(); }
+  if (tok) return Promise.resolve(tok);
+  return askClientsForToken().then(function(t){
+    if (t) { MEDIA_TOKEN = t; MEDIA_TOKEN_AT = Date.now(); }
     return t;
   });
-  return getTok.then(function(t){
-    if(!t) return new Response('', { status: 404, statusText: 'Not Found' });
-    return fetch(req.url, { headers: { 'Authorization': 'Bearer ' + t, 'apikey': SB_ANON_KEY } })
-      .then(function(r){
-        // token 可能刚好过期 → 重新要一次再试
-        if(r.status === 400 || r.status === 401 || r.status === 403){
-          return askClientsForToken().then(function(t2){
-            if(!t2) return r;
-            MEDIA_TOKEN = t2; MEDIA_TOKEN_AT = Date.now();
-            return fetch(req.url, { headers: { 'Authorization': 'Bearer ' + t2, 'apikey': SB_ANON_KEY } });
-          });
-        }
-        return r;
+}
+function fetchWithToken(url, t){
+  return fetch(url, { headers: { 'Authorization': 'Bearer ' + t, 'apikey': SB_ANON_KEY } });
+}
+
+function mediaFetch(req){
+  return caches.open(MEDIA_CACHE).then(function(cache){
+    // ① 先查本地缓存（命中就直接返回，不走网络）
+    return cache.match(req.url).then(function(hit){
+      if (hit) return hit;
+
+      // ② 没命中 → 用登录态去取
+      return getMediaToken().then(function(t){
+        if (!t) return new Response('', { status: 404, statusText: 'Not Found' });
+        return fetchWithToken(req.url, t).then(function(r){
+          // token 可能刚好过期 → 重新要一次再试
+          if (r.status === 400 || r.status === 401 || r.status === 403) {
+            return askClientsForToken().then(function(t2){
+              if (!t2) return r;
+              MEDIA_TOKEN = t2; MEDIA_TOKEN_AT = Date.now();
+              return fetchWithToken(req.url, t2);
+            });
+          }
+          // ③ 成功就存进本地缓存（下次直接命中）
+          if (r && r.status === 200) {
+            var copy = r.clone();
+            cache.put(req.url, copy).then(function(){ trimMediaCache(cache); }).catch(function(){});
+          }
+          return r;
+        });
       });
+    });
   });
 }
 // Supabase 读请求缓存名 + 有效期（5分钟内直接用缓存，后台再刷新）
@@ -101,8 +139,9 @@ self.addEventListener('activate', function(e) {
     caches.keys().then(function(names) {
       return Promise.all(
         names.map(function(name) {
-          // 2026-09-19：旧读缓存桶（supabase-reads-v1）可能存着过期数据，一并清掉
-          if (name !== CACHE && name !== SUPABASE_CACHE) return caches.delete(name);
+          // ★ 注意：MEDIA_CACHE（私有媒体本地缓存）必须保留，否则每次升级 SW 都要重新下载全部照片
+          if (name === CACHE || name === SUPABASE_CACHE || name === MEDIA_CACHE) return;
+          return caches.delete(name);
         })
       );
     })

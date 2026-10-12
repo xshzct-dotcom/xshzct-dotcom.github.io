@@ -53,6 +53,7 @@
   }
 })();
 </script>
+<link rel="preconnect" href="https://mvzbkuhwapdqcdkekczh.supabase.co" crossorigin>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- ★ 2026-10-12 字体瘦身：删掉 jsDelivr 的 fontsource Noto Serif SC ★
@@ -60,7 +61,7 @@
        A 两套都加载 3.88 MB / B 只用 Google Fonts 2.32 MB / C 只用 jsDelivr 2.98 MB
      保留 Google Fonts（更省），删掉 jsDelivr 的 3 个 CSS：省 1.56 MB（40%），
      而 document.fonts.check('16px "Noto Serif SC"') 仍为 true → 零视觉变化。 -->
-<link rel="stylesheet" href="style.css?v=20261012-5">
+<link rel="stylesheet" href="style.css?v=20261012-6">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>body{font-family:'Inter','Noto Serif SC',system-ui,sans-serif;background:var(--bg);color:var(--text);margin:0}
 /* 灯箱核心 CSS — 内联!important 确保 SW 缓存旧版 style.css 也不影响 */
@@ -123,8 +124,7 @@
     <div style="font-size:1.6rem;margin-bottom:12px;font-family:var(--font-display,'Playfair Display',serif);font-style:italic;color:var(--accent,#7C9B7E)">✦</div>
     <div style="font-size:.95rem;font-weight:500;color:var(--text,#E8E4DA);margin-bottom:16px">输入密码</div>
     <div style="position:relative;width:100%;margin-bottom:12px">
-      <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);color:rgba(var(--fg-rgb),.5);font-size:.95rem;pointer-events:none;z-index:1;user-select:none">陈</span>
-      <input id="pwdInput" lang="zh-CN" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%;padding:12px 16px 12px 40px;background:rgba(var(--fg-rgb),.06);border:1px solid var(--border, rgba(var(--fg-rgb),.12));border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left;-webkit-text-security:disc" placeholder="**" autocomplete="off" inputmode="text">
+      <input id="pwdInput" lang="zh-CN" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%;padding:12px 16px;background:rgba(var(--fg-rgb),.06);border:1px solid var(--border, rgba(var(--fg-rgb),.12));border-radius:10px;color:var(--text,#E8E4DA);font-size:.95rem;outline:none;text-align:left;-webkit-text-security:disc" placeholder="请输入密码" autocomplete="off" inputmode="text">
     </div>
     <div id="pwdError" style="font-size:.78rem;color:#e74c3c;margin-bottom:10px;display:none">密码不对，再试试</div>
     <button id="pwdSubmit" style="width:100%;padding:12px;border:none;border-radius:10px;background:var(--accent,#7C9B7E);color:#fff;font-size:.9rem;font-weight:500;cursor:pointer;transition:opacity .2s">进入</button>
@@ -148,7 +148,7 @@
   window.openBlog = function(){
     // 2026-09-16：每次打开博客都重新加载 iframe —— 确保拿到编辑器最新的改动
     //   （数据量小、且主页空闲时已预加载过静态资源，重载主要是拉一次 posts 数据）
-    var url = 'moments.html?v=20261012-5';
+    var url = 'moments.html?v=20261012-6';
     if(!loaded){
       fr.src = url; loaded = true;
     }else{
@@ -257,7 +257,7 @@
   (function(){
     function preload(){
       if(loaded || isOpen) return;
-      var url = 'moments.html?v=20261012-5';
+      var url = 'moments.html?v=20261012-6';
       loaded = true;
       fr.src = url;          // 提前加载；openBlog 里会因 loaded=true 而直接显示
       try{ fr.style.visibility = 'hidden'; }catch(e){}
@@ -371,8 +371,7 @@
     <h3>旧世界</h3>
     <p style="margin-top:8px">作者真实姓名</p>
     <div style="position:relative;max-width:300px;margin:0 auto 12px">
-      <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:rgba(var(--fg-rgb),.5);font-size:.95rem;pointer-events:none;z-index:1;user-select:none">陈</span>
-      <input type="text" id="pwdInput2" placeholder="**" style="width:100%;padding:10px 12px 10px 36px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);text-align:left;font-size:1rem;outline:none;-webkit-text-security:disc" autocomplete="off" inputmode="text">
+      <input type="text" id="pwdInput2" placeholder="请输入密码" style="width:100%;padding:10px 12px;background:rgba(var(--fg-rgb),.04);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);text-align:left;font-size:1rem;outline:none;-webkit-text-security:disc" autocomplete="off" inputmode="text">
     </div>
     <p class="pwd-error"></p>
     <button class="pwd-btn-ok" onclick="checkPwd()">确定</button>
@@ -389,9 +388,9 @@
 
 <audio id="bgMusic" preload="auto"></audio>
 
-<script src="../data.js?v=20261012-5"></script>
+<script src="../data.js?v=20261012-6"></script>
 <!-- Supabase SDK：2026-09-10 改为本地托管（原来走 unpkg 外部 CDN，加载失败会导致编辑器/音乐静默变空） -->
-<script src="vendor/supabase.js?v=20261012-5"></script>
+<script src="vendor/supabase.js?v=20261012-6"></script>
 <script>
   // 本地加载失败时回退到 CDN（双保险）
   if (typeof supabase === 'undefined') {
@@ -465,10 +464,10 @@
   }, 100);
 })();
 </script>
-<script src="script.js?v=20261012-5"></script>
-<script src="sound.js?v=20261012-5"></script>
-<script src="vendor/lame.min.js?v=20261012-5"></script>
-<script src="editor.js?v=20261012-5"></script>
+<script src="script.js?v=20261012-6"></script>
+<script src="sound.js?v=20261012-6"></script>
+<script src="vendor/lame.min.js?v=20261012-6"></script>
+<script src="editor.js?v=20261012-6"></script>
 <script>
 // 访客统计（Supabase，后台记录，不在页面上显示，不被 adblock 拦截）
 (function(){
@@ -645,7 +644,7 @@
 // Service Worker 注册（2026-08-11 启用：加速二次访问 + 离线回退）
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js?v=20261012-5').catch(function(e){
+    navigator.serviceWorker.register('sw.js?v=20261012-6').catch(function(e){
       console.warn('[SW] register failed:', e);
     });
   });
