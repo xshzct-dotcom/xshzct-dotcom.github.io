@@ -3,7 +3,7 @@
 // 策略：network-first（每次都拿最新），离线时回退缓存
 // 2026-08-11：从根目录 sw.js 复制到 memories/ 并修正路径；移除旧版编辑器死文件的预缓存
 // ============================================
-const CACHE = 'memories-v198';
+const CACHE = 'memories-v200';
 const STATIC_ASSETS = [
   '/memories/', '/memories/index.html',
   '/memories/style.css', '/data.js', '/memories/script.js',
@@ -11,7 +11,7 @@ const STATIC_ASSETS = [
   '/memories/vendor/supabase.js'   // 2026-09-10：本地托管的 Supabase SDK，预缓存保证离线/快速可用
 ];
 
-const SUPABASE_STORAGE = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/photos';
+/* 2026-10-12：这行是旧的公开桶常量，代码里已无人使用，删除以免误导（桶 photos 仍存在，只是前端不再依赖它） */
 const SUPABASE_REST = 'https://mvzbkuhwapdqcdkekczh.supabase.co/rest/v1';
 /* ★ 2026-10-12 私有媒体：图片不再放公开仓库，改放 Supabase 私有桶 ★
    URL 是固定的（/storage/v1/object/authenticated/private/<key>），
