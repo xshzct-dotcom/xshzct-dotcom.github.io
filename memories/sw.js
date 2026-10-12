@@ -3,7 +3,7 @@
 // 策略：network-first（每次都拿最新），离线时回退缓存
 // 2026-08-11：从根目录 sw.js 复制到 memories/ 并修正路径；移除旧版编辑器死文件的预缓存
 // ============================================
-const CACHE = 'memories-v202';
+const CACHE = 'memories-v203';
 const STATIC_ASSETS = [
   '/memories/', '/memories/index.html',
   '/memories/style.css', '/data.js', '/memories/script.js',
@@ -37,12 +37,21 @@ let MEDIA_TOKEN = null, MEDIA_TOKEN_AT = 0;
 const MEDIA_CACHE = 'private-media-v1';
 const MEDIA_MAX_ENTRIES = 900;      // 约 60~80MB，防止无限增长把磁盘吃满
 
+/* ★ 2026-10-12：节流 —— 原来每存一张图就 await 一次 cache.keys()（900+ 条要全量列举），
+   滚动时几百次 put 就是几百次全量列举，纯浪费。现在同一时刻只跑一次，收尾时若期间又有
+   新写入则再补跑一轮。 */
+var _trimRunning = false, _trimAgain = false;
 function trimMediaCache(cache){
-  return cache.keys().then(function(keys){
+  if (_trimRunning) { _trimAgain = true; return; }
+  _trimRunning = true;
+  cache.keys().then(function(keys){
     if (keys.length <= MEDIA_MAX_ENTRIES) return;
     var drop = keys.slice(0, keys.length - MEDIA_MAX_ENTRIES);
     return Promise.all(drop.map(function(k){ return cache.delete(k); }));
-  }).catch(function(){});
+  }).catch(function(){}).then(function(){
+    _trimRunning = false;
+    if (_trimAgain) { _trimAgain = false; trimMediaCache(cache); }
+  });
 }
 
 // 页面把登录后的 access_token 推给 SW
@@ -71,25 +80,108 @@ function askClientsForToken(){
   });
 }
 
+/* ★ 2026-10-12：并发去重 ★
+   页面冷启动时 SW 内存里没有 token，而首屏上百张图几乎是同时到达 ——
+   原来每个请求都走一遍 askClientsForToken()，等于打 N 次 postMessage、
+   建 N 个 MessageChannel。这是"打开什么都慢一点"的主因之一。
+   现在共用同一个在途 Promise：第一个去要，其余都等它。 */
+var _tokenPending = null;
 function getMediaToken(){
   var tok = (MEDIA_TOKEN && (Date.now() - MEDIA_TOKEN_AT) < MEDIA_TOKEN_TTL) ? MEDIA_TOKEN : null;
   if (tok) return Promise.resolve(tok);
-  return askClientsForToken().then(function(t){
+  if (_tokenPending) return _tokenPending;
+  _tokenPending = askClientsForToken().then(function(t){
     if (t) { MEDIA_TOKEN = t; MEDIA_TOKEN_AT = Date.now(); }
+    _tokenPending = null;
     return t;
-  });
+  }).catch(function(){ _tokenPending = null; return null; });
+  return _tokenPending;
 }
-function fetchWithToken(url, t){
-  return fetch(url, { headers: { 'Authorization': 'Bearer ' + t, 'apikey': SB_ANON_KEY } });
+function fetchWithToken(url, t, rangeHeader){
+  var h = { 'Authorization': 'Bearer ' + t, 'apikey': SB_ANON_KEY };
+  if (rangeHeader) h['Range'] = rangeHeader;
+  return fetch(url, { headers: h });
+}
+
+/* ══ ★ 2026-10-12：Range 请求支持（音乐/视频播放与拖进度条）★ ══
+   背景：<audio>/<video> 播放和 seek 时会发 `Range: bytes=N-`，期望拿到
+        206 Partial Content。而原来 SW 对这两种情况都只给【完整 200】：
+          · 缓存命中   → 直接 return hit（整文件 200）
+          · 缓存未命中 → fetchWithToken() 重新构造请求，把 Range 头丢了
+        后果：浏览器认为该资源"不可跳转" → 拖进度条只能从头播；
+              移动端浏览器更严格，直接拒绝加载（用户实测：手机播不了、电脑才行）。
+   修法：· 缓存里已有整文件 → 自己按 Range 切出 206（零网络，秒跳）
+        · 缓存没有        → 带 token 把 Range 原样透传，拿服务器真正的 206
+        · 206 响应【绝不】写进缓存，否则会缓存下一段残缺文件 */
+function parseRange(header, size){
+  var m = /bytes=(\d*)-(\d*)/.exec(header || '');
+  var start = 0, end = size - 1;
+  if (m) {
+    if (m[1]) {                        // bytes=1000-2000 / bytes=1000-
+      start = parseInt(m[1], 10);
+      if (m[2]) end = parseInt(m[2], 10);
+    } else if (m[2]) {                 // bytes=-1000（最后 1000 字节）
+      start = Math.max(0, size - parseInt(m[2], 10));
+    }
+  }
+  if (isNaN(start) || start < 0) start = 0;
+  if (isNaN(end) || end > size - 1) end = size - 1;
+  if (start > end) { start = 0; end = size - 1; }
+  return { start: start, end: end };
+}
+function rangeFromCache(full, rangeHeader){
+  return full.blob().then(function(blob){
+    var size = blob.size;
+    var r = parseRange(rangeHeader, size);
+    var chunk = blob.slice(r.start, r.end + 1, blob.type);
+    /* ⚠️ 必须原样保留原始响应头（尤其 Access-Control-Allow-Origin）——
+       Media 是跨域资源，若新 Response 丢掉 CORS 头，浏览器会直接拒收。
+       只改与"片段"相关的三个，再删掉 Content-Encoding（原文件若被压缩过，
+       切片后的长度与它矛盾）。Content-Length 由浏览器按 body 自动算。 */
+    var h = new Headers(full.headers);
+    h.set('Content-Range', 'bytes ' + r.start + '-' + r.end + '/' + size);
+    h.set('Accept-Ranges', 'bytes');
+    h.delete('Content-Encoding');
+    return new Response(chunk, { status: 206, statusText: 'Partial Content', headers: h });
+  }).catch(function(){ return full; });   // 切不出来就退回整文件，至少能播
+}
+
+/* ★ 2026-10-12：缓存句柄复用 —— 原来每个请求都 caches.open() 一次 */
+var _mediaCachePromise = null;
+function mediaCache(){
+  if (!_mediaCachePromise) _mediaCachePromise = caches.open(MEDIA_CACHE);
+  return _mediaCachePromise;
 }
 
 function mediaFetch(req){
-  return caches.open(MEDIA_CACHE).then(function(cache){
-    // ① 先查本地缓存（命中就直接返回，不走网络）
+  var rangeHeader = null;
+  try { rangeHeader = req.headers.get('range'); } catch(e) {}
+
+  return mediaCache().then(function(cache){
     return cache.match(req.url).then(function(hit){
+
+      // ① Range 请求（音频/视频 seek）→ 必须回 206，详见 rangeFromCache 上方说明
+      if (rangeHeader) {
+        if (hit) return rangeFromCache(hit, rangeHeader);
+        return getMediaToken().then(function(t){
+          if (!t) return new Response('', { status: 404, statusText: 'Not Found' });
+          return fetchWithToken(req.url, t, rangeHeader).then(function(r){
+            if (r.status === 400 || r.status === 401 || r.status === 403) {
+              return askClientsForToken().then(function(t2){
+                if (!t2) return r;
+                MEDIA_TOKEN = t2; MEDIA_TOKEN_AT = Date.now();
+                return fetchWithToken(req.url, t2, rangeHeader);
+              });
+            }
+            return r;   // 206 不写缓存
+          });
+        });
+      }
+
+      // ② 普通整文件请求：缓存优先
       if (hit) return hit;
 
-      // ② 没命中 → 用登录态去取
+      // ③ 没命中 → 用登录态去取
       return getMediaToken().then(function(t){
         if (!t) return new Response('', { status: 404, statusText: 'Not Found' });
         return fetchWithToken(req.url, t).then(function(r){
@@ -101,7 +193,7 @@ function mediaFetch(req){
               return fetchWithToken(req.url, t2);
             });
           }
-          // ③ 成功就存进本地缓存（下次直接命中）
+          // ④ 成功就存进本地缓存（下次直接命中）
           if (r && r.status === 200) {
             var copy = r.clone();
             cache.put(req.url, copy).then(function(){ trimMediaCache(cache); }).catch(function(){});

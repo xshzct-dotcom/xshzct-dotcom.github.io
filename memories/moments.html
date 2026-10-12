@@ -51,6 +51,15 @@
         try{ p.postMessage({ token: window.__mediaToken() }); }catch(err){ p.postMessage({ token: null }); }
       }
     });
+    /* ★ 2026-10-12：不等它问，SW 一就绪就【主动】把 token 推过去。
+       原来只有 SW 来问才给，而首屏上百张图几乎同时到达、SW 要挨个问，
+       每个请求都多等一次跨线程往返。主动推一次就省掉这一整轮。 */
+    navigator.serviceWorker.ready.then(function(reg){
+      var t = window.__mediaToken && window.__mediaToken();
+      if (t && reg && reg.active) {
+        try{ reg.active.postMessage({ type: 'media-token', token: t }); }catch(e){}
+      }
+    }).catch(function(){});
   }
 })();
 </script>
@@ -58,7 +67,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261012-12">
+<link rel="stylesheet" href="style.css?v=20261012-13">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -661,7 +670,7 @@ function gateSb(){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20261012-12"></script>
+<script src="vendor/supabase.js?v=20261012-13"></script>
 <script>
 (function(){
   'use strict';
