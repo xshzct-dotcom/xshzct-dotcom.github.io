@@ -58,7 +58,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261012-8">
+<link rel="stylesheet" href="style.css?v=20261012-10">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -661,13 +661,34 @@ function gateSb(){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20261012-8"></script>
+<script src="vendor/supabase.js?v=20261012-10"></script>
 <script>
 (function(){
   'use strict';
   var SB_URL='https://mvzbkuhwapdqcdkekczh.supabase.co';
   var SB_KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
-  var STORAGE=SB_URL+'/storage/v1/object/public/photos/';
+  /* ★ 2026-10-12：博客页的图片也改走【私有桶】★
+     原来用公开桶 photos —— 你在博客里传过的图，别人拿到链接就能看。
+     现在走 authenticated/private，由 Service Worker 补登录凭证；没登录一律 404。
+     safeKey 与主页/编辑器同一套规则（库里已有对象名都是纯 ASCII，对它无操作）。 */
+  var STORAGE=SB_URL+'/storage/v1/object/authenticated/private/';
+  function safeKey(path){
+    return String(path || '').split('/').map(function(seg){
+      var out = '';
+      for (var i = 0; i < seg.length; ) {
+        var cp = seg.codePointAt(i), ch = String.fromCodePoint(cp);
+        i += ch.length;
+        if (cp < 128 && /[A-Za-z0-9._-]/.test(ch)) { out += ch; }
+        else {
+          var bytes = unescape(encodeURIComponent(ch));
+          for (var k = 0; k < bytes.length; k++) {
+            out += '_' + ('0' + bytes.charCodeAt(k).toString(16).toUpperCase()).slice(-2);
+          }
+        }
+      }
+      return out;
+    }).join('/');
+  }
   var sb=null;
   try{ sb=supabase.createClient(SB_URL,SB_KEY); }catch(e){ sb=null; }
 
@@ -678,7 +699,7 @@ function gateSb(){
   }
   function fileUrl(p){
     if(!p) return '';
-    return /^https?:/i.test(p) ? p : STORAGE + p;
+    return /^https?:/i.test(p) ? p : STORAGE + safeKey(p);
   }
   function fmtTime(iso){
     var d=new Date(iso); if(isNaN(d.getTime())) return '';
@@ -797,9 +818,9 @@ function gateSb(){
   function thumbOf(p){
     var blocks = p.blocks || [];
     for(var i = 0; i < blocks.length; i++){
-      if(blocks[i].t === 'img' && blocks[i].src) return STORAGE + 'thumbs/' + blocks[i].src;
+      if(blocks[i].t === 'img' && blocks[i].src) return STORAGE + safeKey('thumbs/' + blocks[i].src);
     }
-    if(p.images && p.images.length) return STORAGE + 'thumbs/' + p.images[0];
+    if(p.images && p.images.length) return STORAGE + safeKey('thumbs/' + p.images[0]);
     return '';
   }
   function thumbFallback(p){
