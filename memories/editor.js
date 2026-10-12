@@ -134,7 +134,8 @@ async function open(){
           var _ta = document.getElementById('postText');
           var _busy = (_ta && _ta.value && _ta.value.trim()) || (_postDraft.images || []).length;
           invalidateCache();
-          if(!_busy) renderTab();
+          // ★ 2026-10-12：用户已进入子视图时不要重画（见 _subView 声明处的说明）
+          if(!_busy && !_subView) renderTab();
         }
       })
       .catch(function(){});
@@ -153,6 +154,27 @@ window.EDITOR={open,close};
 
 // 兜底同步：script.js 没跑时，editor 自己从 data.js 拉数据同步（bulk insert）
 let _synced = false;
+/* ★ 2026-10-12 修复「进了相册、正看着照片，突然自己弹回相册列表」★
+   根因（已在线上用调用栈追踪抓到实证）：
+     open() 里有一段「首次数据同步完成后刷新视图」的后台逻辑，它要连查几张表的
+     count，慢的时候能拖到十几秒。而用户在等待期间很可能已经切到相册 tab、
+     甚至点进某个相册在看照片了 —— 这时它无脑执行 renderTab()，
+     renderTab() 按 currentTab 分发 → renderAlbumTab() → 把整个 #editorBody
+     重画成相册列表。用户看到的就是"照片突然消失，自己跳回列表"。
+     实测时间戳：+0.8s 写入相册详情页（editor.js:562），+12.6s 被
+     相册列表页顶掉（editor.js:489），两次都是 renderAlbumTab 写的。
+   修法：加「子视图」标记。只要用户已经钻进下一层（相册详情 / 某个分类的文章
+     列表 / 帖子编辑页），后台任务完成后就【不要】再自动 renderTab()。
+     顶层渲染函数（renderXxxTab）开头会把标记复位，所以切 tab 不受影响。 */
+let _subView = false;
+/* ★ 2026-10-12 配套的「渲染序号」—— 解决另一种竞态：
+   如果后台任务先触发、renderAlbumTab 正在 await 拿数据（几百毫秒到几秒），
+   用户在这期间点进了某个相册 —— 数据回来后 renderAlbumTab 仍会写 innerHTML，
+   照样把详情页顶掉（_subView 是在调用前检查的，拦不住这种"已经在途"的渲染）。
+   做法：每次"用户主动切视图"都把序号 +1，在途的旧渲染发现自己序号过期就
+   直接放弃、不写 DOM。反向也成立（进相册后马上按"返回"，详情页的异步回调
+   不会再杀回来）。 */
+let _renderSeq = 0;
 async function ensureDataSync(){
   if(_synced || !sb) return;
   _synced = true;
@@ -264,6 +286,7 @@ $$('#editorTabs .editor-tab').forEach(tab=>{
 
 // ===== 文章编辑 =====
 async function renderEssayTab(){
+  _subView = false;   // 顶层视图
   const body=$('#editorBody');
   // 2026-09-15：「日记」分类已迁移到博客（posts 表），此处移除
   const cats=['童年篇','初恋篇','旅行见闻'];
@@ -328,6 +351,7 @@ async function renderEssayTab(){
   function renderArticlesInCat(catId){
     const g = groups[catId];
     if(!g) return;
+    _subView = true;    // ★ 子视图：某分类的文章列表（2026-10-12）
     // 按日期降序（最新在前），无日期排在最后
     const items = [...g.items].sort(function(a,b){ return cmpDate(a.date, b.date); });
     const list=$('#eeList');
@@ -480,10 +504,13 @@ window.renderEssayTab=renderEssayTab;
 
 // ===== 相册编辑 =====
 async function renderAlbumTab(){
+  _subView = false;   // 回到顶层（相册列表）
+  var _seq = ++_renderSeq;            // ★ 取本次渲染的序号
   window._aeGrid = null;  // 离开相册视图，释放灯箱引用
   _aeResetSel = null;
   const body=$('#editorBody');
   var albums = await loadTabData('album');
+  if(_seq !== _renderSeq) return;     // ★ 等待期间用户已经切到别处 → 放弃这次渲染
   const list=albums||[];
   body.style.paddingTop = '';
   body.innerHTML=`
@@ -545,8 +572,11 @@ function renderList(){
       console.warn('[album] renderAlbumPhotos called with invalid album:', album);
       return;
     }
+    _subView = true;    // ★ 子视图：相册详情，禁止后台任务重画（2026-10-12）
+    var _seq = ++_renderSeq;            // ★ 取本次渲染的序号（同时让在途的列表渲染作废）
     console.log('[album] loading photos for album.id:', album.id, 'title:', album.title);
     db().from('album_photos').select('*').eq('album_id',album.id).then(({data:photos})=>{
+      if(_seq !== _renderSeq) return;   // ★ 期间用户已经返回/切走 → 别再顶屏
       console.log('[album] got', (photos||[]).length, 'photos for album', album.id);
       // 混合排序：用户新上传的（sort_order 是 Date.now() 大数字）排最前（按时间倒序），
       // 其余老照片保持原始顺序（sort_order 升序）
@@ -990,6 +1020,7 @@ window.renderAlbumTab=renderAlbumTab;
 
 // ===== 音乐编辑 =====
 async function renderMusicTab(){
+  _subView = false;   // 顶层视图
   const body=$('#editorBody');
   var tracks = await loadTabData('music');
   const list=tracks||[];
@@ -1382,6 +1413,7 @@ function renderPostOldList(posts){
 
 // 进入编辑模式（2026-09-12 新增）
 function startEditPost(p){
+  _subView = true;    // ★ 子视图：帖子编辑页（2026-10-12）
   _postDraft = {
     images: [],
     videos: [],
@@ -1973,6 +2005,7 @@ function pbRestoreDraft(d){
 }
 
 async function renderPostTab(){
+  _subView = false;   // 顶层视图
   const body = $('#editorBody');
   const posts = await loadTabData('post');
   _postDraft = { images: [], existing: [], videos: [], music: null, musicKeep: null, musicKeepTitle: null, editingId: null };
