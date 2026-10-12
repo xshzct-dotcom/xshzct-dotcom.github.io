@@ -2263,16 +2263,25 @@ function init(){
   // 主题切换（2026-08-27：右上角 ☀/☾ 按钮）
   initTheme();   // 2026-09-15：初始化明暗主题（默认暗色）
 
-  // 同步 data.js → Supabase（让编辑器有真实数据）— 暴露 promise 给 editor 共享
-  window.MemoriesReady = ensureSync();
-
   /* ══ 拉 DB 数据 + 歌单（2026-10-12 改造）══
      数据库的读权限已收紧为「仅已登录用户可读」，所以必须先确认有登录会话再请求，
      否则未登录时会刷一堆 401。
      未登录时页面被密码门整屏遮住、看不到任何内容，也根本不需要加载数据；
      登录成功后代码会 location.reload()，那时 hasLocalSession() 为真，自然就会加载。 */
-  if (typeof hasLocalSession === 'function' && hasLocalSession()) {
-    ensureSync().then(() => loadFromSupabase()).then(() => {
+  var _loggedIn = (typeof hasLocalSession === 'function') && hasLocalSession();
+
+  /* ★ 2026-10-12 修复（自查发现的真 bug）★
+     这里原来写作：window.MemoriesReady = ensureSync();  ← 【无条件】调用！
+     而 ensureSync() 开头就是 essays / albums / music 三张表的 count 查询。
+     读权限收紧后，未登录时这三次请求会被 RLS 直接拒 —— 实测线上确实出现 3 个 401，
+     白跑三轮跨洋请求（这也是"打开好像慢了一点"的一部分）。
+     改成：只有已登录才做首次同步；未登录给一个已 resolve 的 promise
+     （editor.js 里 `(window.MemoriesReady || Promise.resolve())` 的用法完全不受影响）。
+     顺带把下面那次重复的 ensureSync() 去掉，共用同一个 promise，少一轮调用。 */
+  window.MemoriesReady = _loggedIn ? ensureSync() : Promise.resolve();
+
+  if (_loggedIn) {
+    window.MemoriesReady.then(() => loadFromSupabase()).then(() => {
       if(window._currentSongs && window._currentSongs.length > 0){
         switchPlaylist(window._currentSongs);
       }

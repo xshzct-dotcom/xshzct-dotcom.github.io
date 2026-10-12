@@ -3,7 +3,7 @@
 // 策略：network-first（每次都拿最新），离线时回退缓存
 // 2026-08-11：从根目录 sw.js 复制到 memories/ 并修正路径；移除旧版编辑器死文件的预缓存
 // ============================================
-const CACHE = 'memories-v203';
+const CACHE = 'memories-v204';
 const STATIC_ASSETS = [
   '/memories/', '/memories/index.html',
   '/memories/style.css', '/data.js', '/memories/script.js',
@@ -35,7 +35,18 @@ let MEDIA_TOKEN = null, MEDIA_TOKEN_AT = 0;
    安全说明：缓存只存在【这台设备的浏览器里】，且只有登录后才会产生；
    缓存键是固定 URL、存的是图片内容本身，不含任何凭证。 */
 const MEDIA_CACHE = 'private-media-v1';
-const MEDIA_MAX_ENTRIES = 900;      // 约 60~80MB，防止无限增长把磁盘吃满
+/* ★ 2026-10-12：缓存配额【按类型分开】（原来是"所有资源一共 900 条"）★
+   用户反馈"这次大改之后打开什么都慢了一点"，根因就在这个 900：
+     缩略图（~30KB）和灯箱原图（0.5~3MB）混在同一个池子里按【条数】淘汰。
+     用户在相册里点开十几张原图，就会把几十上百条缩略图挤出缓存；
+     回到列表要重新下载 → 表现就是"越用越慢"，而且用的越多越明显。
+   修法：分开配额 ——
+     · 缩略图小、复用率最高 → 给足，能覆盖整个相册（约 2494 张）
+     · 原图 / 音乐 大 → 只留最近看的一小批，防止把磁盘吃掉
+   按【条数】而不是字节是因为读每条 response 的大小代价太高（要遍历 body），
+   而这两类的大小量级稳定（缩略图几十 KB、原图几百 KB~几 MB），条数就够精确。 */
+const MEDIA_MAX_THUMBS = 2400;   // thumbs/ 前缀：约 75MB
+const MEDIA_MAX_OTHER  = 120;    // 原图 / 音乐：约 120MB
 
 /* ★ 2026-10-12：节流 —— 原来每存一张图就 await 一次 cache.keys()（900+ 条要全量列举），
    滚动时几百次 put 就是几百次全量列举，纯浪费。现在同一时刻只跑一次，收尾时若期间又有
@@ -45,9 +56,24 @@ function trimMediaCache(cache){
   if (_trimRunning) { _trimAgain = true; return; }
   _trimRunning = true;
   cache.keys().then(function(keys){
-    if (keys.length <= MEDIA_MAX_ENTRIES) return;
-    var drop = keys.slice(0, keys.length - MEDIA_MAX_ENTRIES);
-    return Promise.all(drop.map(function(k){ return cache.delete(k); }));
+    if (!keys.length) return;
+    // 分开归类（缓存键是完整 URL，缩略图一定在 /thumbs/ 下）
+    var thumbs = [], other = [];
+    keys.forEach(function(k){
+      if (k.url.indexOf('/thumbs/') >= 0) thumbs.push(k); else other.push(k);
+    });
+    var drop = [];
+    if (thumbs.length > MEDIA_MAX_THUMBS) drop = drop.concat(thumbs.slice(0, thumbs.length - MEDIA_MAX_THUMBS));
+    if (other.length  > MEDIA_MAX_OTHER)  drop = drop.concat(other.slice(0, other.length - MEDIA_MAX_OTHER));
+    if (!drop.length) return;
+    // 分批删（每批 60）—— 原来一次性 Promise.all 几百个 cache.delete，会卡住 SW
+    var i = 0;
+    function step(){
+      if (i >= drop.length) return;
+      var batch = drop.slice(i, i + 60); i += 60;
+      return Promise.all(batch.map(function(k){ return cache.delete(k); })).then(step);
+    }
+    return step();
   }).catch(function(){}).then(function(){
     _trimRunning = false;
     if (_trimAgain) { _trimAgain = false; trimMediaCache(cache); }
