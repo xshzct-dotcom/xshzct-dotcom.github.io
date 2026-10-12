@@ -113,17 +113,37 @@ function _mediaAuthed(){
   }catch(e){}
   return false;
 }
+/* ⚠️ 路径有【两种来源】，格式不一致，必须先归一：
+   · data.js 里是相对路径：'images/chuanxi/DSC_5024_看图王.jpg'
+   · 但 loadFromSupabase() 从 album_photos 表读回来时，把它拼成了完整 URL：
+     'https://xshzct-dotcom.github.io/images/chuanxi/...'
+   （见 loadFromSupabase 里的 imgUrl；当初这么做是为了绕开仓库直链）
+   所以不能简单用「是不是 http 开头」来判断外链 —— 那会把本站照片当成外链放过去，
+   结果就是照片仍然从公开仓库加载，私有化白做。 */
+function _normMediaPath(s){
+  if (!s) return '';
+  var t = String(s);
+  var m = t.match(/^https?:\/\/[^/]+\/(.+)$/i);
+  if (m) t = m[1];                    // 剥掉域名
+  t = t.replace(/^\.\.\//, '');      // 去掉 ../
+  return t;
+}
+// 只有 images/ 或 thumbs/ 开头的才是"从仓库迁过来的那批" → 走私有桶
+function _isOwnMedia(s){ return /^(images|thumbs)\//.test(s); }
+
 // 缩略图
 function thumb(p){
-  var s = getPath(p); if (!s) return '';
-  if (/^https?:/i.test(s)) return s;          // 外链原样返回
+  var raw = getPath(p); if (!raw) return '';
+  var s = _normMediaPath(raw);
+  if (!_isOwnMedia(s)) return raw;             // 外链 / 公开桶（编辑器上传的）原样返回
   if (!_mediaAuthed()) return MEDIA_BLANK;
   return MEDIA_BASE + 'thumbs/' + safeKey(_thumbRel(s));
 }
 // 原图
 function full(p){
-  var s = getPath(p); if (!s) return '';
-  if (/^https?:/i.test(s)) return s;
+  var raw = getPath(p); if (!raw) return '';
+  var s = _normMediaPath(raw);
+  if (!_isOwnMedia(s)) return raw;
   if (!_mediaAuthed()) return MEDIA_BLANK;
   return MEDIA_BASE + 'images/' + safeKey(_fullRel(s));
 }
