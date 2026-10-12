@@ -99,6 +99,21 @@ tbody .r{max-width:120px;overflow:hidden;text-overflow:ellipsis;color:rgba(var(-
 </div>
 <script>
 // 密码门（2026-09-15 补）：统计页含访客数据，用同一标记 _v2pw2 校验；2026-09-15 改哈希
+/* ★ 2026-10-12 修复「访问统计进不去/没记录」★
+   主页密码门早已升级为 Supabase Auth（密码 keren678），但统计页还停在
+   旧的前端哈希校验（sha256('科任'+salt)）—— 你用新密码 keren678 会被旧的
+   '科任'哈希拒绝，于是被挡在密码门外面，看起来就像"统计没记录了"。
+   修法：复用主页的登录态 —— 只要 localStorage 里有 Supabase session
+   （在主页面输过 keren678 就有），打开统计页就直接放行，不再单独要密码。 */
+function hasLocalSession(){
+  try{
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (/^sb-.*-auth-token$/.test(k) && localStorage.getItem(k)) return true;
+    }
+  }catch(e){}
+  return false;
+}
 var _PW_SALT = 'memories-2026';
 var _PW_HASH = '15adc3de66e134142320e2af38ad20d0ff12e67b55406682a2307e2a2cbbaf53';
 function _pwOk(v, cb){
@@ -121,6 +136,8 @@ function _pwOk(v, cb){
   if(!gate) return;
   var ok = false;
   try{ ok = localStorage.getItem('_v2pw2') === '1'; }catch(e){}
+  // ★ 2026-10-12：优先复用主页登录态（Supabase session），有就直接进，不用再输密码
+  if(!ok){ try{ ok = hasLocalSession(); }catch(e){} }
   if(ok){ if(gate.parentNode) gate.parentNode.removeChild(gate); return; }
   document.documentElement.style.overflow = 'hidden';
   var inp = document.getElementById('pwdInputS');
