@@ -151,6 +151,15 @@ function full(p){
 function thumbAlt(p){ return full(p); }
 function fullAlt(p){ return full(p); }
 
+/* ★ 2026-10-12：暴露到 window —— editor.js 是独立文件，取图必须用同一套逻辑，
+   否则编辑器里会去访问已经不存在的公开仓库地址（照片迁私有桶后那里会 404）。
+   顺带把 MEDIA_BASE / safeKey 也暴露，方便排查。 */
+window.thumb = thumb;
+window.full = full;
+window.safeKey = safeKey;
+window.MEDIA_BASE = MEDIA_BASE;
+window.isMediaAuthed = _mediaAuthed;
+
 // ===== 2026-09-19：全站 UI 图标（单色 SVG + currentColor，随主题变色）=====
 //   背景：emoji 的渲染颜色由系统字体决定（☀️ 是黄的、🔁 是蓝的），改不了 → 一律用 SVG。
 var ICON = {

@@ -573,7 +573,12 @@ function renderList(){
       function imgSrc(p){
         if(!p || !p.storage_path) return '';
         const sp = p.storage_path;
-        return sp.startsWith('images/') ? ('https://xshzct-dotcom.github.io/images/' + sp.replace(/^images\//,'')) : (STORAGE_URL + '/' + sp);
+        /* ★ 2026-10-12：原来对 images/ 开头的路径硬拼公开仓库地址，
+           照片迁到私有桶后那里已经 404。改用和全站同一套取图逻辑（window.full）。 */
+        if(sp.startsWith('images/') || sp.startsWith('thumbs/')){
+          if(typeof window.full === 'function') return window.full(sp);
+        }
+        return STORAGE_URL + '/' + sp;
       }
       // ===== 独立灯箱缩放（1:1 复刻主页） =====
       var aeZoom = {scale:1, x:0, y:0, dragging:false, lastX:0, lastY:0};
