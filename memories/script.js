@@ -715,6 +715,43 @@ function _shuffleArr(arr, seed){
   }
   return a;
 }
+
+/* ══ ★ 2026-10-13 彻底消除「进照片墙先显示别的照片、闪一下才变」★ ══
+   试过"延迟兜底"（等 900ms 再画），但 Supabase 跨洋要好几秒，
+   兜底必然先跑 → 还是"先画一批再画一批"，照样闪。
+   真正管用的办法：把上一次从数据库拿到的照片清单【缓存在本地】——
+   下次进来直接用缓存立即渲染（内容与数据库一致），
+   数据库回来后再比对指纹：一样就不重画（零闪烁），不一样才更新。 */
+var RIVER_CACHE_KEY = 'memories.riverCache.v1';
+var RIVER_CACHE_MAX_AGE = 7 * 24 * 3600 * 1000;   // 7 天
+
+function _riverSig(list){
+  if (!list || !list.length) return '0';
+  var a = list[0] || {}, z = list[list.length - 1] || {};
+  return list.length + '|' + (a.path || a.src || '') + '|' + (z.path || z.src || '');
+}
+function _saveRiverCache(){
+  try{
+    if (!allGalleryPhotos || !allGalleryPhotos.length) return;
+    var slim = allGalleryPhotos.map(function(p){
+      return [p.path || p.src || '', p._albumId || '', p._albumTitle || ''];
+    });
+    localStorage.setItem(RIVER_CACHE_KEY, JSON.stringify({ ts: Date.now(), sig: _riverSig(allGalleryPhotos), data: slim }));
+  }catch(e){ console.warn('[river] 缓存写入失败（可能超出容量）:', e && e.message); }
+}
+function _loadRiverCache(){
+  try{
+    var raw = localStorage.getItem(RIVER_CACHE_KEY);
+    if (!raw) return null;
+    var o = JSON.parse(raw);
+    if (!o || !o.data || !o.data.length) return null;
+    if (Date.now() - (o.ts || 0) > RIVER_CACHE_MAX_AGE) return null;
+    window._riverSigAtLoad = o.sig || '';
+    return o.data.map(function(t){
+      return { path: t[0], src: t[0], _albumId: t[1], _albumTitle: t[2] };
+    });
+  }catch(e){ return null; }
+}
 const POLAROID_COUNT = 30;
 
 function buildRiver(){
@@ -2480,8 +2517,17 @@ async function loadFromSupabase(){
     }
     // 重新渲染相册 chips 和河流（DB sort_order 已同步）
     window._riverFromDB = true;   // ★ 2026-10-13：告诉 init() 的兜底定时器"数据已到，别再画一遍"
-    if(typeof buildRiverFilters === 'function') buildRiverFilters();
-    if(typeof renderRiver === 'function') renderRiver();
+    _saveRiverCache();            // ★ 存下这次的清单，下次进来直接用（不闪）
+    /* ★ 比对指纹：和进入时的缓存一模一样 → 说明画面已经是对的，【不再重画】（消除闪烁）；
+       有变化（比如你在编辑器里加了照片）才重画。 */
+    var _newSig = _riverSig(allGalleryPhotos);
+    if (_newSig !== window._riverSigAtLoad) {
+      if(typeof buildRiverFilters === 'function') buildRiverFilters();
+      if(typeof renderRiver === 'function') renderRiver();
+      window._riverSigAtLoad = _newSig;
+    } else {
+      console.log('[river] 数据与进入时一致 → 跳过重画（避免闪一下）');
+    }
     // 注：原来这里会再调一次 window._galleryFilterChanged()（内部 renderRiver({forceReset:true})）
     // 导致页面加载时河流被洗两次——看起来"刷一下"。2026-09-11 删除冗余调用。
     window._testReady = true;
@@ -2521,10 +2567,22 @@ function init(){
      而且照片墙是"全部 2469 张"，两批数据的内容/顺序都不同，闪起来特别明显。
      现在：优先等 Supabase 的数据来画（通常几百毫秒），只有它失败/超时（900ms）
      才用 data.js 兜底 —— 保证离线或慢网也不会空白。 */
-  window._riverFromDB = false;
-  setTimeout(function(){
-    if(!window._riverFromDB) buildRiver();   // 离线 / 超时兜底
-  }, 900);
+  /* 先尝试用【本地缓存的照片清单】立即渲染 —— 内容与数据库一致，所以不会闪。
+     没有缓存（首次访问）才退回"等数据库、超时用 data.js 兜底"的老办法。 */
+  var _rc = _loadRiverCache();
+  if (_rc && _rc.length) {
+    allGalleryPhotos = _rc;
+    window._riverFromDB = true;
+    try{ buildRiverFilters(); }catch(e){}
+    buildRiver();
+    console.log('[river] 用本地缓存立即渲染 ' + _rc.length + ' 张（不闪）');
+  } else {
+    window._riverFromDB = false;
+    window._riverSigAtLoad = '';
+    setTimeout(function(){
+      if(!window._riverFromDB) buildRiver();   // 首次访问 / 离线兜底
+    }, 900);
+  }
   bindLightboxInteractions();
   initDailyQuote();
   observeFadeUps();
