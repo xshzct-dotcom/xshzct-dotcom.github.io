@@ -1383,6 +1383,60 @@ function pushMediaToken(){
 }
 window.pushMediaToken = pushMediaToken;
 
+/* ══ ★ 2026-10-13 修复「厂商自带浏览器里照片空白 / 音乐没声音」★ ══
+   私有桶的媒体全靠 Service Worker 补 Authorization 头（见 sw.js 的 mediaFetch）。
+   实测线索：同一台手机，Chrome 正常、系统自带浏览器不正常 —— 差异就在 SW。
+   自带浏览器（小米/华为等）常见两种情况：
+     · SW 的接管时机晚于页面首次渲染（controller 还是 null）
+     · 或者厂商直接限制了 SW 的某些能力
+   而媒体请求一旦"裸奔"到私有桶就是 403/404，偏偏 <img>/<audio>
+   【失败之后不会自己重试】→ 用户看到"照片空白、音乐没声音、点一下还乱切歌"。
+   兜底：等 SW 真正接管（controller 可用）后，把之前失败的媒体重新加载一遍。 */
+function _reloadFailedMedia(){
+  var n = 0;
+  try{
+    var imgs = document.querySelectorAll('img');
+    for (var i = 0; i < imgs.length; i++){
+      var im = imgs[i];
+      var src = im.getAttribute('src') || '';
+      if (src.indexOf('/private/') < 0) continue;
+      // complete 但没有尺寸 = 加载失败（浏览器不会自己重试）
+      if (im.complete && im.naturalWidth === 0){
+        im.removeAttribute('src');
+        (function(el, u){ setTimeout(function(){ el.setAttribute('src', u); }, 30 + Math.random() * 120); })(im, src);
+        n++;
+      }
+    }
+  }catch(e){}
+  try{
+    var a = document.getElementById('bgMusic');
+    if (a && a.error && a.src){
+      a.load();                       // 清掉 error 状态
+      if (window._userStarted) a.play().catch(function(){});
+      n++;
+    }
+  }catch(e){}
+  if (n){
+    try{
+      var t = document.getElementById('playerTitle');
+      if (t && /加载失败/.test(t.textContent || '')) t.textContent = '已重连 · 点 ▶ 播放';
+    }catch(e){}
+  }
+  return n;
+}
+window.reloadFailedMedia = _reloadFailedMedia;
+
+/* 轮询等 SW 接管（controller 可用）。最多等 ~8 秒，等到了就执行回调。 */
+function _whenSwReady(cb, tries){
+  tries = tries || 0;
+  try{ if (navigator.serviceWorker && navigator.serviceWorker.controller){ cb(); return true; } }catch(e){}
+  if (!navigator.serviceWorker || !navigator.serviceWorker.ready){ cb(); return false; }
+  if (tries >= 20) return false;   // 8 秒还没接管 → 放弃（下面有提示）
+  setTimeout(function(){ _whenSwReady(cb, tries + 1); }, 400);
+  return false;
+}
+window.whenSwReady = _whenSwReady;
+
 if (navigator.serviceWorker) {
   navigator.serviceWorker.addEventListener('message', function(e){
     var d = e.data, port = e.ports && e.ports[0];
@@ -1527,11 +1581,26 @@ function initMusic(){
   /* 2026-09-19 修复：加失败计数
      原来任何一首歌加载失败都会 1.2 秒后自动跳下一首 —— 若整个歌单的文件都不可用，
      就会形成【无限循环】：每 1.2 秒发一次请求，永不停止（耗电、耗流量、刷控制台）。 */
+  /* ★ 2026-10-13 修复「手机打开音乐没声音，摸一下页面就自动换一首，还是没声音」★
+     用户实测现象：整条链是——
+       ① 手机上音频加载失败（移动网络跨境取 3~5MB 的歌，容易超时）→ 触发 error
+       ② error 处理器 1.2 秒后自动 nextSong() → 下一首同样失败 → 连环切歌
+       ③ 用户碰一下页面 → _grant 自动续播 → 又失败 → 又切歌（看起来"摸一下就换歌"）
+       ④ 原来的防循环计数器 _errStreak 挂在 'play' 事件上重置，
+          而加载失败的歌在报 error 之前也会先触发 play → 计数器永远归零 → 循环停不下来
+     修法：
+       · 计数器改挂 'playing'（真的开始出声才算成功）
+       · 连续失败 2 首就【停止自动跳过】，并给用户明确提示（不再静默乱切）
+       · 配合下面 togglePlay 里的 error 恢复，用户点 ▶ 能真正重试 */
   var _errStreak = 0;
-  bgMusic.addEventListener('play',function(){ _errStreak = 0; });
+  bgMusic.addEventListener('playing',function(){ _errStreak = 0; });
   bgMusic.addEventListener('error',function(){
     _errStreak++;
-    if(_errStreak > 3){ console.warn('[player] 连续 '+_errStreak+' 首加载失败，已停止自动跳过'); return; }
+    if(_errStreak >= 2){
+      console.warn('[player] 连续 '+_errStreak+' 首加载失败，已停止自动跳过');
+      _musicFailHint();
+      return;
+    }
     setTimeout(nextSong, 1200);
   });
 
@@ -1561,6 +1630,20 @@ function maybeResumePlay(){
     var o = JSON.parse(saved);
     if(!o || !o.ts || (Date.now() - o.ts) >= 3600000) return;
     bgMusic.play().catch(function(){});   // 被拒静默，等用户交互
+  }catch(e){}
+}
+
+/* ★ 2026-10-13：音乐加载失败时给一次明确提示（原来是静默切歌，用户完全不知道发生了什么）
+   8 秒内只提示一次，避免连环失败时刷屏。 */
+var _failHintAt = 0;
+function _musicFailHint(){
+  var now = Date.now();
+  if(now - _failHintAt < 8000) return;
+  _failHintAt = now;
+  try{ if(typeof window.toast === 'function') window.toast('音乐加载失败，请检查网络后点 ▶ 重试', 'warn'); }catch(e){}
+  try{
+    var t = document.getElementById('playerTitle');
+    if(t) t.textContent = '音乐加载失败 · 点 ▶ 重试';
   }catch(e){}
 }
 
@@ -1680,6 +1763,14 @@ function togglePlay(){
   window._userStarted = true;
   if(isPlaying) { bgMusic.pause(); return; }
   if(!bgMusic.src||bgMusic.readyState===0){ const s=window._currentSongs; if(s&&s.length) playSong(currentSongIdx); else return; }
+  /* ★ 2026-10-13 修复「点了播放没反应」★
+     <audio> 一旦进入 error 状态（上一轮加载失败留下的），不重新 load() 是永远
+     播不出来的 —— 原来的 play() 会被直接忽略。所以这里先清掉错误状态再播，
+     这样用户点 ▶ 就是一次【真正的重试】。 */
+  if(bgMusic.error){
+    try{ bgMusic.load(); }catch(e){}
+    _errStreak = 0;
+  }
   bgMusic.play().catch(()=>{});
 }
 function prevSong(){ window._userStarted = true; const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx-1; if(i<0)i=s.length-1; playSong(i); }
@@ -1990,8 +2081,33 @@ try { SB = window._supabaseClient || supabase.createClient(SB_URL, SB_KEY); wind
       boot(); setHeroBg();
       // controller 可能还没切过来，等一拍再推一次
       setTimeout(function(){ boot(); setHeroBg(); }, 800);
+      /* ★ 2026-10-13：再等 controller 真正可用，把"SW 未接管时"失败的媒体重拉一遍。
+         这是厂商自带浏览器（SW 接管慢/受限）下照片空白、音乐没声音的兜底。 */
+      _whenSwReady(function(){
+        pushMediaToken();
+        var n = _reloadFailedMedia();
+        if (n) console.log('[media] SW 接管后重试了 ' + n + ' 个加载失败的媒体');
+        try{ if (typeof window.observeFadeUps === 'function') window.observeFadeUps(); }catch(e){}
+      });
+      // 兜底计时：万一半天内 media 又有新的失败（滚动加载出来的），再补一次
+      setTimeout(function(){
+        var n2 = _reloadFailedMedia();
+        if (n2) console.log('[media] 二次兜底重试 ' + n2 + ' 个');
+      }, 6000);
     }).catch(function(){ boot(); setHeroBg(); });
   } else { boot(); setHeroBg(); }
+
+  /* ★ 2026-10-13：如果 10 秒后 SW 仍没接管，明确告诉用户一次
+     （原来是完全静默 —— 用户只看到"照片是空的、音乐没声音"，无从判断） */
+  setTimeout(function(){
+    try{
+      var noSw = !navigator.serviceWorker || !navigator.serviceWorker.controller;
+      if (noSw && _mediaAuthed()){
+        console.warn('[media] Service Worker 超过 10 秒仍未接管 —— 照片/音乐可能加载不出来');
+        if (typeof window.toast === 'function') window.toast('浏览器限制了离线缓存，照片/音乐可能加载较慢，可下拉刷新重试', 'warn');
+      }
+    }catch(e){}
+  }, 10000);
   window.addEventListener('DOMContentLoaded', setHeroBg);
   window.addEventListener('load', function(){ setTimeout(boot, 400); });
 })();
