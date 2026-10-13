@@ -1564,8 +1564,18 @@ function maybeResumePlay(){
   }catch(e){}
 }
 
-function _grant(){ 
+function _grant(e){
   if(window._userStarted) return;
+  /* ★ 2026-10-13 修复「点暂停没反应 / 点了还继续放」★
+     _grant 绑在 document 的 click/keydown/touchstart 上，本意是"用户首次和页面
+     交互时把音乐续起来"（浏览器不允许无交互自动出声）。
+     但它会【抢在播放器之后执行】：togglePlay() 先把音乐暂停（paused=true），
+     事件冒泡到 document → _grant 看到 paused 为真 → 又 play() 起来 →
+     用户看到的就是"我点了暂停，它还在放"（只发生在页面加载后的第一次点击）。
+     修法：这次交互如果发生在播放器控制区（#player）内，就完全交给播放器处理。 */
+  try{
+    if(e && e.target && e.target.closest && e.target.closest('#player')) return;
+  }catch(err){}
   window._userStarted = true;
   // 如果 switchPlaylist 已加载好歌，立即播放（恢复 paused 检查）
   if(bgMusic && bgMusic.src && bgMusic.src !== window.location.href && bgMusic.paused){
@@ -1666,11 +1676,13 @@ function playSong(idx, seekFromStorage){
 }
 function togglePlay(){
   if(!bgMusic) return;
+  // ★ 2026-10-13：用户已经在操作播放器了，_grant 不必再兜底续播（见 _grant 注释）
+  window._userStarted = true;
   if(isPlaying) { bgMusic.pause(); return; }
   if(!bgMusic.src||bgMusic.readyState===0){ const s=window._currentSongs; if(s&&s.length) playSong(currentSongIdx); else return; }
   bgMusic.play().catch(()=>{});
 }
-function prevSong(){ const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx-1; if(i<0)i=s.length-1; playSong(i); }
+function prevSong(){ window._userStarted = true; const s=window._currentSongs; if(!s||!s.length) return; let i=currentSongIdx-1; if(i<0)i=s.length-1; playSong(i); }
 /* ===== 2026-09-19：播放模式（列表循环 / 单曲循环 / 随机）===== */
 var PLAY_MODE = 'list';   // list | one | shuffle
 /* 2026-09-19：改用内联 SVG 图标（emoji 在不同系统会渲染成蓝色方块，很突兀）
@@ -1732,6 +1744,7 @@ var PLAY_MODE_NAME = { list:'列表循环', one:'单曲循环', shuffle:'随机�
 })();
 
 function nextSong(){
+  window._userStarted = true;   // ★ 2026-10-13：同 prevSong，用户已在操作播放器
   const s=window._currentSongs; if(!s||!s.length) return;
   // 随机：换一首不同的（只有一首时直接重播）
   if(PLAY_MODE === 'shuffle'){
