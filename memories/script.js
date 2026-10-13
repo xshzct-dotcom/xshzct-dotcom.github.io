@@ -39,6 +39,13 @@ function getPath(p){
         固定 URL 能吃到浏览器缓存，对流量和速度都友好得多。
    ══════════════════════════════════════════════════════════════════ */
 const MEDIA_BASE = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/authenticated/private/';
+/* ★ 2026-10-13：音乐的【公开直链】★
+   用户明确表态：音乐不需要保密（只有文章和照片需要）。而私有桶的媒体全靠
+   Service Worker 补鉴权 —— 手机自带浏览器（小米/华为等）限制了 SW，
+   导致"音乐没声音、点一下还乱切歌"。
+   公开直链不需要任何请求头、不经过 SW、不需要签名 → 任何浏览器都能直接放。
+   已把正在使用的 11 个音频（主页 7 首 + 博客帖子里 4 首）复制到公开桶 music。 */
+const MUSIC_PUBLIC = 'https://mvzbkuhwapdqcdkekczh.supabase.co/storage/v1/object/public/music/';
 
 /* 把路径编码成纯 ASCII 的桶 key —— 必须与上传脚本 _upload_private.py 的 safe_key() 完全一致：
    逐段处理，ASCII 的 [A-Za-z0-9._-] 原样保留，其余按 UTF-8 逐字节编成 _XX。
@@ -107,13 +114,112 @@ function _normMediaPath(s){
 // 这些都必须走私有桶；只有真正的外链（别的网站）才原样放行。
 function _isOwnMedia(s){ return /^(images|thumbs|posts)\//.test(s); }
 
+/* ══ ★ 2026-10-13：签名直链 —— 不依赖 Service Worker 的取媒体方案（治本）★ ══
+   背景：私有桶媒体原本全靠 SW 补 Authorization 头，但手机自带浏览器（小米/华为等）
+   对 SW 有限制 —— 实测同一台手机 Chrome 正常、自带浏览器取不到
+   （authenticated 路径裸取返回 HTTP 400）。
+   实测确认 Supabase「签名直链」不需要任何请求头，<audio>/<img> 能直接用：
+     POST /storage/v1/object/sign/private/<key>  →  /object/sign/private/<key>?token=...
+     裸取该链接 → HTTP 200 / audio/mpeg ✓
+   所以：能拿到签名直链就用它（彻底绕开 SW），拿不到才回退到 SW 方案。 */
+var _signedMap = {};        // 桶内 key → 签名直链
+var _signedPending = {};    // 正在生成的 key（防重复请求）
+var SIGN_TTL = 21600;       // 签名有效期 6 小时
+
+function _signKeys(keys, cb){
+  if(typeof SB === 'undefined' || !SB || !keys || !keys.length){ if(cb) cb(); return; }
+  var todo = [];
+  for(var i=0;i<keys.length;i++){
+    var k = keys[i];
+    if(k && !_signedMap[k] && !_signedPending[k]){ _signedPending[k]=1; todo.push(k); }
+  }
+  if(!todo.length){ if(cb) cb(); return; }
+  Promise.resolve(SB.storage.from('private').createSignedUrls(todo, SIGN_TTL)).then(function(r){
+    var list = (r && r.data) || [];
+    list.forEach(function(x){
+      if(x && x.path && x.signedUrl && !x.error) _signedMap[x.path] = x.signedUrl;
+    });
+    todo.forEach(function(k){ delete _signedPending[k]; });
+    if(cb) cb();
+  }).catch(function(e){
+    todo.forEach(function(k){ delete _signedPending[k]; });
+    console.warn('[sign] createSignedUrls failed:', e && e.message);
+    if(cb) cb();
+  });
+}
+
+/* 签名直链生成后，把页面上还在用私有桶路径的同类图片替换掉
+   （key 的文件名部分在两种 URL 里完全一致，用它匹配） */
+function _applySignedToDom(key){
+  var url = _signedMap[key]; if(!url) return 0;
+  var tail = String(key).split('/').pop();
+  if(!tail) return 0;
+  var n = 0, imgs = document.querySelectorAll('img');
+  for(var i=0;i<imgs.length;i++){
+    var src = imgs[i].getAttribute('src') || '';
+    if(src.indexOf('/private/') >= 0 && src.indexOf(tail) >= 0){ imgs[i].setAttribute('src', url); n++; }
+  }
+  return n;
+}
+
+/* 取一个 key 的签名直链；没有就异步生成，生成后自动替换 DOM */
+function _signOne(key, cb){
+  if(_signedMap[key]){ if(cb) cb(_signedMap[key]); return _signedMap[key]; }
+  _signKeys([key], function(){ _applySignedToDom(key); if(cb) cb(_signedMap[key] || null); });
+  return null;
+}
+
+/* 音乐：一次性把所有歌的签名直链生成好（只有几首，成本极低）
+   —— 这样音乐播放【完全不依赖 SW】，手机自带浏览器也能放 */
+function prepareMusicSign(){
+  try{
+    var songs = window._currentSongs || [];
+    if(!songs.length || typeof SB === 'undefined' || !SB) return;
+    var keys = [];
+    songs.forEach(function(x){
+      var p = String(x.storage_path || x.url || '').trim();
+      if(!p || p.indexOf('http') === 0) return;
+      keys.push(safeKey(p));
+    });
+    if(!keys.length) return;
+    _signKeys(keys, function(){
+      var ok = keys.filter(function(k){ return !!_signedMap[k]; }).length;
+      console.log('[music] 签名直链就绪 ' + ok + '/' + keys.length + ' 首');
+      /* 当前这首歌若卡在加载失败，用新拿到的直链自动重试一次 */
+      try{
+        if(bgMusic && bgMusic.error && bgMusic.src && window._userStarted){
+          bgMusic.load(); bgMusic.play().catch(function(){});
+        }
+      }catch(e){}
+      /* 页面上已渲染的音乐按钮也顺手换成直链（data-src） */
+      try{
+        var btns = document.querySelectorAll('[data-src]');
+        for(var i=0;i<btns.length;i++){
+          var ds = btns[i].getAttribute('data-src') || '';
+          if(ds.indexOf('/private/') < 0) continue;
+          for(var j=0;j<keys.length;j++){
+            var tail = keys[j].split('/').pop();
+            if(ds.indexOf(tail) >= 0 && _signedMap[keys[j]]) btns[i].setAttribute('data-src', _signedMap[keys[j]]);
+          }
+        }
+      }catch(e){}
+    });
+  }catch(e){}
+}
+window.prepareMusicSign = prepareMusicSign;
+window.signedUrl = function(k){ return _signedMap[safeKey(k)] || null; };
+
 // 缩略图
 function thumb(p){
   var raw = getPath(p); if (!raw) return '';
   var s = _normMediaPath(raw);
   if (!_isOwnMedia(s)) return raw;             // 外链 / 公开桶（编辑器上传的）原样返回
   if (!_mediaAuthed()) return MEDIA_BLANK;
-  return MEDIA_BASE + 'thumbs/' + safeKey(_thumbRel(s));
+  var k = 'thumbs/' + safeKey(_thumbRel(s));
+  /* ★ 2026-10-13：有签名直链就直接用（不依赖 SW）；没有则异步生成，生成后自动换掉 DOM */
+  if (_signedMap[k]) return _signedMap[k];
+  _signOne(k);
+  return MEDIA_BASE + k;
 }
 // 原图
 function full(p){
@@ -125,8 +231,11 @@ function full(p){
      而 _fullRel() 是给"仓库迁过来那批"设计的 —— 它把 thumbs/x.webp 还原成
      x.jpg 再交给调用方拼 'images/'。若把 posts/ 也交给它，会拼成
      images/posts/x.jpg（桶里没这个 key → 404），所以这里单独走一条直通。 */
-  if (s.indexOf('posts/') === 0) return MEDIA_BASE + safeKey(s);
-  return MEDIA_BASE + 'images/' + safeKey(_fullRel(s));
+  var _k = (s.indexOf('posts/') === 0) ? safeKey(s) : ('images/' + safeKey(_fullRel(s)));
+  /* ★ 2026-10-13：同 thumb()，有签名直链就优先用 */
+  if (_signedMap[_k]) return _signedMap[_k];
+  _signOne(_k);
+  return MEDIA_BASE + _k;
 }
 // 备源：私有桶只有一个源，缩略图缺失时直接回退原图（沿用原有的 onerror 链）
 function thumbAlt(p){ return full(p); }
@@ -1692,6 +1801,8 @@ function switchPlaylist(songs){
   }catch(e){}
 
   currentSongIdx = (resumeIdx >= 0 && resumeIdx < window._currentSongs.length) ? resumeIdx : 0;
+  /* ★ 2026-10-13：歌单一就绪就把所有歌的签名直链备好（不依赖 SW，手机自带浏览器也能放） */
+  try{ prepareMusicSign(); }catch(e){}
   playSong(currentSongIdx, true); // 传入 true 表示需要从 localStorage 恢复进度
   // 2026-09-16：加载完歌之后尝试自动续播（失败则出提示条）
   setTimeout(maybeResumePlay, 300);
@@ -1712,9 +1823,11 @@ function playSong(idx, seekFromStorage){
      注意 sp 可能是带中文的原形（如 'music/陈绮贞 - 旅行的意义.mp3'），
      而桶里的 key 是 safeKey 编码后的形态（'music/_E9_99_88...mp3'），
      所以必须包一层 safeKey；纯 ASCII 的名字 safeKey 是无操作，不会破坏原路径。 */
-  let url = sp.startsWith('http') ? sp
-          : sp ? SUPABASE_STORAGE + safeKey(sp)
-          : SUPABASE_STORAGE + safeKey('music/' + (t.name||t.title||'') + '.mp3');
+  var _mkey = sp ? safeKey(sp) : safeKey('music/' + (t.name||t.title||'') + '.mp3');
+  /* ★ 2026-10-13 治本：音乐一律走【公开桶直链】。
+     公开直链不需要鉴权、不经过 Service Worker、不需要签名 ——
+     手机自带浏览器（SW 被限制）也能正常播放。 */
+  let url = sp.startsWith('http') ? sp : (MUSIC_PUBLIC + _mkey);
   // 2026-09-16 修复：先把"恢复进度"的监听器绑好，再设置 src 并 load
   //   —— 原来是 src+load() 之后才绑 loadedmetadata；元数据若已就绪就永不触发，
   //      这正是"歌记住了但进度不延续"的原因

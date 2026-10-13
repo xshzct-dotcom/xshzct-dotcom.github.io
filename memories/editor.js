@@ -15,6 +15,24 @@ const SB_KEY='sb_publishable_1yOf4jtKqK1GApN3InC7Gg_TUD2Barb';
    说明：库里已有的对象名本来就是纯 ASCII，safeKey() 对它们是无操作，所以不用改数据。 */
 const STORAGE_URL=SB_URL+'/storage/v1/object/authenticated/private';
 const MEDIA_BUCKET='private';
+/* ══ ★ 2026-10-13：音频改走【公开桶 music】★ ══
+   用户明确表态：音乐不需要保密（只有文章和照片需要）。
+   而私有桶的媒体完全依赖 Service Worker 补鉴权 —— 手机自带浏览器（小米/华为等）
+   限制了 SW，导致"音乐没声音、点一下还乱切歌"。
+   公开直链不需要任何请求头、不经过 SW → 任何浏览器都能直接播。
+   约定：音频进 music 桶、用公开直链读；照片/图片仍走 private 桶。
+   ⚠️ 上传和删除都必须按类型选桶 —— 在错误的桶里删除是【静默失败】的。 */
+const MUSIC_BUCKET='music';
+const MUSIC_PUBLIC_URL=SB_URL+'/storage/v1/object/public/music';
+const _AUDIO_RE=/\.(mp3|ogg|m4a|wav|aac|flac)$/i;
+function isAudioPath(p){ return _AUDIO_RE.test(String(p||'')); }
+function bucketFor(p){ return isAudioPath(p) ? MUSIC_BUCKET : MEDIA_BUCKET; }
+function publicUrlOf(p){
+  if(!p) return '';
+  if(/^https?:/i.test(p)) return p;
+  var k = safeKey(p);
+  return isAudioPath(k) ? (MUSIC_PUBLIC_URL + '/' + k) : (STORAGE_URL + '/' + k);
+}
 // 与 script.js 里同名函数保持一致（逐段处理，非 ASCII 编成 _XX）
 function safeKey(path){
   return String(path || '').split('/').map(function(seg){
@@ -633,7 +651,8 @@ function renderList(){
         if(sp.startsWith('images/') || sp.startsWith('thumbs/')){
           if(typeof window.full === 'function') return window.full(sp);
         }
-        return STORAGE_URL + '/' + sp;
+        /* ★ 2026-10-13：音频一律走公开直链（不依赖 SW） */
+        return publicUrlOf(sp);
       }
       // ===== 独立灯箱缩放（1:1 复刻主页） =====
       var aeZoom = {scale:1, x:0, y:0, dragging:false, lastX:0, lastY:0};
@@ -1082,9 +1101,20 @@ async function renderMusicTab(){
         // 2. 删 Supabase Storage 里的文件
         if(t.storage_path){
           const sp = (t.storage_path || '').trim();
-          // 如果 storage_path 是完整 URL（https://xxx/photos/yyy.mp3），提取文件名
-          const objName = sp.includes('photos/') ? sp.split('photos/')[1] : sp;
-          sb.storage.from(MEDIA_BUCKET).remove([safeKey(objName)]).catch(()=>{});
+          // 如果是完整 URL（形如 https://xxx/.../yyy.mp3），提取桶内路径
+          let objName = sp;
+          const _m = sp.match(/\/(?:public|authenticated)\/(?:private|music|photos)\/(.+)$/);
+          if(_m) objName = decodeURIComponent(_m[1]);
+          else if(sp.includes('photos/')) objName = sp.split('photos/')[1];
+          const _key = safeKey(objName);
+          /* ★ 2026-10-13：音频在 music 桶、【必须】从 music 桶删。
+             原来写死 MEDIA_BUCKET(private) —— 在错误的桶里删除是静默失败的，
+             这正是"删了之后文件还留在服务器上"的原因。
+             两个桶都试一次，确保彻底清除（用户要求"删了就彻底清除"）。 */
+          const _buckets = isAudioPath(_key) ? [MUSIC_BUCKET, MEDIA_BUCKET] : [MEDIA_BUCKET, MUSIC_BUCKET];
+          _buckets.forEach(function(bk){
+            sb.storage.from(bk).remove([_key]).catch(function(){});
+          });
         }
         // 3. 歌曲文件在 Supabase storage 里已在上一步删了
         //   （GitHub 仓库里的旧文件不再删——安全起见不携带仓库写权限）
@@ -1142,7 +1172,9 @@ async function renderMusicTab(){
         console.log('[music] uploading', fname, 'size:', f.size);
         try{
           // 15秒超时
-          const upPromise = sb.storage.from(MEDIA_BUCKET).upload(safeKey(fname), f, {
+          /* ★ 2026-10-13：音乐上传到【公开桶 music】（前端读的是公开直链，
+             传到私有桶会导致新歌播不了） */
+          const upPromise = sb.storage.from(MUSIC_BUCKET).upload(safeKey(fname), f, {
             upsert: true,
             contentType: f.type || 'audio/mpeg',
             cacheControl: '3600'
@@ -1250,7 +1282,8 @@ function _postStatus(msg, color){
 }
 
 async function uploadToStorage(path, blobOrFile){
-  var up = sb.storage.from(MEDIA_BUCKET).upload(safeKey(path), blobOrFile, {upsert: true, contentType: blobOrFile.type || undefined});
+  /* ★ 2026-10-13：按文件类型选桶 —— 音频进公开桶 music，图片进私有桶 private */
+  var up = sb.storage.from(bucketFor(path)).upload(safeKey(path), blobOrFile, {upsert: true, contentType: blobOrFile.type || undefined});
   var to = new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('上传超时')); }, 45000); });
   var r = await Promise.race([up, to]);
   if(!r || r.error) throw new Error((r && r.error && r.error.message) || '上传失败');
@@ -1259,7 +1292,9 @@ async function uploadToStorage(path, blobOrFile){
 
 function _storageUrl(p){
   if(!p) return '';
-  return /^https?:/i.test(p) ? p : (STORAGE_URL + '/' + safeKey(p));
+  if(/^https?:/i.test(p)) return p;
+  /* ★ 2026-10-13：音频走公开直链（不依赖 SW） */
+  return publicUrlOf(p);
 }
 
 function renderPostAttachments(){
@@ -1403,7 +1438,15 @@ function renderPostOldList(posts){
         if(p.music_path) rm.push(p.music_path);
         // 2026-09-16：附件 + 缩略图一并删除（否则 thumbs/ 会长期残留占空间）
         var rmAll = rm.concat(rm.map(function(x){ return 'thumbs/' + x; }));
-        if(rmAll.length && sb) sb.storage.from(MEDIA_BUCKET).remove(rmAll.map(safeKey)).catch(function(){});
+        /* ★ 2026-10-13：按类型分别从正确的桶删（音频在 music 桶、图片在 private 桶），
+           否则会出现"删了但文件还在"的残留。 */
+        if(rmAll.length && sb){
+          var byBucket = {};
+          rmAll.forEach(function(x){ var k = safeKey(x); var bk = bucketFor(k); (byBucket[bk] = byBucket[bk] || []).push(k); });
+          Object.keys(byBucket).forEach(function(bk){
+            sb.storage.from(bk).remove(byBucket[bk]).catch(function(){});
+          });
+        }
         invalidateCache('post');
         renderTab();
       }catch(e){ b.textContent = '删除'; alert('删除失败：' + e.message); }

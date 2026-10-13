@@ -67,7 +67,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261013-2">
+<link rel="stylesheet" href="style.css?v=20261013-3">
 <style>
 
 /* 2026-09-15：悬停/按住时【同时减弱暗色遮罩】
@@ -671,7 +671,7 @@ function gateSb(){
 
 <div class="mp-viewer" id="mpViewer" hidden><img id="mpViewerImg" src="" alt=""></div>
 
-<script src="vendor/supabase.js?v=20261013-2"></script>
+<script src="vendor/supabase.js?v=20261013-3"></script>
 <script>
 (function(){
   'use strict';
@@ -682,6 +682,9 @@ function gateSb(){
      现在走 authenticated/private，由 Service Worker 补登录凭证；没登录一律 404。
      safeKey 与主页/编辑器同一套规则（库里已有对象名都是纯 ASCII，对它无操作）。 */
   var STORAGE=SB_URL+'/storage/v1/object/authenticated/private/';
+  /* ★ 2026-10-13：音乐走【公开桶直链】（用户表示音乐无需保密）。
+     公开直链不经过 Service Worker —— 手机自带浏览器（SW 受限）也能正常播放。 */
+  var MUSIC_PUBLIC=SB_URL+'/storage/v1/object/public/music/';
   function safeKey(path){
     return String(path || '').split('/').map(function(seg){
       var out = '';
@@ -709,7 +712,11 @@ function gateSb(){
   }
   function fileUrl(p){
     if(!p) return '';
-    return /^https?:/i.test(p) ? p : STORAGE + safeKey(p);
+    if(/^https?:/i.test(p)) return p;
+    var k = safeKey(p);
+    /* ★ 2026-10-13：音频（含博客帖子里带的）走公开桶；照片仍走私有桶 */
+    if(/\.(mp3|ogg|m4a|wav)$/i.test(k)) return MUSIC_PUBLIC + k;
+    return STORAGE + k;
   }
   function fmtTime(iso){
     var d=new Date(iso); if(isNaN(d.getTime())) return '';
