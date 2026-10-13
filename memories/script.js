@@ -700,6 +700,21 @@ let lightboxPhotos = [];
 let lightboxIdx = 0;
 let allGalleryPhotos = [];
 let currentFilter = 'all';
+/* ★ 2026-10-13：用户要求「全部相册里每次进来都是不一样的随机照片」★
+   原来首屏顺序 = 相册编辑器的排列顺序，每次进来看到的第一屏完全一样。
+   现在："全部"视图下每次页面加载打乱一次。
+   种子在页面加载时定死 —— 同一次会话内滚动/切筛选回来顺序保持稳定，
+   不会出现"看着看着顺序又变了"。 */
+var _riverShuffleSeed = Math.floor(Math.random() * 2147483647) + 1;
+function _shuffleArr(arr, seed){
+  var a = arr.slice(), s = seed || 1;
+  function rnd(){ s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(rnd() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
 const POLAROID_COUNT = 30;
 
 function buildRiver(){
@@ -810,6 +825,11 @@ function renderRiver(opts){
   var filtered = getFilteredRiver();
   // 2026-09-18：顺序【固定】—— 与相册编辑器的排列一致，不随机、不去重
   var pool = (filtered && filtered.length) ? filtered.slice() : allGalleryPhotos.slice();
+  /* ★ 2026-10-13：只有"全部"视图随机（用户要求）；具体某个相册仍保持编辑器的排列顺序。
+     种子固定 → 同一次会话内顺序稳定（滚动、切筛选回来不会跳）。 */
+  if (currentFilter === 'all' && pool.length > 1) {
+    pool = _shuffleArr(pool, _riverShuffleSeed);
+  }
   _riverTotal = pool.length;
 
   // 清掉旧的河流控件（换一批/箭头/轮回提示），并统一容器样式
@@ -2459,6 +2479,7 @@ async function loadFromSupabase(){
       window._currentSongs = newPlaylist;
     }
     // 重新渲染相册 chips 和河流（DB sort_order 已同步）
+    window._riverFromDB = true;   // ★ 2026-10-13：告诉 init() 的兜底定时器"数据已到，别再画一遍"
     if(typeof buildRiverFilters === 'function') buildRiverFilters();
     if(typeof renderRiver === 'function') renderRiver();
     // 注：原来这里会再调一次 window._galleryFilterChanged()（内部 renderRiver({forceReset:true})）
@@ -2494,7 +2515,16 @@ function init(){
   setTimeout(function(){
     if(!window._essaysFromDB) buildTimeline();   // 离线 / 超时兜底
   }, 700);
-  buildRiver();
+  /* ★ 2026-10-13 修复「每次进来先显示别的照片、闪一下才变成现在的」★
+     根因和随笔时间线一模一样：原来这里【无条件】立即 buildRiver()（用 data.js 的数据画），
+     Supabase 的数据回来后又 renderRiver() 重画一次 → 中间必然闪一下。
+     而且照片墙是"全部 2469 张"，两批数据的内容/顺序都不同，闪起来特别明显。
+     现在：优先等 Supabase 的数据来画（通常几百毫秒），只有它失败/超时（900ms）
+     才用 data.js 兜底 —— 保证离线或慢网也不会空白。 */
+  window._riverFromDB = false;
+  setTimeout(function(){
+    if(!window._riverFromDB) buildRiver();   // 离线 / 超时兜底
+  }, 900);
   bindLightboxInteractions();
   initDailyQuote();
   observeFadeUps();
